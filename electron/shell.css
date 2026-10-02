@@ -1,0 +1,15 @@
+:root { font-family: Inter, system-ui, sans-serif; color: #e9f0fc; background: #0b1220; }
+* { box-sizing: border-box; } body { margin: 0; display: flex; height: 100vh; }
+aside { width: 244px; padding: 30px 16px; display: flex; flex-direction: column; background: #111b2d; border-right: 1px solid #25334c; }
+h1 { margin: 0 10px; font-size: 22px; letter-spacing: -.04em; color: #91e6d0; }
+.subtitle { margin: 5px 10px 34px; color: #71839f; font-size: 12px; text-transform: uppercase; letter-spacing: .15em; }
+nav { display: grid; gap: 5px; } button { cursor: pointer; color: #9cb0ce; font: inherit; border: 0; background: transparent; text-align: left; }
+nav button { border-radius: 9px; padding: 12px 14px; } nav button:hover, nav button.active { background: #20354b; color: #a8f1df; }
+.side-bottom { margin-top: auto; display: grid; gap: 12px; padding: 12px; } .side-bottom button { font-size: 13px; } small { color: #71839f; line-height: 1.4; }
+.side-bottom small { overflow-wrap: anywhere; }
+main { min-width: 0; flex: 1; display: flex; flex-direction: column; } header { height: 108px; padding: 24px 36px; border-bottom: 1px solid #25334c; display: flex; align-items: center; justify-content: space-between; }
+.eyebrow { color: #72b6a9; font-size: 11px; letter-spacing: .15em; } h2 { margin: 6px 0 0; font-size: 24px; } #badge { color: #71839f; font-size: 11px; letter-spacing: .1em; }
+#content { flex: 1; min-height: 0; } webview { width: 100%; height: 100%; } .welcome { padding: 52px 36px; max-width: 780px; } .welcome h3 { font-size: 34px; margin: 0 0 14px; } .welcome p { color: #9cb0ce; line-height: 1.7; } .cards { display: flex; gap: 16px; margin-top: 36px; } .cards button { border: 1px solid #345269; border-radius: 12px; padding: 24px; background: #15263a; color: #c8eadd; flex: 1; }
+.primary { background: #2d736e; color: white; padding: 12px 20px; border-radius: 9px; }
+.item-list { margin-top: 28px; display: grid; gap: 12px; color: #9cb0ce; }
+.item { display: block; width: 100%; padding: 17px; background: #15263a; border: 1px solid #345269; border-radius: 9px; color: #e9f0fc; }

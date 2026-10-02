@@ -1,0 +1,13 @@
+{
+  "architecture": "x64",
+  "python": {
+    "version": "3.11.13",
+    "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20250918/cpython-3.11.13+20250918-x86_64-unknown-linux-gnu-install_only.tar.gz",
+    "sha256": "db82bdf293ab8e8a24812b2dcffda36baddf9177742296b448169a92a603437c"
+  },
+  "caddy": {
+    "version": "2.10.2",
+    "url": "https://github.com/caddyserver/caddy/releases/download/v2.10.2/caddy_2.10.2_linux_amd64.tar.gz",
+    "sha256": "5c218bc34c9197369263da7e9317a83acdbd80ef45d94dca5eff76e727c67cdd"
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "name": "aceswarm",
+  "version": "0.1.0",
+  "description": "ACEswarm robot workbench",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test tests/*.test.js",
+    "check": "node --check electron/main.js && node --check electron/preload.js && node --check electron/shell.js && node --check scripts/smoke-services.js && node --test tests/*.test.js",
+    "smoke": "node scripts/smoke-services.js",
+    "bundle:runtime": "bash scripts/build-python-runtime.sh",
+    "bundle:verify": "node scripts/verify-bundle.js",
+    "dist": "npm run bundle:verify && electron-builder --linux AppImage"
+  },
+  "devDependencies": {
+    "electron": "40.10.2",
+    "electron-builder": "26.0.12"
+  },
+  "build": {
+    "appId": "dev.aceswarm.workbench",
+    "productName": "ACEswarm",
+    "asar": true,
+    "files": ["electron/**/*", "package.json"],
+    "extraResources": [
+      { "from": "resources/python-runtime", "to": "python-runtime" },
+      { "from": "resources/python-packages", "to": "python-packages" },
+      { "from": "resources/app-gateway/caddy", "to": "caddy" },
+      { "from": "resources/seed-apps", "to": "seed-apps" },
+      { "from": "resources/release-manifest.json", "to": "release-manifest.json" }
+    ],
+    "linux": { "target": ["AppImage"], "category": "Development", "artifactName": "ACEswarm-${version}-${arch}.${ext}" }
+  }
+}

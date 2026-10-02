@@ -1,0 +1,11 @@
+node_modules/
+dist/
+resources/python-runtime/
+resources/python-packages/
+resources/python-wheels/
+resources/build-sources/
+resources/app-gateway/caddy
+resources/release-manifest.json
+resources/wheels.lock.generated
+*.log
+.smoke/
