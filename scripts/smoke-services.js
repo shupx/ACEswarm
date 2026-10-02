@@ -23,6 +23,13 @@ async function run() {
       }
       const gatewayApi = await fetch(`${endpoints.gateway}/aivuda_os/api/auth/me`);
       assert.notEqual(gatewayApi.status, 502);
+      const openapi = await (await fetch(new URL('openapi.json', endpoints.os))).json();
+      assert.ok(openapi.paths['/aivuda_os/api/config/import']);
+      const storeFiles = path.join(paths.store, 'data', 'files');
+      fs.mkdirSync(storeFiles, { recursive: true });
+      fs.writeFileSync(path.join(storeFiles, 'smoke-artifact'), 'store artifact');
+      assert.equal(await (await fetch(new URL('aivuda_app_store/files/smoke-artifact', endpoints.store))).text(), 'store artifact');
+      fs.rmSync(path.join(storeFiles, 'smoke-artifact'));
       execFileSync(path.join(paths.os, '.tools/caddy/caddy'), ['reload', '--config', path.join(paths.os, 'config/Caddyfile')]);
       assert.equal((await fetch(`${endpoints.gateway}/`)).status, 200);
       assert.equal(fs.readFileSync(path.join(paths.state, 'persistence-check'), 'utf8'), 'kept');

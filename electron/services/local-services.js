@@ -61,9 +61,9 @@ class LocalServices {
   }
 
   async start() {
-    const [osPort, storePort, gatewayPort, adminPort] = await Promise.all([freePort(), freePort(), freePort(), freePort()]);
-    if (new Set([osPort, storePort, gatewayPort, adminPort]).size !== 4) throw new Error('Port allocation collision; retry launch');
-    const gateway = prepareGateway(this.paths, this.runtime, gatewayPort, osPort, adminPort);
+    const [osPort, storePort, gatewayPort, adminPort, storeGatewayPort] = await Promise.all([freePort(), freePort(), freePort(), freePort(), freePort()]);
+    if (new Set([osPort, storePort, gatewayPort, adminPort, storeGatewayPort]).size !== 5) throw new Error('Port allocation collision; retry launch');
+    const gateway = prepareGateway(this.paths, this.runtime, gatewayPort, osPort, adminPort, storeGatewayPort, storePort);
     const caddyEnvironment = {
       XDG_CONFIG_HOME: path.join(this.paths.os, 'caddy-config'),
       XDG_DATA_HOME: path.join(this.paths.os, 'caddy-data'),
@@ -72,7 +72,7 @@ class LocalServices {
       PYTHONHOME: path.join(this.runtime.resourcesPath, 'python-runtime'),
       PYTHONPATH: path.join(this.runtime.resourcesPath, 'python-packages'),
     } : {
-      PYTHONPATH: [this.runtime.packages, this.runtime.osRoot, this.runtime.storeRoot, process.env.PYTHONPATH || '']
+      PYTHONPATH: [this.runtime.osRoot, this.runtime.storeRoot, this.runtime.packages, process.env.PYTHONPATH || '']
         .filter(Boolean).join(path.delimiter),
     };
     const osChild = this.launch('aivudaos', this.runtime.python,
@@ -89,9 +89,10 @@ class LocalServices {
     await waitFor(`http://127.0.0.1:${storePort}/openapi.json`, storeChild);
     const gatewayChild = this.launch('gateway', gateway.binary, ['run', '--config', gateway.config], caddyEnvironment);
     await waitFor(`http://127.0.0.1:${gatewayPort}/`, gatewayChild);
+    await waitFor(`http://127.0.0.1:${storeGatewayPort}/aivuda_app_store/store/index`, gatewayChild);
     this.endpoints = {
       os: `http://127.0.0.1:${osPort}/`,
-      store: `http://127.0.0.1:${storePort}/`,
+      store: `http://127.0.0.1:${storeGatewayPort}/`,
       gateway: `http://127.0.0.1:${gatewayPort}`,
     };
     return this.endpoints;

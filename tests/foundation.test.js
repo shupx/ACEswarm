@@ -3,6 +3,7 @@ const test = require('node:test');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { spawn } = require('node:child_process');
 const { workspace } = require('../electron/services/workspace');
 const { gatewayConfig } = require('../electron/services/gateway');
 const { fixed, resolvePage } = require('../electron/services/pages');
@@ -61,6 +62,37 @@ test('gateway regenerates ports and retains installed app imports', () => {
     assert.match(text, /reverse_proxy 127\.0\.0\.1:32222/);
     assert.doesNotMatch(text, /31111|https:\/\//);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+test('gateway replaces a running executable without writing to its source', { skip: process.platform !== 'linux' }, async () => {
+  const { prepareGateway } = require('../electron/services/gateway');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'aceswarm-gateway-running-'));
+  let running;
+  try {
+    const paths = workspace(root);
+    const osRoot = path.join(root, 'os-package');
+    const uiRoot = path.join(osRoot, 'aivudaos/resources/ui/dist');
+    fs.mkdirSync(uiRoot, { recursive: true });
+    fs.writeFileSync(path.join(uiRoot, 'index.html'), 'ui');
+    const installed = prepareGateway(paths, { caddy: '/bin/sleep', osRoot }, 31111, 31112, 31113);
+    running = spawn(installed.binary, ['30']);
+    await new Promise((resolve, reject) => {
+      running.once('spawn', resolve);
+      running.once('error', reject);
+    });
+    const replacement = path.join(root, 'read-only-caddy');
+    fs.copyFileSync('/bin/true', replacement);
+    fs.chmodSync(replacement, 0o444);
+    prepareGateway(paths, { caddy: replacement, osRoot }, 32221, 32222, 32223);
+    assert.deepEqual(fs.readFileSync(installed.binary), fs.readFileSync(replacement));
+    assert.equal(fs.statSync(installed.binary).mode & 0o777, 0o755);
+    assert.equal(running.exitCode, null);
+  } finally {
+    if (running?.exitCode === null) {
+      running.kill();
+      await new Promise((resolve) => running.once('exit', resolve));
+    }
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 test('registry resolves local, installed and remote pages', () => {
   const endpoints = { os: 'http://127.0.0.1:2/', store: 'http://127.0.0.1:3/', gateway: 'http://127.0.0.1:4' };
