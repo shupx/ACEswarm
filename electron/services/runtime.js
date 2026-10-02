@@ -7,10 +7,10 @@ function resolveRuntime({ packaged, resourcesPath, sourceRoot }) {
   if (packaged) verifyRelease(resourcesPath);
   const python = packaged
     ? path.join(resourcesPath, 'python-runtime', 'bin', 'python3')
-    : process.env.ACESWARM_PYTHON;
+    : process.env.ACESWARM_PYTHON ?? path.resolve(sourceRoot, 'resources', 'python-runtime', 'bin', 'python3');
   const caddy = packaged
     ? path.join(resourcesPath, 'caddy')
-    : process.env.ACESWARM_CADDY;
+    : process.env.ACESWARM_CADDY ?? path.resolve(sourceRoot, 'resources', 'app-gateway', 'caddy');
   if (!python || !path.isAbsolute(python) || !fs.existsSync(python)) {
     throw new Error('Python runtime missing: build with npm run bundle:runtime, or set absolute ACESWARM_PYTHON in development');
   }

@@ -123,3 +123,42 @@ test('development resolves both sibling checkouts', () => {
     else process.env.ACESWARM_CADDY = caddy;
   }
 });
+test('development uses bundled tools unless explicitly overridden', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'aceswarm-development-'));
+  const sourceRoot = path.join(root, 'ACEswarm');
+  const python = process.env.ACESWARM_PYTHON;
+  const caddy = process.env.ACESWARM_CADDY;
+  try {
+    for (const file of [
+      'ACEswarm/resources/python-runtime/bin/python3',
+      'ACEswarm/resources/app-gateway/caddy',
+      'aivudaOS/aivudaos/resources/ui/dist/index.html',
+      'aivudaAppStore/aivudaappstore/resources/ui/dist/index.html',
+    ]) {
+      const target = path.join(root, file);
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, '');
+    }
+    delete process.env.ACESWARM_PYTHON;
+    delete process.env.ACESWARM_CADDY;
+    const bundled = resolveRuntime({ packaged: false, sourceRoot });
+    assert.equal(bundled.python, path.join(sourceRoot, 'resources/python-runtime/bin/python3'));
+    assert.equal(bundled.caddy, path.join(sourceRoot, 'resources/app-gateway/caddy'));
+    process.env.ACESWARM_PYTHON = process.execPath;
+    process.env.ACESWARM_CADDY = process.execPath;
+    const overridden = resolveRuntime({ packaged: false, sourceRoot });
+    assert.equal(overridden.python, process.execPath);
+    assert.equal(overridden.caddy, process.execPath);
+    process.env.ACESWARM_PYTHON = 'relative/python';
+    assert.throws(() => resolveRuntime({ packaged: false, sourceRoot }), /Python runtime missing/);
+    process.env.ACESWARM_PYTHON = process.execPath;
+    process.env.ACESWARM_CADDY = 'relative/caddy';
+    assert.throws(() => resolveRuntime({ packaged: false, sourceRoot }), /Caddy missing/);
+  } finally {
+    if (python === undefined) delete process.env.ACESWARM_PYTHON;
+    else process.env.ACESWARM_PYTHON = python;
+    if (caddy === undefined) delete process.env.ACESWARM_CADDY;
+    else process.env.ACESWARM_CADDY = caddy;
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
