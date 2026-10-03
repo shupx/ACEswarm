@@ -1,25 +1,129 @@
 # ACEswarm
 
-Linux-first Electron workbench for robot fleets. The desktop app launches independent AivudaOS and AivudaAppStore ASGI applications on dynamic loopback ports and an ACEswarm-owned Caddy app gateway. Home, projects, simulation, experiments, fleet, settings, store, installed-app pages and remote robot targets share a product navigation shell.
+ACEswarm 是面向无人机和机器人集群的地面端工作台。
 
-## Development
+## 下载
 
-Requires Node.js, a Python interpreter with dependencies from both sibling repositories, and Caddy. Build both independent frontends (`npm ci --include=dev && npm run build` in each `aivudaos/resources/ui` and `aivudaappstore/resources/ui`). From this directory:
+从发布地址下载 Linux x86_64 版本：
+
+[下载 ACEswarm AppImage](https://download.example.com/aceswarm/latest/ACEswarm-x86_64.AppImage)
+
+> 实际发布时，请将上面的地址替换为正式下载地址。
+
+## 运行
+
+下载完成后，在终端执行：
 
 ```bash
-npm ci --include=dev
-ACESWARM_PYTHON=/absolute/path/to/python3 ACESWARM_CADDY=/absolute/path/to/caddy \
-ACESWARM_OS_ROOT=/absolute/path/to/aivudaOS ACESWARM_STORE_ROOT=/absolute/path/to/aivudaAppStore npm start
+chmod +x ACEswarm-x86_64.AppImage
+./ACEswarm-x86_64.AppImage
 ```
 
-The development executable paths must be absolute. The two package roots default to the sibling checkouts; set both explicitly to use other revisions. The Python environment must contain both packages' ASGI dependencies, or first build this repository's private runtime. The app never invokes standalone deployment scripts. Data lives in `$HOME/ACEswarm_ws` (override with `ACESWARM_WS_ROOT`); the embedded services do not write to `$HOME/aivudaOS_ws` or `$HOME/aivudaAppStore_ws`. Projects and experiments are folders under that workspace. Robot URLs and installed app IDs can be added from the sidebar.
+也可以在文件管理器中右键打开文件属性，勾选“允许作为程序执行”，然后双击运行。
 
-## Offline release
+ACEswarm 自带运行所需的：
 
-`npm run bundle:runtime` stages already-built independent frontend distributions, standalone Python, local wheels for both packages and dependencies, and Caddy, then verifies the bundle. The sibling sources are copied into a temporary build directory; the packaging script never edits those repositories. Importable packages and UI assets are staged in `resources/python-packages` and copied into the AppImage. `npm run dist` builds `dist/ACEswarm-0.1.0-x86_64.AppImage`. See `docs/build.md` for host requirements and release gates. Packaged launch verifies executable and independent-package hashes; it never calls pip, a system Python, or a package index.
+- Python 运行环境；
+- AivudaOS；
+- AivudaAppStore；
+- Caddy 本地应用网关；
+- ACEswarm 预置应用包。
 
-`resources/seed-apps/aceswarm-config-export.json` is the sole bootstrap descriptor: an AivudaOS format-version-1 export with an `aceswarm.packages` extension listing archive paths and SHA-256 digests. Four approved archives from `/home/spx/spx_ws/ACE/prepkg` live in the sibling `packages/` directory. At startup ACEswarm verifies every archive, parses its `manifest.yaml` through the local AppStore API, checks its app ID/version against `payload.apps`, publishes missing versions, and submits the export to AivudaOS's import API. Set `ACESWARM_SEED_ADMIN_PASSWORD` and `ACESWARM_SEED_STORE_PASSWORD` for the local OS and AppStore admin accounts. The desktop reports missing credentials or bootstrap failures instead of importing a database. See `docs/build.md` for the export layout.
+用户不需要另外安装 Python、pip、FastAPI、Uvicorn、AivudaOS、AivudaAppStore 或 Caddy。
 
-Run `npm run check` for focused tests. `npm run smoke` exercises both source-mode ASGI apps and Caddy through two start/stop cycles with explicit `ACESWARM_PYTHON` and `ACESWARM_CADDY`; `ACESWARM_RESOURCES=$PWD/dist/linux-unpacked/resources npm run smoke` verifies the packaged resources without requiring a desktop session. For embedded OS-mode tests run `PYTHONPATH=../aivudaOS python3 -m unittest discover -s ../aivudaOS/tests -p test_embedded_mode.py`.
+首次启动时，ACEswarm 会自动：
 
-For a controlled graphical smoke test on Linux, set `ACESWARM_SMOKE_EXIT_MS=3000` when launching the packaged executable under a display server. It logs `ACEswarm workbench ready` after the shell loads and quits cleanly after the requested delay (maximum 60 seconds).
+1. 启动本地 AivudaOS 和 AivudaAppStore；
+2. 将预置应用发布到本地应用商店；
+3. 根据内置配置导出文件安装应用；
+4. 打开 ACEswarm 工作台。
+
+首次初始化可能需要一些时间，请不要重复启动多个 ACEswarm 实例。
+
+## 用户数据目录
+
+默认工作目录为：
+
+```text
+~/ACEswarm_ws/
+```
+
+主要内容：
+
+```text
+~/ACEswarm_ws/
+├── services/
+│   ├── aivudaos/          # 本地 AivudaOS 工作目录、应用和数据库
+│   └── aivudaappstore/    # 本地 AppStore 数据库和应用包
+├── projects/              # ACEswarm 项目
+├── experiments/           # 实验数据
+├── logs/                  # ACEswarm、AivudaOS、AppStore、Gateway 日志
+└── state/                 # ACEswarm 初始化状态
+```
+
+程序安装包中的运行资源是只读的，用户数据不会写入 AppImage 内部。
+
+如需指定其他工作目录，可以设置：
+
+```bash
+ACESWARM_WS_ROOT=/path/to/ACEswarm_ws ./ACEswarm-x86_64.AppImage
+```
+
+## 卸载
+
+ACEswarm 使用 AppImage，不需要传统安装程序。卸载时只需要删除下载的 AppImage 文件：
+
+```bash
+rm ACEswarm-x86_64.AppImage
+```
+
+删除 AppImage **不会删除用户数据**。如需同时清理所有 ACEswarm 数据，请在确认不再需要项目、实验、日志和已安装应用后执行：
+
+```bash
+rm -rf ~/ACEswarm_ws
+```
+
+这个删除操作不可恢复，请先备份重要数据。
+
+## 常见问题
+
+### 双击没有反应
+
+请先赋予执行权限：
+
+```bash
+chmod +x ACEswarm-x86_64.AppImage
+```
+
+### 如何查看日志
+
+```text
+~/ACEswarm_ws/logs/
+```
+
+其中包括：
+
+```text
+aceswarm.log
+aivudaos.log
+aivudaappstore.log
+gateway.log
+```
+
+具体文件是否生成取决于启动阶段和运行版本。
+
+### 如何恢复首次初始化
+
+关闭 ACEswarm 后，备份并删除：
+
+```text
+~/ACEswarm_ws/state/
+```
+
+然后重新启动 ACEswarm。不要直接删除整个 workspace，除非确认不再需要其中的项目、实验和应用数据。
+
+## 开发者文档
+
+开发、构建、架构和调试文档位于：
+
+- [`docs_dev/`](docs_dev/)
