@@ -8,8 +8,6 @@ Download the Linux x86_64 AppImage from the release server:
 
 [Download ACEswarm AppImage](https://download.example.com/aceswarm/latest/ACEswarm-x86_64.AppImage)
 
-Replace the example URL above with the URL used by your release server.
-
 ## Run
 
 ```bash
