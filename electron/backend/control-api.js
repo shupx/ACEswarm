@@ -52,11 +52,20 @@ function createControlServer(config) {
       if (request.method === 'GET' && url.pathname === '/runtime/status') return json(response, 200, runtime(config));
       if (request.method === 'GET' && url.pathname === '/pages') return json(response, 200, { pages: config.pages || [] });
       if (request.method === 'GET' && url.pathname === '/workspace') return json(response, 200, workspace(config, url.searchParams.get('kind') || 'projects'));
-      if (request.method === 'POST' && url.pathname === '/mcp') {
+      if (url.pathname === '/mcp') {
+        // Streamable HTTP clients may probe the session and clean it up after use.
+        if (request.method === 'GET') {
+          response.writeHead(405, { allow: 'POST, DELETE', 'content-type': 'application/json; charset=utf-8' });
+          return response.end(JSON.stringify({ error: 'Use POST for JSON-RPC messages.' }));
+        }
+        if (request.method === 'DELETE') return response.writeHead(204).end();
+        if (request.method !== 'POST') return json(response, 405, { error: 'method_not_allowed' });
         const rpc = await readJson(request);
         const result = mcpResult(config, rpc);
         response.setHeader('mcp-session-id', 'aceswarm-local');
-        if (rpc.method === 'notifications/initialized') return response.end();
+        // Streamable HTTP clients may send notifications during the handshake.
+        // Always return an explicit JSON content type, even when there is no result.
+        if (rpc.method === 'notifications/initialized') return json(response, 202, {});
         return json(response, 200, { jsonrpc: '2.0', id: rpc.id ?? null, result });
       }
       return json(response, 404, { error: 'not_found' });

@@ -5,6 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { workspace } = require('../electron/services/workspace');
+const { createControlServer } = require('../electron/backend/control-api');
 const { ControlServer } = require('../electron/services/control-server');
 const { LocalServices } = require('../electron/services/local-services');
 const { createControlAdapter } = require('../electron/renderer-adapter');
@@ -23,6 +24,21 @@ test('control API exposes safe status, descriptors, workspace and targets', asyn
     assert.equal((await request(`${base}/api/v1/workspace/projects`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: '../escape' }) })).status, 400);
   } finally { await control.stop(); fs.rmSync(root, { recursive: true, force: true }); }
 });
+test('streamable HTTP MCP keeps Codex-compatible notification and session responses', async () => {
+  const server = createControlServer({ endpoints: {}, pages: [], failures: [] });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const initialize = await fetch(`${base}/mcp`, { method: 'POST', headers: { accept: 'application/json, text/event-stream', 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }) });
+    assert.equal(initialize.status, 200);
+    assert.match(initialize.headers.get('content-type'), /^application\/json/);
+    const notification = await fetch(`${base}/mcp`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) });
+    assert.equal(notification.status, 202);
+    assert.match(notification.headers.get('content-type'), /^application\/json/);
+    assert.equal((await fetch(`${base}/mcp`, { method: 'DELETE' })).status, 204);
+  } finally { await new Promise((resolve) => server.close(resolve)); }
+});
+
 test('stdio MCP handshake and structured tool call use control API', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'aceswarm-mcp-')); const paths = workspace(root);
   const control = new ControlServer({ paths, endpoints: { os: 'http://127.0.0.1:1/', store: 'http://127.0.0.1:2/', gateway: 'http://127.0.0.1:3' } });
