@@ -30,7 +30,7 @@ async function run() {
       }
       const gatewayApi = await fetch(`${endpoints.gateway}/aivuda_os/api/auth/me`);
       assert.notEqual(gatewayApi.status, 502);
-      const openapi = await (await fetch(new URL('openapi.json', endpoints.os))).json();
+      const openapi = await (await fetch(new URL('openapi.json', endpoints.osApi))).json();
       assert.ok(openapi.paths['/aivuda_os/api/config/import']);
       const storeFiles = path.join(paths.store, 'data', 'files');
       fs.mkdirSync(storeFiles, { recursive: true });

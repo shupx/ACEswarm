@@ -91,9 +91,13 @@ class LocalServices {
     await waitFor(`http://127.0.0.1:${gatewayPort}/`, gatewayChild);
     await waitFor(`http://127.0.0.1:${storeGatewayPort}/aivuda_app_store/store/index`, gatewayChild);
     this.endpoints = {
-      os: `http://127.0.0.1:${osPort}/`,
+      // UI pages must use the gateway origin: AivudaOS's embedded app iframe
+      // uses relative /<app_id>/ui/ URLs that Caddy imports from installed apps.
+      os: `http://127.0.0.1:${gatewayPort}/`,
       store: `http://127.0.0.1:${storeGatewayPort}/`,
       gateway: `http://127.0.0.1:${gatewayPort}`,
+      osApi: `http://127.0.0.1:${osPort}/`,
+      storeApi: `http://127.0.0.1:${storePort}/`,
     };
     return this.endpoints;
   }
@@ -113,7 +117,7 @@ class LocalServices {
     } : { PYTHONPATH: this.runtime.pythonPath };
     this.startMcpPackage('aivudaos-mcp', 'aivudaos.mcp_server', {
       ...common,
-      AIVUDAOS_MCP_BASE_URL: this.endpoints.os.replace(/\/$/, ''),
+      AIVUDAOS_MCP_BASE_URL: this.endpoints.osApi.replace(/\/$/, ''),
       ...(process.env.AIVUDAOS_MCP_TOKEN ? { AIVUDAOS_MCP_TOKEN: process.env.AIVUDAOS_MCP_TOKEN } : {}),
     });
     this.startMcpPackage('aivudaappstore-mcp', 'aivudaappstore.mcp_server', {

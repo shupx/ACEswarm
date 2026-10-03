@@ -91,7 +91,7 @@ app.whenReady().then(async () => {
     ipcMain.handle('control:bootstrap', () => control.bootstrap);
     createWindow();
     control.setBootstrap('running');
-    provision({ osUrl: endpoints.os, storeUrl: endpoints.store, configPath: path.join(app.isPackaged ? process.resourcesPath : path.resolve(__dirname, '..', 'resources'), 'seed-apps', 'aceswarm-config-export.json') })
+    provision({ osUrl: endpoints.osApi, storeUrl: endpoints.storeApi, configPath: path.join(app.isPackaged ? process.resourcesPath : path.resolve(__dirname, '..', 'resources'), 'seed-apps', 'aceswarm-config-export.json') })
       .then((result) => control.setBootstrap('completed', { result }))
       .catch((error) => { control.setBootstrap('failed', { error: error.message }); services.failures.push(`Seed provisioning: ${error.message}`); console.error(error); });
   } catch (error) {
