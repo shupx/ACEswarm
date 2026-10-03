@@ -1,15 +1,16 @@
 ## One-command development setup
 
 
-Use **Node.js 22.x** and npm 10.x. The repository pins the expected major version in [`.nvmrc`](../.nvmrc) and `package.json` engines. In a new shell, install and activate nvm, then install and switch to the project version:
+Use **Node.js 22.x** and npm 10.x. The repository pins the expected major version in [`.nvmrc`](../.nvmrc) and `package.json` engines. 
 
 ```bash
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] || { curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash; }
-. "$NVM_DIR/nvm.sh"
-NVM_NODEJS_ORG_MIRROR=https://npmmirror.com/mirrors/node nvm install
-nvm use
-nvm alias default 22
+# install nvm for node version management if you don't have it already
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+source ~/.bashrc
+
+export NVM_NODEJS_ORG_MIRROR=https://npmmirror.com/mirrors/node
+nvm install 22
+nvm alias default 22 # set default node version to 22.x
 ```
 
 Verify before setup:
@@ -17,6 +18,9 @@ Verify before setup:
 ```bash
 node --version  # v22.x
 npm --version   # 10.x
+# Check that the npm registry is set to npmmirror for faster downloads in China:
+npm config set registry https://registry.npmmirror.com
+npm config get registry
 ```
 
 The repository `.npmrc` configures npmmirror for Electron and electron-builder binary downloads.
