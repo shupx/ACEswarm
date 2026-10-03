@@ -13,3 +13,7 @@ main { min-width: 0; flex: 1; display: flex; flex-direction: column; } header { 
 .primary { background: #2d736e; color: white; padding: 12px 20px; border-radius: 9px; }
 .item-list { margin-top: 28px; display: grid; gap: 12px; color: #9cb0ce; }
 .item { display: block; width: 100%; padding: 17px; background: #15263a; border: 1px solid #345269; border-radius: 9px; color: #e9f0fc; }
+.favorites-bar { display: flex; align-items: center; gap: 6px; min-height: 30px; padding: 3px 8px; border-bottom: 1px solid #d8dee6; background: #f8fafc; }
+.favorites-bar button { border: 1px solid #cbd5e1; border-radius: 6px; padding: 4px 10px; background: #fff; color: #334e68; font-size: 12px; cursor: pointer; }
+.favorites-bar button:hover { background: #e7eef6; }
+.favorites-bar #add-favorite { margin-left: auto; width: 28px; padding: 4px; }

@@ -1,3 +1,301 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; frame-src http: https:; img-src 'self' data:"><meta name="viewport" content="width=device-width, initial-scale=1"><title>ACEswarm</title><link rel="stylesheet" href="shell.css"></head>
-<body><aside><h1>◈ ACEswarm</h1><p class="subtitle">Robot workbench</p><nav id="navigation"></nav><div class="side-bottom"><button id="add-robot">+ Connect robot</button><button id="add-app">+ Open installed app</button><small id="health">Starting services…</small></div></aside><main><header><div><span class="eyebrow">WORKSPACE / <span id="section">HOME</span></span><h2 id="title">Home</h2></div><span id="badge">LOCAL GROUND STATION</span></header><section id="content"></section></main><script src="renderer-adapter.js"></script><script src="shell.js"></script></body></html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AivudaOS</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #f4f6f8;
+        color: #102a43;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        height: 100vh;
+        margin: 0;
+        overflow: hidden;
+      }
+
+      .shell {
+        display: grid;
+        grid-template-rows: 1fr;
+        height: 100vh;
+        background: #f4f6f8;
+      }
+
+      .shell.expanded {
+        grid-template-rows: auto 1fr;
+      }
+
+      .top-chrome {
+        display: none;
+      }
+
+      .shell.expanded .top-chrome {
+        display: block;
+      }
+
+      .tab-strip {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        min-height: 34px;
+        border-bottom: 1px solid #d8dee6;
+        background: #e9eef4;
+      }
+
+      .tabs {
+        display: flex;
+        align-items: stretch;
+        min-width: 0;
+        overflow-x: auto;
+      }
+
+      .tab {
+        display: inline-grid;
+        grid-template-columns: minmax(88px, 172px) 24px;
+        align-items: center;
+        min-width: 120px;
+        max-width: 204px;
+        height: 29px;
+        margin: 5px 0 0 5px;
+        border: 1px solid transparent;
+        border-bottom: 0;
+        border-radius: 8px 8px 0 0;
+        background: #dce5ef;
+        color: #334e68;
+      }
+
+      .tab.active {
+        background: #ffffff;
+        border-color: #d8dee6;
+        color: #102a43;
+      }
+
+      .tab-main {
+        display: flex;
+        align-items: center;
+        min-width: 0;
+        gap: 8px;
+        padding: 0 8px 0 10px;
+      }
+
+      .tab-icon {
+        display: inline-grid;
+        place-items: center;
+        flex: 0 0 auto;
+        width: 14px;
+        height: 14px;
+        color: #52606d;
+      }
+
+      .tab-icon img,
+      .tab-icon svg,
+      .chrome-icon {
+        width: 14px;
+        height: 14px;
+      }
+
+      .tab-icon img {
+        border-radius: 3px;
+        object-fit: cover;
+      }
+
+      .tab-icon img.hidden,
+      .tab-icon svg.hidden {
+        display: none;
+      }
+
+      .tab-title {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .tab-close,
+      .new-tab,
+      .collapse-chrome,
+      .nav-button {
+        display: inline-grid;
+        place-items: center;
+        width: 24px;
+        height: 24px;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: #52606d;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .tab-close:hover,
+      .new-tab:hover,
+      .collapse-chrome:hover,
+      .nav-button:hover {
+        background: rgba(16, 42, 67, 0.1);
+        color: #102a43;
+      }
+
+      .toolbar-actions {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 0 6px;
+      }
+
+      .address-row {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 8px;
+        align-items: center;
+        min-height: 38px;
+        padding: 4px 8px;
+        border-bottom: 1px solid #d8dee6;
+        background: #ffffff;
+      }
+
+      .nav-group {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+      }
+
+      .address-input {
+        width: 100%;
+        height: 28px;
+        border: 1px solid #cbd5e1;
+        border-radius: 999px;
+        padding: 0 12px;
+        color: #102a43;
+        font: inherit;
+        font-size: 12px;
+      }
+
+      .address-input:focus {
+        border-color: #1769aa;
+        outline: 2px solid rgba(23, 105, 170, 0.16);
+      }
+
+      .status-text {
+        min-width: 92px;
+        color: #627d98;
+        font-size: 11px;
+        text-align: right;
+      }
+
+      .favorites-bar {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 30px;
+        padding: 3px 8px;
+        overflow-x: auto;
+        border-bottom: 1px solid #d8dee6;
+        background: #f8fafc;
+      }
+
+      .favorites-bar button {
+        flex: 0 0 auto;
+        min-height: 24px;
+        padding: 2px 10px;
+        border: 1px solid #cbd5e1;
+        border-radius: 999px;
+        background: #ffffff;
+        color: #334e68;
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      .favorites-bar button:hover {
+        border-color: #1769aa;
+        color: #1769aa;
+      }
+
+      .favorites-bar button[data-favorite-url] {
+        max-width: 180px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .webview-stack {
+        position: relative;
+        min-height: 0;
+        background: #ffffff;
+      }
+
+      webview {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      webview.hidden {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="shell" class="shell">
+      <section class="top-chrome">
+        <div class="tab-strip">
+          <div id="tabs" class="tabs" role="tablist"></div>
+          <div class="toolbar-actions">
+            <button id="new-tab" class="new-tab" type="button" title="New tab" aria-label="New tab">
+              <svg class="chrome-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M8 3.25v9.5M3.25 8h9.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+              </svg>
+            </button>
+            <button id="collapse-chrome" class="collapse-chrome" type="button" title="Hide tabs and address bar" aria-label="Hide tabs and address bar">
+              <svg class="chrome-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="m4.25 10.25 3.75-3.75 3.75 3.75" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="address-row">
+          <div class="nav-group">
+            <button id="back-button" class="nav-button" type="button" title="Back" aria-label="Back">
+              <svg class="chrome-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M9.75 3.5 5.25 8l4.5 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
+            <button id="forward-button" class="nav-button" type="button" title="Forward" aria-label="Forward">
+              <svg class="chrome-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M6.25 3.5 10.75 8l-4.5 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
+            <button id="reload-button" class="nav-button" type="button" title="Reload" aria-label="Reload">
+              <svg class="chrome-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M12.75 5.75V3.5H10.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M12.2 8A4.2 4.2 0 1 1 8 3.8c1.23 0 2.25.43 3.1 1.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+              </svg>
+            </button>
+          </div>
+          <input id="address-input" class="address-input" type="url" spellcheck="false" />
+          <div id="status-text" class="status-text">Ready</div>
+        </div>
+        <div id="favorites-bar" class="favorites-bar" aria-label="Favorites">
+          <button id="home-button" type="button">⌂ Home</button>
+          <button id="store-button" type="button">▦ AppStore</button>
+          <button id="add-favorite" type="button" title="Bookmark this page">☆</button>
+        </div>
+      </section>
+      <section id="webview-stack" class="webview-stack"></section>
+    </main>
+
+    <script src="./shell.js"></script>
+  </body>
+</html>

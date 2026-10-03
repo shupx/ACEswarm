@@ -1,5 +1,6 @@
 const path = require('node:path');
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const fs = require('node:fs');
+const { app, BrowserWindow, desktopCapturer, ipcMain, session, shell } = require('electron');
 const { workspace } = require('./services/workspace');
 const { resolveRuntime } = require('./services/runtime');
 const { LocalServices } = require('./services/local-services');
@@ -15,6 +16,20 @@ const remoteOrigins = new Set();
 let paths;
 let quitting = false;
 let control;
+
+let shellStatePath;
+let shellState;
+
+function readShellState() {
+  try { shellState = JSON.parse(fs.readFileSync(shellStatePath, 'utf8')); } catch (_) { shellState = null; }
+  return shellState;
+}
+
+function saveShellState(state) {
+  shellState = state && typeof state === 'object' ? state : {};
+  fs.mkdirSync(path.dirname(shellStatePath), { recursive: true });
+  fs.writeFileSync(shellStatePath, JSON.stringify(shellState, null, 2));
+}
 
 function allowedUrl(rawUrl) {
   try {
@@ -45,6 +60,7 @@ function createWindow() {
     if (!allowedUrl(url)) event.preventDefault();
     preferences.nodeIntegration = false;
     preferences.contextIsolation = true;
+    preferences.preload = path.join(__dirname, 'guest-preload.js');
   });
   window.webContents.on('did-attach-webview', (_, contents) => {
     contents.on('will-navigate', (event, url) => { if (!allowedUrl(url)) event.preventDefault(); });
@@ -71,6 +87,8 @@ app.whenReady().then(async () => {
     const runtime = resolveRuntime({ packaged: app.isPackaged, resourcesPath: process.resourcesPath, sourceRoot: path.resolve(__dirname, '..') });
     services = new LocalServices(paths, runtime);
     endpoints = await services.start();
+    shellStatePath = path.join(app.getPath('userData'), 'shell-state.json');
+    readShellState();
     control = new ControlServer({ paths, endpoints });
     endpoints.control = await control.start();
     console.log(`ACEswarm Control API: ${endpoints.control}`);
@@ -89,9 +107,34 @@ app.whenReady().then(async () => {
     ipcMain.handle('control:settings', () => ({ url: endpoints.os, kind: 'aivudaos-settings' }));
     ipcMain.handle('control:store', () => ({ url: endpoints.store, kind: 'aivudaappstore' }));
     ipcMain.handle('control:bootstrap', () => control.bootstrap);
+    ipcMain.handle('aivuda-shell:get-startup', () => ({ defaultUrl: endpoints.os, initialUrl: endpoints.os, storeUrl: endpoints.store, recordingsDir: path.join(app.getPath('videos'), 'ACEswarm'), savedState: shellState }));
+    ipcMain.handle('aivuda-shell:get-gpu-status', () => app.getGPUFeatureStatus());
+    ipcMain.handle('aivuda-shell:save-shell-state', (_, state) => { try { saveShellState(state); return { ok: true }; } catch (error) { return { ok: false, error: error.message }; } });
+    ipcMain.handle('aivuda-shell:clear-browser-data', async () => {
+      await session.fromPartition('persist:aivuda-shell').clearStorageData();
+      await session.fromPartition('persist:aivuda-shell').clearCache();
+      shellState = null;
+      try { fs.rmSync(shellStatePath, { force: true }); } catch (_) {}
+      return { ok: true };
+    });
+    ipcMain.handle('aivuda-shell:open-path', async (_, target) => { if (typeof target !== 'string') return { ok: false, error: 'Missing path' }; const error = await shell.openPath(target); return error ? { ok: false, error } : { ok: true }; });
+    ipcMain.handle('aivuda-shell:show-item-in-folder', (_, target) => { if (typeof target !== 'string') return { ok: false, error: 'Missing path' }; shell.showItemInFolder(target); return { ok: true }; });
+    ipcMain.handle('aivuda-shell:prepare-window-recording', async () => {
+      if (!window || window.isDestroyed()) return { ok: false, error: 'Main window is not available.' };
+      const sources = await desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 0, height: 0 }, fetchWindowIcons: false });
+      const source = sources.find((entry) => entry.name === window.getTitle()) || sources[0];
+      if (!source) return { ok: false, error: 'No capturable window source was found.' };
+      const dir = path.join(app.getPath('videos'), 'ACEswarm');
+      fs.mkdirSync(dir, { recursive: true });
+      const outputPath = path.join(dir, `aceswarm-${new Date().toISOString().replaceAll(':', '-')}.webm`);
+      return { ok: true, sourceId: source.id, outputPath, recordingsDir: dir };
+    });
+    ipcMain.handle('aivuda-shell:save-recording-file', (_, payload) => { try { if (!payload?.outputPath || !Array.isArray(payload.buffer)) throw new Error('Invalid recording payload'); fs.mkdirSync(path.dirname(payload.outputPath), { recursive: true }); fs.writeFileSync(payload.outputPath, Buffer.from(payload.buffer)); return { ok: true, outputPath: payload.outputPath }; } catch (error) { return { ok: false, error: error.message }; } });
+    for (const name of ['start-ffmpeg-window-recording', 'start-ffmpeg-x11-recording']) ipcMain.handle(`aivuda-shell:${name}`, () => ({ ok: false, error: 'FFmpeg recording is not available in ACEswarm yet.' }));
+    for (const name of ['pause-ffmpeg-window-recording', 'resume-ffmpeg-window-recording', 'stop-ffmpeg-window-recording']) ipcMain.handle(`aivuda-shell:${name}`, () => ({ ok: false, error: 'No active FFmpeg recording.' }));
     createWindow();
     control.setBootstrap('running');
-    provision({ osUrl: endpoints.osApi, storeUrl: endpoints.storeApi, configPath: path.join(app.isPackaged ? process.resourcesPath : path.resolve(__dirname, '..', 'resources'), 'seed-apps', 'aceswarm-config-export.json') })
+    provision({ osUrl: endpoints.osApi, storeUrl: endpoints.store, storeApiUrl: endpoints.storeApi, configPath: path.join(app.isPackaged ? process.resourcesPath : path.resolve(__dirname, '..', 'resources'), 'seed-apps', 'aceswarm-config-export.json') })
       .then((result) => control.setBootstrap('completed', { result }))
       .catch((error) => { control.setBootstrap('failed', { error: error.message }); services.failures.push(`Seed provisioning: ${error.message}`); console.error(error); });
   } catch (error) {

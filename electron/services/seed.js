@@ -87,7 +87,7 @@ async function publishSeed(entry, artifact, manifest, storeUrl, authorization) {
   await requestJson(downloadUrl);
 }
 
-async function provision({ osUrl, storeUrl, configPath }) {
+async function provision({ osUrl, storeUrl, storeApiUrl = storeUrl, configPath }) {
   const directory = path.dirname(configPath);
   if (!fs.statSync(configPath).isFile() || fs.realpathSync(configPath) !== path.resolve(configPath)) throw new Error('Invalid seed config export');
   const document = JSON.parse(fs.readFileSync(configPath, 'utf8'));
@@ -98,18 +98,18 @@ async function provision({ osUrl, storeUrl, configPath }) {
   if (artifacts.size) {
     const storeForm = new FormData();
     storeForm.set('username', 'admin'); storeForm.set('password', DEFAULT_ADMIN_PASSWORD);
-    const storeLogin = await requestJson(new URL('aivuda_app_store/dev/auth/login', storeUrl), { method: 'POST', body: storeForm });
+    const storeLogin = await requestJson(new URL('aivuda_app_store/dev/auth/login', storeApiUrl), { method: 'POST', body: storeForm });
     const authorization = `Bearer ${storeLogin.access_token}`;
     const expected = new Map(document.payload.apps.map((item) => [item.app_id, item.version]));
     const seeds = [];
     for (const artifact of artifacts.values()) {
-      const manifest = await parseSeed(artifact, storeUrl, authorization);
+      const manifest = await parseSeed(artifact, storeApiUrl, authorization);
       const id = manifest?.app_id;
       const version = String(manifest?.version);
       if (expected.get(id) !== version || seeds.some((seed) => seed.id === id)) throw new Error(`Seed package identity mismatch: ${path.basename(artifact)}`);
       seeds.push({ id, version, artifact, manifest });
     }
-    for (const seed of seeds) await publishSeed(seed, seed.artifact, seed.manifest, storeUrl, authorization);
+    for (const seed of seeds) await publishSeed(seed, seed.artifact, seed.manifest, storeApiUrl, authorization);
   }
   const token = encodeURIComponent(osLogin.access_token);
   const queued = await requestJson(new URL(`aivuda_os/api/config/import?token=${token}`, osUrl), {
