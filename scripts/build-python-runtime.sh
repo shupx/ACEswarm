@@ -45,25 +45,13 @@ python="$runtime/bin/python3"
   "$python" -m ensurepip --upgrade
   "$python" -m pip install --retries 0 'setuptools==80.9.0' 'wheel==0.45.1'
 }
-for repo in aivudaOS aivudaAppStore; do
-  ui="$root/../$repo/$( [[ "$repo" == aivudaOS ]] && echo aivudaos || echo aivudaappstore )/resources/ui"
-  [[ -f "$ui/dist/index.html" ]] || { echo "Build $repo frontend independently before bundling: $ui" >&2; exit 1; }
-done
-export AIVUDAOS_BUILD_DATE=20261002 AIVUDAOS_BUILD_SEQ=01
-export AIVUDAAPPSTORE_BUILD_DATE=20261002 AIVUDAAPPSTORE_BUILD_SEQ=01
 export SOURCE_DATE_EPOCH=1790899200
 pip_options=(--retries 0)
 if [[ "${ACESWARM_OFFLINE:-0}" == 1 ]]; then pip_options+=(--no-index --find-links "$wheels"); fi
-staging="$root/resources/build-sources"
-rm -rf "$staging"
-mkdir -p "$staging/aivudaOS" "$staging/aivudaAppStore"
-trap 'rm -rf "$staging"' EXIT
-for pair in 'aivudaOS aivudaos' 'aivudaAppStore aivudaappstore'; do
-  read -r repo module <<< "$pair"
-  cp "$root/../$repo/"{setup.py,pyproject.toml,requirements.txt,README.md} "$staging/$repo/"
-  rsync -a --exclude=node_modules --exclude=.vite --exclude=.vite-temp --exclude=package.json --exclude=package-lock.json --exclude=__pycache__ "$root/../$repo/$module/" "$staging/$repo/$module/"
-done
-"$python" -m pip wheel "${pip_options[@]}" --no-build-isolation --wheel-dir "$wheels" "$staging/aivudaOS" "$staging/aivudaAppStore"
+os_version="$(read_lock pythonPackages aivudaos)"
+store_version="$(read_lock pythonPackages aivudaappstore)"
+"$python" -m pip wheel "${pip_options[@]}" --no-build-isolation --wheel-dir "$wheels" \
+  "aivudaos==$os_version" "aivudaappstore==$store_version"
 find "$wheels" -maxdepth 1 -name '*.whl' -type f -printf '%f\n' | sort | (cd "$wheels" && xargs sha256sum) > "$root/resources/wheels.lock.generated"
 if [[ -f "$root/resources/wheels.lock" ]]; then
   cmp -s "$root/resources/wheels.lock" "$root/resources/wheels.lock.generated" || {
@@ -74,5 +62,9 @@ else
 fi
 rm -rf "$packages"
 mkdir -p "$packages"
-"$python" -m pip install --no-index --find-links "$wheels" --target "$packages" aivudaos aivudaappstore
+"$python" -m pip install --no-index --find-links "$wheels" --target "$packages" \
+  "aivudaos==$os_version" "aivudaappstore==$store_version"
+for ui in "$packages/aivudaos/resources/ui/dist/index.html" "$packages/aivudaappstore/resources/ui/dist/index.html"; do
+  [[ -f "$ui" ]] || { echo "Published package UI resource missing: $ui" >&2; exit 1; }
+done
 node "$root/scripts/verify-bundle.js"

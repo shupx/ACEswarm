@@ -2,7 +2,7 @@
 
 ## Runtime bundle
 
-`resources/runtime-lock.json` pins the standalone CPython runtime and Caddy versions, URLs, and SHA-256 digests. The build verifies archive hashes before extraction.
+`resources/runtime-lock.json` pins the standalone CPython runtime, Caddy, and the published PyPI package versions. The build verifies archive hashes before extraction.
 
 A pre-downloaded archive may be placed in `${ACESWARM_DOWNLOAD_CACHE:-/tmp/aceswarm-download}`:
 
@@ -14,18 +14,6 @@ caddy.tar.gz
 TLS verification is enabled by default. `ACESWARM_CURL_INSECURE=1` is an explicit emergency override; SHA-256 verification still applies.
 
 ## Build
-
-Build the independent frontends first:
-
-```bash
-cd /path/to/aivudaOS/aivudaos/resources/ui
-npm ci --include=dev
-npm run build
-
-cd /path/to/aivudaAppStore/aivudaappstore/resources/ui
-npm ci --include=dev
-npm run build
-```
 
 Then build ACEswarm:
 
@@ -49,10 +37,10 @@ The build host needs:
 
 - Node.js and npm;
 - Python build tooling;
-- tar, curl, and rsync;
-- compiler tools for native Python wheels;
+- tar, curl, and a working Python `pip`;
+- compiler tools for native Python wheels when PyPI has no compatible wheel;
 - several GB of free disk space;
-- access to the sibling AivudaOS and AivudaAppStore source trees.
+- network access to PyPI, or a wheelhouse containing the locked distributions.
 
 The runtime, Python packages, wheels, Caddy, and release manifest are build outputs. They are excluded from the source repository where appropriate and are included in the AppImage.
 
@@ -64,7 +52,7 @@ Set:
 ACESWARM_OFFLINE=1
 ```
 
-to use cached runtime archives, existing frontend builds, and a pre-populated wheelhouse. The required archives and wheels must already exist locally.
+to use cached runtime archives and a pre-populated wheelhouse. The required archives and locked PyPI wheels must already exist locally.
 
 ## Seed package preparation
 

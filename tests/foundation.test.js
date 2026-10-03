@@ -3,7 +3,7 @@ const test = require('node:test');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { spawn } = require('node:child_process');
+const { spawn, execFileSync } = require('node:child_process');
 const { workspace } = require('../electron/services/workspace');
 const { gatewayConfig } = require('../electron/services/gateway');
 const { fixed, resolvePage } = require('../electron/services/pages');
@@ -140,15 +140,20 @@ test('packaged runtime resolves separately shipped Python packages', () => {
     fs.rmSync(resourcesPath, { recursive: true, force: true });
   }
 });
-test('development resolves both sibling checkouts', () => {
+test('development resolves published packages from one explicit Python environment', () => {
   const python = process.env.ACESWARM_PYTHON;
   const caddy = process.env.ACESWARM_CADDY;
+  const pythonPath = execFileSync('python3', ['-c', 'import sys; print(sys.executable)'], { encoding: 'utf8' }).trim();
   try {
-    process.env.ACESWARM_PYTHON = process.execPath;
+    process.env.ACESWARM_PYTHON = pythonPath;
     process.env.ACESWARM_CADDY = process.execPath;
     const runtime = resolveRuntime({ packaged: false, sourceRoot: path.resolve(__dirname, '..') });
-    assert.equal(runtime.osRoot, path.resolve(__dirname, '../../aivudaOS'));
-    assert.equal(runtime.storeRoot, path.resolve(__dirname, '../../aivudaAppStore'));
+    assert.ok(runtime.osRoot.includes('site-packages'));
+    assert.equal(runtime.osRoot, runtime.storeRoot);
+    assert.ok(!runtime.osRoot.includes('aivudaOS'));
+    assert.ok(!runtime.storeRoot.includes('aivudaAppStore'));
+    assert.equal(process.env.ACESWARM_OS_ROOT, undefined);
+    assert.equal(process.env.ACESWARM_STORE_ROOT, undefined);
   } finally {
     if (python === undefined) delete process.env.ACESWARM_PYTHON;
     else process.env.ACESWARM_PYTHON = python;
@@ -156,42 +161,21 @@ test('development resolves both sibling checkouts', () => {
     else process.env.ACESWARM_CADDY = caddy;
   }
 });
-test('development uses bundled tools unless explicitly overridden', () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'aceswarm-development-'));
-  const sourceRoot = path.join(root, 'ACEswarm');
+test('development requires an explicit Python environment', () => {
   const python = process.env.ACESWARM_PYTHON;
   const caddy = process.env.ACESWARM_CADDY;
   try {
-    for (const file of [
-      'ACEswarm/resources/python-runtime/bin/python3',
-      'ACEswarm/resources/app-gateway/caddy',
-      'aivudaOS/aivudaos/resources/ui/dist/index.html',
-      'aivudaAppStore/aivudaappstore/resources/ui/dist/index.html',
-    ]) {
-      const target = path.join(root, file);
-      fs.mkdirSync(path.dirname(target), { recursive: true });
-      fs.writeFileSync(target, '');
-    }
     delete process.env.ACESWARM_PYTHON;
-    delete process.env.ACESWARM_CADDY;
-    const bundled = resolveRuntime({ packaged: false, sourceRoot });
-    assert.equal(bundled.python, path.join(sourceRoot, 'resources/python-runtime/bin/python3'));
-    assert.equal(bundled.caddy, path.join(sourceRoot, 'resources/app-gateway/caddy'));
-    process.env.ACESWARM_PYTHON = process.execPath;
     process.env.ACESWARM_CADDY = process.execPath;
-    const overridden = resolveRuntime({ packaged: false, sourceRoot });
-    assert.equal(overridden.python, process.execPath);
-    assert.equal(overridden.caddy, process.execPath);
+    assert.throws(() => resolveRuntime({ packaged: false, sourceRoot: path.resolve(__dirname, '..') }), /absolute ACESWARM_PYTHON/);
     process.env.ACESWARM_PYTHON = 'relative/python';
-    assert.throws(() => resolveRuntime({ packaged: false, sourceRoot }), /Python runtime missing/);
+    assert.throws(() => resolveRuntime({ packaged: false, sourceRoot: path.resolve(__dirname, '..') }), /absolute ACESWARM_PYTHON/);
     process.env.ACESWARM_PYTHON = process.execPath;
-    process.env.ACESWARM_CADDY = 'relative/caddy';
-    assert.throws(() => resolveRuntime({ packaged: false, sourceRoot }), /Caddy missing/);
+    assert.throws(() => resolveRuntime({ packaged: false, sourceRoot: path.resolve(__dirname, '..') }), /Python environment/);
   } finally {
     if (python === undefined) delete process.env.ACESWARM_PYTHON;
     else process.env.ACESWARM_PYTHON = python;
     if (caddy === undefined) delete process.env.ACESWARM_CADDY;
     else process.env.ACESWARM_CADDY = caddy;
-    fs.rmSync(root, { recursive: true, force: true });
   }
 });

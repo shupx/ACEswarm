@@ -2,13 +2,14 @@
 
 ## Repository layout
 
-ACEswarm is developed alongside the independent AivudaOS and AivudaAppStore repositories. The paths below are examples; use paths appropriate for your checkout.
+ACEswarm is self-contained. AivudaOS and AivudaAppStore remain independent packages and are consumed from PyPI; no sibling checkout is needed.
 
 ```text
-workspace/
-├── ACEswarm/
-├── aivudaOS/
-└── aivudaAppStore/
+ACEswarm/
+├── electron/
+├── resources/
+├── scripts/
+└── tests/
 ```
 
 ACEswarm consumes the two packages through local ASGI/HTTP services. It does not import their private Python modules or access their databases.
@@ -16,20 +17,12 @@ ACEswarm consumes the two packages through local ASGI/HTTP services. It does not
 ## Prerequisites
 
 - Node.js and npm;
-- a Python environment containing the AivudaOS and AivudaAppStore dependencies;
+- one Python environment containing the pinned published packages;
 - an executable Caddy binary;
-- built AivudaOS and AivudaAppStore frontends.
-
-Build each independent frontend from its own checkout:
+- Install the published packages into that environment:
 
 ```bash
-cd /path/to/aivudaOS/aivudaos/resources/ui
-npm ci --include=dev
-npm run build
-
-cd /path/to/aivudaAppStore/aivudaappstore/resources/ui
-npm ci --include=dev
-npm run build
+python3 -m pip install 'aivudaos==1.0.0.dev2026100201' 'aivudaappstore==1.0.0.dev2026100201'
 ```
 
 ## Start ACEswarm in development
@@ -38,21 +31,12 @@ npm run build
 cd /path/to/ACEswarm
 npm ci --include=dev
 
-ACESWARM_PYTHON=/absolute/path/to/python3 \
+ACESWARM_PYTHON=/absolute/path/to/python-in-that-environment \
 ACESWARM_CADDY=/absolute/path/to/caddy \
-ACESWARM_OS_ROOT=/path/to/aivudaOS \
-ACESWARM_STORE_ROOT=/path/to/aivudaAppStore \
 npm start
 ```
 
-When a local bundled runtime exists, ACEswarm can use:
-
-```text
-resources/python-runtime/bin/python3
-resources/app-gateway/caddy
-```
-
-Explicit `ACESWARM_PYTHON` and `ACESWARM_CADDY` values override those defaults.
+`ACESWARM_PYTHON` is required in development and is the only Python executable used by both local services. ACEswarm discovers both package roots by importing the installed PyPI distributions from that environment. `ACESWARM_CADDY` selects the gateway binary.
 
 ## Local services
 
@@ -73,13 +57,6 @@ npm test
 npm run check
 npm run bundle:verify
 npm run smoke
-```
-
-Run AivudaOS tests from its own checkout:
-
-```bash
-cd /path/to/aivudaOS
-python3 -m unittest discover -s tests -p 'test*.py' -v
 ```
 
 Test packaged resources without opening an Electron window:

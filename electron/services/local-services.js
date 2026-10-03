@@ -72,8 +72,7 @@ class LocalServices {
       PYTHONHOME: path.join(this.runtime.resourcesPath, 'python-runtime'),
       PYTHONPATH: path.join(this.runtime.resourcesPath, 'python-packages'),
     } : {
-      PYTHONPATH: [this.runtime.osRoot, this.runtime.storeRoot, this.runtime.packages, process.env.PYTHONPATH || '']
-        .filter(Boolean).join(path.delimiter),
+      PYTHONPATH: '',
     };
     const osChild = this.launch('aivudaos', this.runtime.python,
       ['-m', 'uvicorn', 'aivudaos.gateway.main:app', '--host', '127.0.0.1', '--port', String(osPort)], {
