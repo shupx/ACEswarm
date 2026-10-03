@@ -74,6 +74,7 @@ app.whenReady().then(async () => {
     control = new ControlServer({ paths, endpoints });
     endpoints.control = await control.start();
     services.startMcp(endpoints.control);
+    services.startPackageMcps();
     ipcMain.handle('control:pages', () => fixed);
     ipcMain.handle('control:resolve', (_, id, context) => {
       const page = resolvePage(id, endpoints, context);

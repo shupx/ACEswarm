@@ -39,14 +39,14 @@ class LocalServices {
     this.failures = [];
   }
 
-  launch(name, binary, args, environment = {}) {
+  launch(name, binary, args, environment = {}, keepStdin = false) {
     const log = fs.createWriteStream(path.join(this.paths.logs, `${name}.log`), { flags: 'a' });
     const env = { ...process.env, ...environment };
     if (!this.runtime.packaged) delete env.PYTHONHOME;
     const child = spawn(binary, args, {
       env,
       detached: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: [keepStdin ? 'pipe' : 'ignore', 'pipe', 'pipe'],
     });
     child.stdout.pipe(log, { end: false });
     child.stderr.pipe(log, { end: false });
@@ -101,9 +101,30 @@ class LocalServices {
   startMcp(controlUrl) {
     const child = this.launch('aceswarm-mcp', process.execPath, [path.join(__dirname, 'mcp-server.js')], {
       ACESWARM_CONTROL_URL: controlUrl,
-    });
+    }, true);
     this.mcp = child;
     return child;
+  }
+
+  startPackageMcps() {
+    const common = this.runtime.packaged ? {
+      PYTHONHOME: path.join(this.runtime.resourcesPath, 'python-runtime'),
+      PYTHONPATH: path.join(this.runtime.resourcesPath, 'python-packages'),
+    } : { PYTHONPATH: this.runtime.pythonPath };
+    this.startMcpPackage('aivudaos-mcp', 'aivudaos.mcp_server', {
+      ...common,
+      AIVUDAOS_MCP_BASE_URL: this.endpoints.os.replace(/\/$/, ''),
+      ...(process.env.AIVUDAOS_MCP_TOKEN ? { AIVUDAOS_MCP_TOKEN: process.env.AIVUDAOS_MCP_TOKEN } : {}),
+    });
+    this.startMcpPackage('aivudaappstore-mcp', 'aivudaappstore.mcp_server', {
+      ...common,
+      AIVUDAAPPSTORE_MCP_BASE_URL: this.endpoints.store.replace(/\/$/, '').replace(/\/$/, '') + '/aivuda_app_store',
+      ...(process.env.AIVUDAAPPSTORE_MCP_TOKEN ? { AIVUDAAPPSTORE_MCP_TOKEN: process.env.AIVUDAAPPSTORE_MCP_TOKEN } : {}),
+    });
+  }
+
+  startMcpPackage(name, moduleName, environment) {
+    return this.launch(name, this.runtime.python, ['-m', moduleName], environment, true);
   }
 
   async stop() {
