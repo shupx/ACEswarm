@@ -22,6 +22,12 @@ let shellState;
 
 function readShellState() {
   try { shellState = JSON.parse(fs.readFileSync(shellStatePath, 'utf8')); } catch (_) { shellState = null; }
+  for (const entry of [...(shellState?.tabs || []), ...(shellState?.favorites || [])]) {
+    try {
+      const url = new URL(entry.url);
+      if (['http:', 'https:'].includes(url.protocol)) remoteOrigins.add(url.origin);
+    } catch (_) {}
+  }
   return shellState;
 }
 
@@ -34,6 +40,9 @@ function saveShellState(state) {
 function allowedUrl(rawUrl) {
   try {
     const url = new URL(rawUrl);
+    if (url.protocol === 'file:') {
+      return url.pathname === path.join(__dirname, 'offline.html');
+    }
     const local = [endpoints.os, endpoints.store, `${endpoints.gateway}/`].some((endpoint) => url.origin === new URL(endpoint).origin);
     return ['http:', 'https:'].includes(url.protocol) && (local || remoteOrigins.has(url.origin));
   } catch (_) { return false; }
@@ -75,7 +84,11 @@ function createWindow() {
 function handleTerminationSignal() {
   if (quitting) return;
   quitting = true;
-  Promise.resolve(control?.stop()).finally(() => services?.stop()).finally(() => app.quit());
+  Promise.resolve(window?.webContents.executeJavaScript('window.__aivudaFinalizeActiveRecordingBeforeClose?.()'))
+    .catch(() => {})
+    .finally(() => control?.stop())
+    .finally(() => services?.stop())
+    .finally(() => app.quit());
 }
 process.on('SIGTERM', handleTerminationSignal);
 process.on('SIGINT', handleTerminationSignal);
@@ -149,6 +162,10 @@ app.on('before-quit', (event) => {
   if (quitting || !services) return;
   event.preventDefault();
   quitting = true;
-  control?.stop().finally(() => services.stop()).finally(() => app.quit());
+  Promise.resolve(window?.webContents.executeJavaScript('window.__aivudaFinalizeActiveRecordingBeforeClose?.()'))
+    .catch(() => {})
+    .finally(() => control?.stop())
+    .finally(() => services.stop())
+    .finally(() => app.quit());
 });
 app.on('window-all-closed', () => app.quit());
