@@ -1,129 +1,80 @@
 # ACEswarm
 
-ACEswarm 是面向无人机和机器人集群的地面端工作台。
+ACEswarm is a ground-station workbench for distributed drone and robot swarms.
 
-## 下载
+## Download
 
-从发布地址下载 Linux x86_64 版本：
+Download the Linux x86_64 AppImage from the release server:
 
-[下载 ACEswarm AppImage](https://download.example.com/aceswarm/latest/ACEswarm-x86_64.AppImage)
+[Download ACEswarm AppImage](https://download.example.com/aceswarm/latest/ACEswarm-x86_64.AppImage)
 
-> 实际发布时，请将上面的地址替换为正式下载地址。
+Replace the example URL above with the URL used by your release server.
 
-## 运行
-
-下载完成后，在终端执行：
+## Run
 
 ```bash
 chmod +x ACEswarm-x86_64.AppImage
 ./ACEswarm-x86_64.AppImage
 ```
 
-也可以在文件管理器中右键打开文件属性，勾选“允许作为程序执行”，然后双击运行。
+You can also enable “Allow executing file as a program” in the file manager and double-click the AppImage.
 
-ACEswarm 自带运行所需的：
+The AppImage includes the Python runtime, AivudaOS, AivudaAppStore, the local application gateway, and the bundled applications. No separate Python, pip, FastAPI, Uvicorn, AivudaOS, AivudaAppStore, or Caddy installation is required.
 
-- Python 运行环境；
-- AivudaOS；
-- AivudaAppStore；
-- Caddy 本地应用网关；
-- ACEswarm 预置应用包。
+On first launch, ACEswarm starts its local services, publishes the bundled applications to the local AppStore, imports the bundled AivudaOS configuration, and opens the workbench. First launch can take longer than subsequent launches.
 
-用户不需要另外安装 Python、pip、FastAPI、Uvicorn、AivudaOS、AivudaAppStore 或 Caddy。
+## User data
 
-首次启动时，ACEswarm 会自动：
-
-1. 启动本地 AivudaOS 和 AivudaAppStore；
-2. 将预置应用发布到本地应用商店；
-3. 根据内置配置导出文件安装应用；
-4. 打开 ACEswarm 工作台。
-
-首次初始化可能需要一些时间，请不要重复启动多个 ACEswarm 实例。
-
-## 用户数据目录
-
-默认工作目录为：
+The default user workspace is:
 
 ```text
 ~/ACEswarm_ws/
 ```
 
-主要内容：
+It contains local service data, installed applications, projects, experiments, logs, and bootstrap state. The AppImage itself remains read-only.
 
-```text
-~/ACEswarm_ws/
-├── services/
-│   ├── aivudaos/          # 本地 AivudaOS 工作目录、应用和数据库
-│   └── aivudaappstore/    # 本地 AppStore 数据库和应用包
-├── projects/              # ACEswarm 项目
-├── experiments/           # 实验数据
-├── logs/                  # ACEswarm、AivudaOS、AppStore、Gateway 日志
-└── state/                 # ACEswarm 初始化状态
-```
-
-程序安装包中的运行资源是只读的，用户数据不会写入 AppImage 内部。
-
-如需指定其他工作目录，可以设置：
+To use another workspace:
 
 ```bash
 ACESWARM_WS_ROOT=/path/to/ACEswarm_ws ./ACEswarm-x86_64.AppImage
 ```
 
-## 卸载
+## Uninstall
 
-ACEswarm 使用 AppImage，不需要传统安装程序。卸载时只需要删除下载的 AppImage 文件：
+ACEswarm is distributed as an AppImage and does not require a system installer. Remove the downloaded AppImage:
 
 ```bash
 rm ACEswarm-x86_64.AppImage
 ```
 
-删除 AppImage **不会删除用户数据**。如需同时清理所有 ACEswarm 数据，请在确认不再需要项目、实验、日志和已安装应用后执行：
+Removing the AppImage does not remove user data. To remove the workspace as well, after backing up anything you need:
 
 ```bash
 rm -rf ~/ACEswarm_ws
 ```
 
-这个删除操作不可恢复，请先备份重要数据。
+This permanently removes projects, experiments, installed applications, logs, and local service data.
 
-## 常见问题
+## Troubleshooting
 
-### 双击没有反应
-
-请先赋予执行权限：
+If double-clicking does nothing, make the file executable:
 
 ```bash
 chmod +x ACEswarm-x86_64.AppImage
 ```
 
-### 如何查看日志
+Service logs are stored in:
 
 ```text
 ~/ACEswarm_ws/logs/
 ```
 
-其中包括：
-
-```text
-aceswarm.log
-aivudaos.log
-aivudaappstore.log
-gateway.log
-```
-
-具体文件是否生成取决于启动阶段和运行版本。
-
-### 如何恢复首次初始化
-
-关闭 ACEswarm 后，备份并删除：
+To repeat first-launch provisioning, close ACEswarm, back up the workspace, and remove only:
 
 ```text
 ~/ACEswarm_ws/state/
 ```
 
-然后重新启动 ACEswarm。不要直接删除整个 workspace，除非确认不再需要其中的项目、实验和应用数据。
+## Developer documentation
 
-## 开发者文档
-
-开发、构建、架构和调试文档位于：
-
-- [`docs_dev/`](docs_dev/)
+Development, architecture, runtime, bootstrap, build, and release documentation is in [`docs_dev/`](docs_dev/).

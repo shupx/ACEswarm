@@ -1,68 +1,65 @@
-# 项目组成与架构
+# Architecture and Project Layout
 
-## 总体关系
+## Product relationship
 
 ```text
 ACEswarm Electron Workbench
-├── ACEswarm 自有工作台页面
-├── 本地 AivudaOS 页面
-├── 本地 AivudaAppStore 页面
-├── 远程机器人 AivudaOS 页面
-└── 本地服务生命周期管理
+├── ACEswarm workbench pages
+├── Local AivudaOS page
+├── Local AivudaAppStore page
+├── Remote robot AivudaOS pages
+└── Local service lifecycle manager
     ├── AivudaOS Uvicorn
     ├── AivudaAppStore Uvicorn
     └── Caddy App Gateway
 ```
 
-AivudaOS 和 AivudaAppStore 仍然是独立包。ACEswarm 负责启动和承载页面，不把它们变成 ACEswarm 的内部业务库。
+AivudaOS and AivudaAppStore remain independent distributions. ACEswarm launches and hosts their pages without turning them into internal ACEswarm business libraries.
 
-## ACEswarm 目录
+## ACEswarm layout
 
 ```text
 ACEswarm/
 ├── electron/
-│   ├── main.js                 # Electron 主进程和 IPC
-│   ├── preload.js              # 安全桥接
-│   ├── shell.html/js/css       # 工作台外壳
+│   ├── main.js                 # Electron main process and IPC
+│   ├── preload.js              # Security bridge
+│   ├── shell.html/js/css       # Workbench shell
 │   └── services/
-│       ├── local-services.js   # Uvicorn/Caddy 启停、端口、健康检查
-│       ├── runtime.js          # Python/Caddy/源码或打包资源定位
-│       ├── workspace.js        # 用户工作目录
-│       ├── gateway.js          # 动态 Caddyfile 和应用路由
-│       ├── seed.js             # config-export bootstrap
-│       ├── pages.js            # 页面注册与路由
-│       └── integrity.js        # 发布资源完整性校验
+│       ├── local-services.js   # Service lifecycle, ports, health checks
+│       ├── runtime.js          # Runtime and package resolution
+│       ├── workspace.js        # User workspace paths
+│       ├── gateway.js          # Dynamic Caddy configuration
+│       ├── seed.js             # Config-export bootstrap
+│       ├── pages.js            # Page registry and routing
+│       └── integrity.js        # Release integrity checks
 ├── resources/
 │   └── seed-apps/
 │       ├── aceswarm-config-export.json
 │       └── packages/
 ├── scripts/
-│   ├── build-python-runtime.sh
-│   ├── verify-bundle.js
-│   └── smoke-services.js
 ├── tests/
 ├── docs_dev/
 └── package.json
 ```
 
-## 页面路由
+## Page routes
 
-页面由 `electron/services/pages.js` 解析：
+`electron/services/pages.js` resolves targets such as:
 
 ```text
-settings       → 本地 AivudaOS
-store          → 本地 AivudaAppStore
-app:<app_id>   → ACEswarm Gateway 下的已安装应用 UI
-robot:<url>    → 远程机器人 AivudaOS
-home/projects/simulation/... → ACEswarm 自有页面
+settings        → local AivudaOS
+store           → local AivudaAppStore
+app:<app_id>    → installed application UI through the Gateway
+robot:<url>     → remote robot AivudaOS
+home/projects/simulation/... → ACEswarm pages
 ```
 
-## 安全边界
+## Security boundaries
 
-- WebView 默认禁止任意导航；
-- 本地页面只允许 ACEswarm 管理的 loopback origin；
-- 远程机器人页面需要显式添加；
-- Python 和 Caddy 路径使用绝对路径；
-- seed 包必须位于 `resources/seed-apps/packages/`；
-- seed 包必须通过 SHA-256 校验；
-- 不直接读写 AivudaOS/AppStore SQLite 数据库。
+- WebViews reject unapproved navigation;
+- local pages are limited to ACEswarm-managed loopback origins;
+- remote robot pages must be explicitly added;
+- runtime paths are absolute;
+- bundled package paths are restricted to the seed package directory;
+- every bundled archive is checked with SHA-256;
+- ACEswarm does not write to AivudaOS or AppStore databases.

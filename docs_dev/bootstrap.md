@@ -1,14 +1,14 @@
-# 配置导出与预置应用初始化
+# Config Export and Bundled Application Bootstrap
 
-## 唯一初始化描述文件
+## Canonical bootstrap file
 
-当前使用：
+The canonical file is:
 
 ```text
 resources/seed-apps/aceswarm-config-export.json
 ```
 
-它保留 AivudaOS 原生配置导出格式，并增加顶层 `aceswarm.packages` 扩展：
+It preserves the AivudaOS configuration export format and adds a top-level `aceswarm.packages` extension:
 
 ```json
 {
@@ -36,54 +36,46 @@ resources/seed-apps/aceswarm-config-export.json
 }
 ```
 
-AivudaOS 忽略未知的 `aceswarm` 顶层字段；ACEswarm 使用它定位和校验包。
+AivudaOS ignores the unknown `aceswarm` field. ACEswarm uses it to locate and verify package archives.
 
-## 初始化流程
-
-```text
-读取 aceswarm-config-export.json
-    ↓
-校验配置格式
-    ↓
-校验 packages 路径和 SHA-256
-    ↓
-通过 AppStore API 解析每个 manifest.yaml
-    ↓
-校验 app_id/version 与 payload.apps
-    ↓
-发布缺失应用版本到本地 AppStore
-    ↓
-调用 AivudaOS /aivuda_os/api/config/import
-    ↓
-AivudaOS 从本地 AppStore 下载并安装应用
-    ↓
-AivudaOS 恢复参数和 autostart
-```
-
-## 设计原则
-
-- ACEswarm 不解释应用参数；
-- ACEswarm 不直接安装应用到 AivudaOS；
-- ACEswarm 不直接访问任何数据库；
-- AivudaOS 负责导入、安装、参数合并和 autostart；
-- `running` 默认不恢复；
-- `avahi_hostname` 不影响地面端 embedded mode；
-- 预置包必须在 AppStore 发布后，AivudaOS 才能自动安装。
-
-## 预置包来源
-
-当前预置包来自：
+## Bootstrap sequence
 
 ```text
-/home/spx/spx_ws/ACE/prepkg/
+Read aceswarm-config-export.json
+    ↓
+Validate the export format
+    ↓
+Validate package paths and SHA-256 digests
+    ↓
+Parse every package manifest through the AppStore API
+    ↓
+Match app IDs and versions with payload.apps
+    ↓
+Publish missing versions to the local AppStore
+    ↓
+Call AivudaOS /aivuda_os/api/config/import
+    ↓
+AivudaOS downloads and installs applications from the local AppStore
+    ↓
+AivudaOS restores parameters and autostart
 ```
 
-新增或替换包时：
+## Design rules
 
-1. 将包放入 `resources/seed-apps/packages/`；
-2. 读取包内 `manifest.yaml`；
-3. 更新 `payload.apps`；
-4. 更新 `aceswarm.packages`；
-5. 使用 `sha256sum` 更新 SHA-256；
-6. 执行 `npm test`、`npm run bundle:verify` 和 smoke test；
-7. 重新构建 AppImage。
+- ACEswarm does not interpret application parameters;
+- ACEswarm does not install applications directly into AivudaOS;
+- ACEswarm does not access either database;
+- AivudaOS owns import, installation, parameter merging, and autostart semantics;
+- running state is not restored by default;
+- the embedded ground-station hostname is not changed by an export;
+- packages must be published to AppStore before AivudaOS can install them.
+
+## Updating bundled applications
+
+1. Place approved archives in `resources/seed-apps/packages/`;
+2. read each archive's `manifest.yaml`;
+3. update `payload.apps`;
+4. update `aceswarm.packages`;
+5. recompute SHA-256 values with `sha256sum`;
+6. run the test, bundle verification, and smoke commands;
+7. rebuild the AppImage.
