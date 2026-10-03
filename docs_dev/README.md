@@ -1,11 +1,19 @@
 # Developer Documentation
 
-This directory documents ACEswarm development, architecture, runtime behavior, bootstrap, and release packaging.
+This directory contains the technical documentation for ACEswarm. The documents are grouped into **development** instructions and **introduction/reference** material.
 
-- [Development and local startup](development.md)
+## Development
+
+Use these documents when setting up, running, testing, or packaging ACEswarm:
+
+- [Development setup, testing, and release build](development.md)
+
+## Introduction and Reference
+
+Use these documents to understand the system and its runtime behavior:
+
 - [Architecture and project layout](architecture.md)
 - [Runtime and workspace](runtime.md)
-- [Bootstrap and bundled applications](bootstrap.md)
-- [Linux build and release](build.md)
+- [Config export and bundled application bootstrap](bootstrap.md)
 
 User-facing download, run, data, and uninstall instructions are in the repository root [`README.md`](../README.md).

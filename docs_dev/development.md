@@ -1,42 +1,55 @@
-# Development and Local Startup
+## One-command development setup
 
-## Repository layout
+From a fresh clone:
 
-ACEswarm is self-contained. AivudaOS and AivudaAppStore remain independent packages and are consumed from PyPI; no sibling checkout is needed.
+```bash
+git clone https://github.com/shupx/ACEswarm.git
+cd ACEswarm
+npm run setup:dev
+npm run dev
+```
+
+The setup script creates `.venv`, installs both submodule requirement sets, initializes the submodules, builds their frontends, and builds the private development runtime. It does not use external sibling checkouts. After setup, `npm run dev` starts ACEswarm with the private runtime and Caddy automatically. Set `ACESWARM_PYTHON` or `ACESWARM_CADDY` only when overriding those defaults.
+
+## Applying source changes
+
+Every invocation of `npm run dev` first rebuilds both submodule frontends and then starts Electron. After changing ACEswarm JavaScript/HTML/CSS, AivudaOS Python, AivudaAppStore Python, or either frontend:
 
 ```text
-ACEswarm/
-├── electron/
-├── resources/
-├── scripts/
-└── tests/
+1. Edit the source
+2. Stop ACEswarm with Ctrl+C
+3. Run npm run dev again
 ```
 
-ACEswarm consumes the two packages through local ASGI/HTTP services. It does not import their private Python modules or access their databases.
+The Electron main process and both Python services restart, and both frontend bundles are rebuilt before the new session starts. There is currently no background HMR/watch process; `npm run dev` is the single refresh boundary.
 
-## Prerequisites
+## One-command release build
 
-- Node.js and npm;
-- one Python environment containing the pinned published packages;
-- an executable Caddy binary;
-- Install the published packages into that environment:
+From the ACEswarm repository:
 
 ```bash
-python3 -m pip install 'aivudaos==1.0.0.dev2026100201' 'aivudaappstore==1.0.0.dev2026100201'
+npm run build:release
 ```
 
-## Start ACEswarm in development
+The release script initializes submodules, builds the private runtime from checked-out submodule source, verifies the bundle, and produces the AppImage under `dist/`.
+
+## Build requirements
+
+The release build uses the checked-out Git submodules and a private Python runtime. Ensure Node.js/npm, Python build tooling, `tar`, `curl`, `rsync`, compiler tools, and several GB of free disk space are available.
+
+The runtime build does not use external sibling checkouts. It stages `./aivudaOS` and `./aivudaAppStore` into a temporary directory, builds their frontends, builds their Python wheels, and packages the resulting resources into the AppImage.
+
+For a clean release build:
 
 ```bash
-cd /path/to/ACEswarm
-npm ci --include=dev
-
-ACESWARM_PYTHON=/absolute/path/to/python-in-that-environment \
-ACESWARM_CADDY=/absolute/path/to/caddy \
-npm start
+npm run build:release
 ```
 
-`ACESWARM_PYTHON` is required in development and is the only Python executable used by both local services. ACEswarm discovers both package roots by importing the installed PyPI distributions from that environment. `ACESWARM_CADDY` selects the gateway binary.
+The resulting artifact is written to:
+
+```text
+dist/ACEswarm-<version>-x86_64.AppImage
+```
 
 ## Local services
 

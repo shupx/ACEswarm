@@ -8,6 +8,10 @@
     "test": "node --test tests/*.test.js",
     "check": "node --check electron/main.js && node --check electron/preload.js && node --check electron/shell.js && node --check scripts/smoke-services.js && node --test tests/*.test.js",
     "smoke": "node scripts/smoke-services.js",
+    "dev": "bash scripts/start-dev.sh",
+    "build:dev-frontends": "bash scripts/build-dev-frontends.sh",
+    "setup:dev": "bash scripts/setup-dev.sh",
+    "build:release": "bash scripts/build-release.sh",
     "bundle:runtime": "bash scripts/build-python-runtime.sh",
     "bundle:verify": "node scripts/verify-bundle.js",
     "dist": "npm run bundle:verify && electron-builder --linux AppImage"

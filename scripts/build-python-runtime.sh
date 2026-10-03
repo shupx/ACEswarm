@@ -7,6 +7,8 @@ runtime="$root/resources/python-runtime"
 wheels="$root/resources/python-wheels"
 packages="$root/resources/python-packages"
 cache="${ACESWARM_DOWNLOAD_CACHE:-/tmp/aceswarm-download}"
+staging="$(mktemp -d "${TMPDIR:-/tmp}/aceswarm-python-sources.XXXXXX")"
+trap 'rm -rf "$staging"' EXIT
 mkdir -p "$cache" "$wheels" "$runtime" "$packages"
 [[ $(uname -s) == Linux && $(uname -m) == x86_64 ]] || { echo 'Only Linux x86_64 is supported for this release' >&2; exit 1; }
 read_lock() { node -p "require('$lock').$1.$2"; }
@@ -48,11 +50,33 @@ python="$runtime/bin/python3"
 export SOURCE_DATE_EPOCH=1790899200
 pip_options=(--retries 0)
 if [[ "${ACESWARM_OFFLINE:-0}" == 1 ]]; then pip_options+=(--no-index --find-links "$wheels"); fi
-os_version="$(read_lock pythonPackages aivudaos)"
-store_version="$(read_lock pythonPackages aivudaappstore)"
+for source in aivudaOS aivudaAppStore; do
+  [[ -d "$root/$source" && -f "$root/$source/pyproject.toml" ]] || {
+    echo "Missing git submodule source: $root/$source; run git submodule update --init --recursive" >&2
+    exit 1
+  }
+  cp -a "$root/$source" "$staging/$source"
+done
+# Remove stale ACEswarm package wheels before rebuilding the current submodule revisions.
+rm -f "$wheels"/aivudaos-*.whl "$wheels"/aivudaappstore-*.whl
+# Build frontend assets from the copies so setuptools/npm cannot mutate the checked-out submodules.
+npm_cmd="$(command -v npm)" || { echo 'npm is required to build submodule frontends' >&2; exit 1; }
+for ui in \
+  "$staging/aivudaOS/aivudaos/resources/ui" \
+  "$staging/aivudaAppStore/aivudaappstore/resources/ui"; do
+  rm -rf "$ui/node_modules" "$ui/dist"
+  "$npm_cmd" --prefix "$ui" ci --include=dev --ignore-scripts
+  "$npm_cmd" --prefix "$ui" run build
+done
+# setuptools invokes each package's resource hook again; keep frontend devDependencies available there.
+export NODE_ENV=development
+# Rebuild the two source distributions at the current submodule revisions.
+rm -f "$wheels"/aivudaos-*.whl "$wheels"/aivudaappstore-*.whl
 "$python" -m pip wheel "${pip_options[@]}" --no-build-isolation --wheel-dir "$wheels" \
-  "aivudaos==$os_version" "aivudaappstore==$store_version"
-find "$wheels" -maxdepth 1 -name '*.whl' -type f -printf '%f\n' | sort | (cd "$wheels" && xargs sha256sum) > "$root/resources/wheels.lock.generated"
+  "$staging/aivudaOS" "$staging/aivudaAppStore"
+find "$wheels" -maxdepth 1 -name '*.whl' -type f \
+  ! -name 'aivudaos-*.whl' ! -name 'aivudaappstore-*.whl' \
+  -printf '%f\n' | sort | (cd "$wheels" && xargs sha256sum) > "$root/resources/wheels.lock.generated"
 if [[ -f "$root/resources/wheels.lock" ]]; then
   cmp -s "$root/resources/wheels.lock" "$root/resources/wheels.lock.generated" || {
     echo "Wheelhouse differs from pinned resources/wheels.lock; inspect upstream package/dependency drift" >&2; exit 1;
@@ -63,7 +87,7 @@ fi
 rm -rf "$packages"
 mkdir -p "$packages"
 "$python" -m pip install --no-index --find-links "$wheels" --target "$packages" \
-  "aivudaos==$os_version" "aivudaappstore==$store_version"
+  aivudaos aivudaappstore
 for ui in "$packages/aivudaos/resources/ui/dist/index.html" "$packages/aivudaappstore/resources/ui/dist/index.html"; do
   [[ -f "$ui" ]] || { echo "Published package UI resource missing: $ui" >&2; exit 1; }
 done

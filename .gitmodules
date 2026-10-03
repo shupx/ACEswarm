@@ -1,0 +1,6 @@
+[submodule "aivudaOS"]
+	path = aivudaOS
+	url = https://github.com/shupx/aivudaOS.git
+[submodule "aivudaAppStore"]
+	path = aivudaAppStore
+	url = https://github.com/shupx/aivudaAppStore.git

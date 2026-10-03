@@ -140,21 +140,27 @@ test('packaged runtime resolves separately shipped Python packages', () => {
     fs.rmSync(resourcesPath, { recursive: true, force: true });
   }
 });
-test('development resolves published packages from one explicit Python environment', () => {
+test('development resolves the checked-out submodule sources through PYTHONPATH', () => {
   const python = process.env.ACESWARM_PYTHON;
   const caddy = process.env.ACESWARM_CADDY;
+  const sourceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'aceswarm-source-'));
   const pythonPath = execFileSync('python3', ['-c', 'import sys; print(sys.executable)'], { encoding: 'utf8' }).trim();
   try {
+    for (const [checkout, packageName] of [['aivudaOS', 'aivudaos'], ['aivudaAppStore', 'aivudaappstore']]) {
+      const ui = path.join(sourceRoot, checkout, packageName, 'resources/ui/dist');
+      fs.mkdirSync(ui, { recursive: true });
+      fs.writeFileSync(path.join(ui, 'index.html'), 'ui');
+    }
     process.env.ACESWARM_PYTHON = pythonPath;
     process.env.ACESWARM_CADDY = process.execPath;
-    const runtime = resolveRuntime({ packaged: false, sourceRoot: path.resolve(__dirname, '..') });
-    assert.ok(runtime.osRoot.includes('site-packages'));
-    assert.equal(runtime.osRoot, runtime.storeRoot);
-    assert.ok(!runtime.osRoot.includes('aivudaOS'));
-    assert.ok(!runtime.storeRoot.includes('aivudaAppStore'));
-    assert.equal(process.env.ACESWARM_OS_ROOT, undefined);
-    assert.equal(process.env.ACESWARM_STORE_ROOT, undefined);
+    const runtime = resolveRuntime({ packaged: false, sourceRoot });
+    assert.equal(runtime.osRoot, path.join(sourceRoot, 'aivudaOS'));
+    assert.equal(runtime.storeRoot, path.join(sourceRoot, 'aivudaAppStore'));
+    assert.equal(runtime.pythonPath, [runtime.osRoot, runtime.storeRoot].join(path.delimiter));
+    assert.ok(runtime.pythonPath.includes(`${path.sep}aivudaOS`));
+    assert.ok(runtime.pythonPath.includes(`${path.sep}aivudaAppStore`));
   } finally {
+    fs.rmSync(sourceRoot, { recursive: true, force: true });
     if (python === undefined) delete process.env.ACESWARM_PYTHON;
     else process.env.ACESWARM_PYTHON = python;
     if (caddy === undefined) delete process.env.ACESWARM_CADDY;
@@ -171,7 +177,9 @@ test('development requires an explicit Python environment', () => {
     process.env.ACESWARM_PYTHON = 'relative/python';
     assert.throws(() => resolveRuntime({ packaged: false, sourceRoot: path.resolve(__dirname, '..') }), /absolute ACESWARM_PYTHON/);
     process.env.ACESWARM_PYTHON = process.execPath;
-    assert.throws(() => resolveRuntime({ packaged: false, sourceRoot: path.resolve(__dirname, '..') }), /Python environment/);
+    const runtime = resolveRuntime({ packaged: false, sourceRoot: path.resolve(__dirname, '..') });
+    assert.equal(runtime.osRoot, path.resolve(__dirname, '..', 'aivudaOS'));
+
   } finally {
     if (python === undefined) delete process.env.ACESWARM_PYTHON;
     else process.env.ACESWARM_PYTHON = python;
