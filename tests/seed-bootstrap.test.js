@@ -40,14 +40,14 @@ test('seed publication uses the AppStore API and queues the canonical config exp
     else { response.statusCode = 404; body = { detail: 'unknown' }; }
     response.end(JSON.stringify(body));
   });
-  const previousOs = process.env.ACESWARM_SEED_ADMIN_PASSWORD;
-  const previousStore = process.env.ACESWARM_SEED_STORE_PASSWORD;
   try {
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
     const base = `http://127.0.0.1:${server.address().port}/`;
-    process.env.ACESWARM_SEED_ADMIN_PASSWORD = 'os-password';
-    process.env.ACESWARM_SEED_STORE_PASSWORD = 'store-password';
     assert.deepEqual(await provision({ osUrl: base, storeUrl: base, configPath }), { configured: ['demo'] });
+    const osLogin = calls.find((call) => call.pathname.endsWith('/aivuda_os/api/auth/login'));
+    assert.deepEqual(JSON.parse(osLogin.body), { username: 'admin', password: 'admin123' });
+    const storeLogin = calls.find((call) => call.pathname.endsWith('/aivuda_app_store/dev/auth/login'));
+    assert.match(storeLogin.body, /admin123/);
     const published = calls.find((call) => call.pathname.endsWith('/upload-package'));
     assert.equal(published.headers.authorization, 'Bearer secret');
     assert.ok(published.body.includes('manifest_json'));
@@ -63,8 +63,6 @@ test('seed publication uses the AppStore API and queues the canonical config exp
     assert.throws(() => verifyArtifact(document.aceswarm.packages[0], directory), /hash mismatch/);
     await assert.rejects(provision({ osUrl: base, storeUrl: base, configPath }), /hash mismatch/);
   } finally {
-    if (previousOs === undefined) delete process.env.ACESWARM_SEED_ADMIN_PASSWORD; else process.env.ACESWARM_SEED_ADMIN_PASSWORD = previousOs;
-    if (previousStore === undefined) delete process.env.ACESWARM_SEED_STORE_PASSWORD; else process.env.ACESWARM_SEED_STORE_PASSWORD = previousStore;
     await new Promise((resolve) => server.close(resolve));
     fs.rmSync(directory, { recursive: true, force: true });
   }

@@ -2,6 +2,11 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 
+// Embedded AivudaOS and AivudaAppStore initialize their local admin accounts
+// with this development/embedded default. Seed bootstrap is intentionally
+// self-contained so launching an AppImage does not require shell variables.
+const DEFAULT_ADMIN_PASSWORD = 'admin123';
+
 function verifyArtifact(entry, directory) {
   if (!entry || typeof entry.artifact !== 'string' || !/^packages\/[^/\\]+\.(?:zip|tar|tar\.gz|tgz|tar\.xz|txz)$/.test(entry.artifact) ||
       !/^[a-f0-9]{64}$/.test(entry.sha256)) throw new Error('Invalid seed artifact metadata');
@@ -87,15 +92,12 @@ async function provision({ osUrl, storeUrl, configPath }) {
   if (!fs.statSync(configPath).isFile() || fs.realpathSync(configPath) !== path.resolve(configPath)) throw new Error('Invalid seed config export');
   const document = JSON.parse(fs.readFileSync(configPath, 'utf8'));
   const artifacts = discoverSeeds(document, directory);
-  const password = process.env.ACESWARM_SEED_ADMIN_PASSWORD;
-  const storePassword = process.env.ACESWARM_SEED_STORE_PASSWORD;
-  if (!password || (artifacts.size && !storePassword)) throw new Error('Set ACESWARM_SEED_ADMIN_PASSWORD and ACESWARM_SEED_STORE_PASSWORD for seed provisioning');
   const osLogin = await requestJson(new URL('aivuda_os/api/auth/login', osUrl), {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: 'admin', password }),
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: 'admin', password: DEFAULT_ADMIN_PASSWORD }),
   });
   if (artifacts.size) {
     const storeForm = new FormData();
-    storeForm.set('username', 'admin'); storeForm.set('password', storePassword);
+    storeForm.set('username', 'admin'); storeForm.set('password', DEFAULT_ADMIN_PASSWORD);
     const storeLogin = await requestJson(new URL('aivuda_app_store/dev/auth/login', storeUrl), { method: 'POST', body: storeForm });
     const authorization = `Bearer ${storeLogin.access_token}`;
     const expected = new Map(document.payload.apps.map((item) => [item.app_id, item.version]));
