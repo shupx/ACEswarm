@@ -9,7 +9,7 @@ build_frontend() {
     echo "Frontend checkout is incomplete: $ui_dir" >&2
     exit 1
   fi
-  if [[ ! -d "$ui_dir/node_modules" ]]; then
+  if [[ ! -x "$ui_dir/node_modules/.bin/vite" ]]; then
     npm --prefix "$ui_dir" ci --include=dev --no-audit --no-fund
   fi
   npm --prefix "$ui_dir" run build

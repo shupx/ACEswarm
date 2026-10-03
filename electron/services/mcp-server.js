@@ -3,10 +3,10 @@ const CONTROL_URL = process.env.ACESWARM_CONTROL_URL;
 if (!CONTROL_URL) { process.stderr.write('ACESWARM_CONTROL_URL is required\n'); process.exit(2); }
 async function call(path, options) { const response = await fetch(`${CONTROL_URL}${path}`, options); const body = await response.json(); if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`); return body; }
 const tools = [
-  { name: 'aceswarm_status', description: 'Read ACEswarm service and bootstrap status.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
-  { name: 'aceswarm_list_pages', description: 'List safe ACEswarm page descriptors.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
-  { name: 'aceswarm_bootstrap_status', description: 'Read seed bootstrap status.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
-  { name: 'aceswarm_list_workspace_items', description: 'List projects or experiments.', inputSchema: { type: 'object', properties: { kind: { type: 'string', enum: ['projects', 'experiments'] } }, required: ['kind'], additionalProperties: false } },
+  { name: 'aceswarm_status', description: 'Read ACEswarm service and bootstrap status.', annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }, inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
+  { name: 'aceswarm_list_pages', description: 'List safe ACEswarm page descriptors.', annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }, inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
+  { name: 'aceswarm_bootstrap_status', description: 'Read seed bootstrap status.', annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }, inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
+  { name: 'aceswarm_list_workspace_items', description: 'List projects or experiments.', annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }, inputSchema: { type: 'object', properties: { kind: { type: 'string', enum: ['projects', 'experiments'] } }, required: ['kind'], additionalProperties: false } },
   { name: 'aceswarm_create_workspace_item', description: 'Create a project or experiment folder.', inputSchema: { type: 'object', properties: { kind: { type: 'string', enum: ['projects', 'experiments'] }, name: { type: 'string', minLength: 1, maxLength: 80 } }, required: ['kind', 'name'], additionalProperties: false } },
   { name: 'aceswarm_targets', description: 'Get settings and app store UI targets.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
 ];

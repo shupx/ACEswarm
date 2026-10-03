@@ -2,9 +2,9 @@ const http = require('node:http');
 const { listItems } = require('../services/workspace-items');
 
 const MCP_TOOLS = [
-  { name: 'aceswarm_get_runtime_status', description: 'Read ACEswarm local service endpoints and failures.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
-  { name: 'aceswarm_list_pages', description: 'List ACEswarm navigation pages.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
-  { name: 'aceswarm_list_workspace', description: 'List names in a workspace collection.', inputSchema: { type: 'object', properties: { kind: { type: 'string', enum: ['projects', 'experiments'] } }, required: ['kind'], additionalProperties: false } },
+  { name: 'aceswarm_get_runtime_status', description: 'Read ACEswarm local service endpoints and failures.', annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }, inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
+  { name: 'aceswarm_list_pages', description: 'List ACEswarm navigation pages.', annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }, inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
+  { name: 'aceswarm_list_workspace', description: 'List names in a workspace collection.', annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }, inputSchema: { type: 'object', properties: { kind: { type: 'string', enum: ['projects', 'experiments'] } }, required: ['kind'], additionalProperties: false } },
 ];
 
 function json(response, status, value) {

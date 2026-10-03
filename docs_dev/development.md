@@ -61,7 +61,15 @@ AivudaAppStore FastAPI/Uvicorn
 ACEswarm Caddy App Gateway
 ```
 
-All services bind to dynamically allocated loopback ports. ACEswarm also starts its Control API and local MCP transport on a dynamic loopback port. The stdio compatibility transport is available with `ACESWARM_CONTROL_URL=http://127.0.0.1:<port> npm run mcp:stdio`; Electron starts it automatically for local Agent/Codex integrations. ACEswarm does not call standalone installation scripts, systemd, Avahi, or ports 80/443.
+All services bind to dynamically allocated loopback ports. ACEswarm also starts its Control API and local MCP transport on a dynamic loopback port. The streamable HTTP endpoint is available at the reported control URL; a local MCP client such as Codex must be configured with that URL for the session. The stdio compatibility transport is available with `ACESWARM_CONTROL_URL=http://127.0.0.1:<port> npm run mcp:stdio`. AivudaOS and AivudaAppStore MCP servers are started as separate local processes. ACEswarm does not call standalone installation scripts, systemd, Avahi, or ports 80/443.
+
+When ACEswarm is running, its console prints the MCP endpoint. For a local Codex smoke test, configure that endpoint for the session and ask Codex to list the pages:
+
+```bash
+codex exec --ephemeral --skip-git-repo-check --sandbox read-only \
+  -c 'mcp_servers.aceswarm.url="http://127.0.0.1:<control-port>/mcp"' \
+  'Use the ACEswarm MCP server. List the pages and report their ids.'
+```
 
 ## Tests
 

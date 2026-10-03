@@ -49,7 +49,9 @@ test('stdio MCP handshake and structured tool call use control API', async () =>
     child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }) + '\n');
     assert.equal((await next()).result.serverInfo.name, 'aceswarm');
     child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }) + '\n');
-    assert.ok((await next()).result.tools.some((tool) => tool.name === 'aceswarm_status'));
+    const listed = (await next()).result.tools;
+    assert.ok(listed.some((tool) => tool.name === 'aceswarm_status'));
+    assert.equal(listed.find((tool) => tool.name === 'aceswarm_status').annotations.readOnlyHint, true);
     child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'aceswarm_status', arguments: {} } }) + '\n');
     assert.equal((await next()).result.isError, false);
   } finally { child.kill('SIGTERM'); await control.stop(); fs.rmSync(root, { recursive: true, force: true }); }

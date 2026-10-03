@@ -73,6 +73,8 @@ app.whenReady().then(async () => {
     endpoints = await services.start();
     control = new ControlServer({ paths, endpoints });
     endpoints.control = await control.start();
+    console.log(`ACEswarm Control API: ${endpoints.control}`);
+    console.log(`ACEswarm MCP HTTP: ${endpoints.control}/mcp`);
     services.startMcp(endpoints.control);
     services.startPackageMcps();
     ipcMain.handle('control:pages', () => fixed);
