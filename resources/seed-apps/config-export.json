@@ -1,0 +1,50 @@
+{
+  "format_version": 1,
+  "human_header": {
+    "description": "ACEswarm ground-station seed configuration export.",
+    "aivudaos_version": "",
+    "avahi_hostname": "aceswarm",
+    "exported_at": 0,
+    "selected": {
+      "system_parameters": true,
+      "app_count": 4
+    }
+  },
+  "payload": {
+    "system_parameters": {},
+    "apps": [
+      {
+        "app_id": "app_hello_world_examle_2026040813_429c",
+        "name": "app_hello_world_examle_2026040813_429c",
+        "version": "1.1.0",
+        "autostart": false,
+        "running": false,
+        "parameters": {}
+      },
+      {
+        "app_id": "app_panel_hub_2026042422_9ec8",
+        "name": "app_panel_hub_2026042422_9ec8",
+        "version": "0.1.0",
+        "autostart": false,
+        "running": false,
+        "parameters": {}
+      },
+      {
+        "app_id": "app_swarm_controlpad_2026043022_d04b",
+        "name": "app_swarm_controlpad_2026043022_d04b",
+        "version": "0.1.0",
+        "autostart": false,
+        "running": false,
+        "parameters": {}
+      },
+      {
+        "app_id": "app_swarm_dashboard_2026042621_5e65",
+        "name": "app_swarm_dashboard_2026042621_5e65",
+        "version": "0.1.0",
+        "autostart": false,
+        "running": false,
+        "parameters": {}
+      }
+    ]
+  }
+}
