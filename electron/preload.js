@@ -1,8 +1,11 @@
 const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('aceswarm', {
-  list: () => ipcRenderer.invoke('pages:list'),
-  resolve: (id, context) => ipcRenderer.invoke('pages:resolve', id, context),
-  status: () => ipcRenderer.invoke('services:status'),
-  items: (kind) => ipcRenderer.invoke('workspace:list', kind),
-  create: (kind, name) => ipcRenderer.invoke('workspace:create', kind, name),
+  pages: () => ipcRenderer.invoke('control:pages'),
+  resolvePage: (id, context) => ipcRenderer.invoke('control:resolve', id, context),
+  status: () => ipcRenderer.invoke('control:status'),
+  workspaceItems: (kind) => ipcRenderer.invoke('control:items', kind),
+  createWorkspaceItem: (kind, name) => ipcRenderer.invoke('control:create', kind, name),
+  settingsTarget: () => ipcRenderer.invoke('control:settings'),
+  storeTarget: () => ipcRenderer.invoke('control:store'),
+  bootstrap: () => ipcRenderer.invoke('control:bootstrap'),
 });

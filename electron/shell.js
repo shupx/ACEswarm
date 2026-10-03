@@ -6,7 +6,7 @@ if (!Array.isArray(saved)) saved = [];
 let current = 'home';
 
 async function openPage(id) {
-  const page = await window.aceswarm.resolve(id);
+  const page = await window.aceswarmControl.resolvePage(id);
   current = id;
   document.querySelector('#title').textContent = page.label;
   document.querySelector('#section').textContent = page.label.toUpperCase();
@@ -39,7 +39,7 @@ async function openPage(id) {
       const refresh = async () => {
         list.replaceChildren();
         try {
-          const items = await window.aceswarm.items(id);
+          const items = (await window.aceswarmControl.workspaceItems(id)).items;
           if (!items.length) list.textContent = `No ${id} yet. Create one to get started.`;
           for (const name of items) {
             const item = document.createElement('div'); item.className = 'item'; item.textContent = name; list.append(item);
@@ -49,7 +49,7 @@ async function openPage(id) {
       create.onclick = async () => {
         const name = prompt(`Name your ${id === 'projects' ? 'project' : 'experiment'}`);
         if (!name) return;
-        try { await window.aceswarm.create(id, name.trim()); await refresh(); }
+        try { await window.aceswarmControl.createWorkspaceItem(id, name.trim()); await refresh(); }
         catch (error) { alert(error.message); }
       };
       section.append(create, list);
@@ -74,16 +74,16 @@ function addButton(id, label) {
   navigation.append(button);
 }
 
-window.aceswarm.list().then((pages) => {
+window.aceswarmControl.pages().then((pages) => {
   for (const page of pages) addButton(page.id, page.label);
-  for (const id of saved) if (typeof id === 'string') window.aceswarm.resolve(id).then((page) => addButton(page.id, page.label)).catch(() => {});
+  for (const id of saved) if (typeof id === 'string') window.aceswarmControl.resolvePage(id).then((page) => addButton(id, page.label)).catch(() => {});
   openPage('home');
 });
 
 function addTarget(prefix, value) {
   if (!value) return;
   const id = prefix + value.trim();
-  window.aceswarm.resolve(id).then((page) => {
+  window.aceswarmControl.resolvePage(id).then((page) => {
     if (!saved.includes(id)) { saved.push(id); localStorage.setItem('aceswarm.pages', JSON.stringify(saved)); addButton(id, page.label); }
     openPage(id);
   }).catch((error) => alert(error.message));
@@ -91,6 +91,6 @@ function addTarget(prefix, value) {
 document.querySelector('#add-robot').onclick = () => addTarget('robot:', prompt('Robot AivudaOS URL (http:// or https://)'));
 document.querySelector('#add-app').onclick = () => addTarget('app:', prompt('Installed application ID'));
 setInterval(async () => {
-  const status = await window.aceswarm.status();
+  const status = await window.aceswarmControl.status();
   document.querySelector('#health').textContent = status.failures.at(-1) || '● Local services running';
 }, 3000);

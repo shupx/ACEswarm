@@ -6,6 +6,7 @@ const { LocalServices } = require('./services/local-services');
 const { fixed, resolvePage } = require('./services/pages');
 const { provision } = require('./services/seed');
 const { listItems, createItem } = require('./services/workspace-items');
+const { ControlServer } = require('./services/control-server');
 
 let services;
 let window;
@@ -13,6 +14,7 @@ let endpoints;
 const remoteOrigins = new Set();
 let paths;
 let quitting = false;
+let control;
 
 function allowedUrl(rawUrl) {
   try {
@@ -57,7 +59,7 @@ function createWindow() {
 function handleTerminationSignal() {
   if (quitting) return;
   quitting = true;
-  services?.stop().finally(() => app.quit());
+  Promise.resolve(control?.stop()).finally(() => services?.stop()).finally(() => app.quit());
 }
 process.on('SIGTERM', handleTerminationSignal);
 process.on('SIGINT', handleTerminationSignal);
@@ -69,19 +71,28 @@ app.whenReady().then(async () => {
     const runtime = resolveRuntime({ packaged: app.isPackaged, resourcesPath: process.resourcesPath, sourceRoot: path.resolve(__dirname, '..') });
     services = new LocalServices(paths, runtime);
     endpoints = await services.start();
-    ipcMain.handle('pages:list', () => fixed);
-    ipcMain.handle('pages:resolve', (_, id, context) => {
+    control = new ControlServer({ paths, endpoints });
+    endpoints.control = await control.start();
+    services.startMcp(endpoints.control);
+    ipcMain.handle('control:pages', () => fixed);
+    ipcMain.handle('control:resolve', (_, id, context) => {
       const page = resolvePage(id, endpoints, context);
       if (page.kind === 'robot') remoteOrigins.add(new URL(page.url).origin);
       return page;
     });
-    ipcMain.handle('services:status', () => ({ endpoints, failures: services.failures }));
-    ipcMain.handle('workspace:list', (_, kind) => listItems(paths, kind));
-    ipcMain.handle('workspace:create', (_, kind, name) => createItem(paths, kind, name));
+    ipcMain.handle('control:status', () => ({ ...services.endpoints, control: endpoints.control, failures: services.failures, bootstrap: control.bootstrap }));
+    ipcMain.handle('control:items', (_, kind) => ({ kind, items: listItems(paths, kind) }));
+    ipcMain.handle('control:create', (_, kind, name) => createItem(paths, kind, name));
+    ipcMain.handle('control:settings', () => ({ url: endpoints.os, kind: 'aivudaos-settings' }));
+    ipcMain.handle('control:store', () => ({ url: endpoints.store, kind: 'aivudaappstore' }));
+    ipcMain.handle('control:bootstrap', () => control.bootstrap);
     createWindow();
+    control.setBootstrap('running');
     provision({ osUrl: endpoints.os, storeUrl: endpoints.store, configPath: path.join(app.isPackaged ? process.resourcesPath : path.resolve(__dirname, '..', 'resources'), 'seed-apps', 'aceswarm-config-export.json') })
-      .catch((error) => { services.failures.push(`Seed provisioning: ${error.message}`); console.error(error); });
+      .then((result) => control.setBootstrap('completed', { result }))
+      .catch((error) => { control.setBootstrap('failed', { error: error.message }); services.failures.push(`Seed provisioning: ${error.message}`); console.error(error); });
   } catch (error) {
+    await control?.stop();
     await services?.stop();
     console.error('ACEswarm startup failed:', error);
     require('electron').dialog.showErrorBox('ACEswarm startup failed', `${error.message}\n\nLogs: ${paths?.logs || 'not initialized'}`);
@@ -92,6 +103,6 @@ app.on('before-quit', (event) => {
   if (quitting || !services) return;
   event.preventDefault();
   quitting = true;
-  services.stop().finally(() => app.quit());
+  control?.stop().finally(() => services.stop()).finally(() => app.quit());
 });
 app.on('window-all-closed', () => app.quit());

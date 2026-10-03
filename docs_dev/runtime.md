@@ -38,6 +38,7 @@ AivudaOS Uvicorn       127.0.0.1:<dynamic>
 AivudaAppStore Uvicorn 127.0.0.1:<dynamic>
 Caddy Gateway          127.0.0.1:<dynamic>
 Caddy admin            127.0.0.1:<dynamic>
+ACEswarm Control API   127.0.0.1:<dynamic>
 ```
 
 The embedded services do not bind ports 80/443 and do not require Avahi.

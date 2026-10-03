@@ -3,6 +3,7 @@ const net = require('node:net');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { prepareGateway } = require('./gateway');
+const { fixed } = require('./pages');
 
 function freePort() {
   return new Promise((resolve, reject) => {
@@ -95,6 +96,14 @@ class LocalServices {
       gateway: `http://127.0.0.1:${gatewayPort}`,
     };
     return this.endpoints;
+  }
+
+  startMcp(controlUrl) {
+    const child = this.launch('aceswarm-mcp', process.execPath, [path.join(__dirname, 'mcp-server.js')], {
+      ACESWARM_CONTROL_URL: controlUrl,
+    });
+    this.mcp = child;
+    return child;
   }
 
   async stop() {
