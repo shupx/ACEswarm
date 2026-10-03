@@ -79,7 +79,7 @@ app.whenReady().then(async () => {
     ipcMain.handle('workspace:list', (_, kind) => listItems(paths, kind));
     ipcMain.handle('workspace:create', (_, kind, name) => createItem(paths, kind, name));
     createWindow();
-    provision({ osUrl: endpoints.os, storeUrl: endpoints.store, paths, manifestPath: path.join(app.isPackaged ? process.resourcesPath : path.resolve(__dirname, '..', 'resources'), 'seed-apps', 'seed-manifest.json') })
+    provision({ osUrl: endpoints.os, storeUrl: endpoints.store, configPath: path.join(app.isPackaged ? process.resourcesPath : path.resolve(__dirname, '..', 'resources'), 'seed-apps', 'aceswarm-config-export.json') })
       .catch((error) => { services.failures.push(`Seed provisioning: ${error.message}`); console.error(error); });
   } catch (error) {
     await services?.stop();

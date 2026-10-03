@@ -8,7 +8,7 @@ const { workspace } = require('../electron/services/workspace');
 const { gatewayConfig } = require('../electron/services/gateway');
 const { fixed, resolvePage } = require('../electron/services/pages');
 const { freePort } = require('../electron/services/local-services');
-const { verifySeed } = require('../electron/services/seed');
+const { verifyArtifact } = require('../electron/services/seed');
 const { resolveRuntime } = require('../electron/services/runtime');
 const { treeDigest } = require('../electron/services/integrity');
 const { listItems, createItem } = require('../electron/services/workspace-items');
@@ -108,8 +108,9 @@ test('free port binds loopback', async () => {
 });
 test('seed rejects mismatched hashes', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'aceswarm-seed-'));
-  fs.writeFileSync(path.join(root, 'demo.zip'), 'test');
-  assert.throws(() => verifySeed({ id: 'demo', version: '1.0.0', policy: 'install-if-missing', artifact: 'demo.zip', sha256: '0'.repeat(64) }, root), /hash mismatch/);
+  fs.mkdirSync(path.join(root, 'packages'));
+  fs.writeFileSync(path.join(root, 'packages/demo.zip'), 'test');
+  assert.throws(() => verifyArtifact({ artifact: 'packages/demo.zip', sha256: '0'.repeat(64) }, root), /hash mismatch/);
   fs.rmSync(root, { recursive: true });
 });
 test('packaged runtime resolves separately shipped Python packages', () => {

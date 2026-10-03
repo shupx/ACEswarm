@@ -5,22 +5,22 @@ const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
-const { provision, verifyArtifact } = require('../electron/services/seed');
+const { provision, discoverSeeds, verifyArtifact } = require('../electron/services/seed');
+
+const digest = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
 
 test('seed publication uses the AppStore API and queues the canonical config export', async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'aceswarm-bootstrap-'));
   const archive = Buffer.from('package-content');
-  const digest = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
   const document = { format_version: 1, payload: { system_parameters: { feature: true }, apps: [
     { app_id: 'demo', version: '1.0.0', parameters: { port: 10 }, autostart: true, running: true },
-  ] } };
-  fs.writeFileSync(path.join(directory, 'demo.zip'), archive);
-  fs.writeFileSync(path.join(directory, 'config.json'), JSON.stringify(document));
-  const manifest = { schemaVersion: 2, configExport: { artifact: 'config.json', sha256: digest(fs.readFileSync(path.join(directory, 'config.json'))) },
-    apps: [{ id: 'demo', version: '1.0.0', artifact: 'demo.zip', sha256: digest(archive), policy: 'install-if-missing', required: true }] };
-  const manifestPath = path.join(directory, 'seed-manifest.json');
-  fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+  ] }, aceswarm: { packages: [{ artifact: 'packages/demo.zip', sha256: digest(archive) }] } };
+  fs.mkdirSync(path.join(directory, 'packages'));
+  fs.writeFileSync(path.join(directory, 'packages/demo.zip'), archive);
+  const configPath = path.join(directory, 'aceswarm-config-export.json');
+  fs.writeFileSync(configPath, JSON.stringify(document));
   const calls = [];
+  let parsedVersion = '1.0.0';
   const server = http.createServer(async (request, response) => {
     const chunks = [];
     for await (const chunk of request) chunks.push(chunk);
@@ -32,7 +32,7 @@ test('seed publication uses the AppStore API and queues the canonical config exp
     else if (url.pathname.endsWith('/download-url')) {
       if (!calls.some((call) => call.pathname.endsWith('/upload-package'))) { response.statusCode = 404; body = { detail: 'missing' }; }
       else body = { url: '/aivuda_app_store/files/apps/demo/1.0.0/package.zip' };
-    } else if (url.pathname.endsWith('/manifest/parse-package')) body = { manifest: { app_id: 'demo', version: '1.0.0', name: 'Demo', description: 'Example' } };
+    } else if (url.pathname.endsWith('/manifest/parse-package')) body = { manifest: { app_id: 'demo', version: parsedVersion, name: 'Demo', description: 'Example' } };
     else if (url.pathname === '/aivuda_app_store/store/apps/demo') { response.statusCode = 404; body = { detail: 'missing' }; }
     else if (url.pathname.endsWith('/upload-package')) body = { app_id: 'demo', version: '1.0.0', status: 'published' };
     else if (url.pathname.endsWith('/config/import')) body = { operation_id: 'op1', status: 'queued' };
@@ -47,7 +47,7 @@ test('seed publication uses the AppStore API and queues the canonical config exp
     const base = `http://127.0.0.1:${server.address().port}/`;
     process.env.ACESWARM_SEED_ADMIN_PASSWORD = 'os-password';
     process.env.ACESWARM_SEED_STORE_PASSWORD = 'store-password';
-    assert.deepEqual(await provision({ osUrl: base, storeUrl: base, manifestPath }), { configured: ['demo'] });
+    assert.deepEqual(await provision({ osUrl: base, storeUrl: base, configPath }), { configured: ['demo'] });
     const published = calls.find((call) => call.pathname.endsWith('/upload-package'));
     assert.equal(published.headers.authorization, 'Bearer secret');
     assert.ok(published.body.includes('manifest_json'));
@@ -55,12 +55,47 @@ test('seed publication uses the AppStore API and queues the canonical config exp
     assert.deepEqual(JSON.parse(imported.body), { document, app_store_base_url: base });
     assert.ok(calls.some((call) => call.pathname.endsWith('/operations/op1')));
     assert.equal(calls.filter((call) => call.pathname.includes('/aivuda_os/api/apps/upload')).length, 0);
-    fs.writeFileSync(path.join(directory, 'demo.zip'), 'tampered');
-    assert.throws(() => verifyArtifact(manifest.apps[0], directory), /hash mismatch/);
+    parsedVersion = '2.0.0';
+    const imports = calls.filter((call) => call.pathname.endsWith('/config/import')).length;
+    await assert.rejects(provision({ osUrl: base, storeUrl: base, configPath }), /identity mismatch/);
+    assert.equal(calls.filter((call) => call.pathname.endsWith('/config/import')).length, imports);
+    fs.writeFileSync(path.join(directory, 'packages/demo.zip'), 'tampered');
+    assert.throws(() => verifyArtifact(document.aceswarm.packages[0], directory), /hash mismatch/);
+    await assert.rejects(provision({ osUrl: base, storeUrl: base, configPath }), /hash mismatch/);
   } finally {
     if (previousOs === undefined) delete process.env.ACESWARM_SEED_ADMIN_PASSWORD; else process.env.ACESWARM_SEED_ADMIN_PASSWORD = previousOs;
     if (previousStore === undefined) delete process.env.ACESWARM_SEED_STORE_PASSWORD; else process.env.ACESWARM_SEED_STORE_PASSWORD = previousStore;
     await new Promise((resolve) => server.close(resolve));
     fs.rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test('discovery rejects unlisted, missing, escaped and symlinked archives', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'aceswarm-seeds-'));
+  const packages = path.join(directory, 'packages');
+  const archive = Buffer.from('archive');
+  const document = { format_version: 1, payload: { apps: [{ app_id: 'demo', version: '1.0.0' }] },
+    aceswarm: { packages: [{ artifact: 'packages/demo.zip', sha256: digest(archive) }] } };
+  try {
+    fs.mkdirSync(packages);
+    fs.writeFileSync(path.join(packages, 'demo.zip'), archive);
+    assert.equal(discoverSeeds(document, directory).size, 1);
+    fs.writeFileSync(path.join(packages, 'extra.zip'), archive);
+    assert.throws(() => discoverSeeds(document, directory), /do not match/);
+    fs.rmSync(path.join(packages, 'extra.zip'));
+    document.aceswarm.packages[0].artifact = '../outside.zip';
+    assert.throws(() => discoverSeeds(document, directory), /metadata/);
+    document.aceswarm.packages[0].artifact = 'packages/demo.zip';
+    fs.rmSync(path.join(packages, 'demo.zip'));
+    assert.throws(() => discoverSeeds(document, directory), /Invalid seed artifact/);
+    fs.symlinkSync(path.join(directory, 'outside.zip'), path.join(packages, 'demo.zip'));
+    fs.writeFileSync(path.join(directory, 'outside.zip'), archive);
+    assert.throws(() => discoverSeeds(document, directory), /Invalid seed artifact/);
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('bundled config export matches all staged archive hashes', () => {
+  const directory = path.resolve(__dirname, '../resources/seed-apps');
+  const document = JSON.parse(fs.readFileSync(path.join(directory, 'aceswarm-config-export.json')));
+  assert.equal(discoverSeeds(document, directory).size, document.payload.apps.length);
 });

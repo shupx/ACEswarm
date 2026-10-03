@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { digest, treeDigest } = require('../electron/services/integrity');
+const { discoverSeeds } = require('../electron/services/seed');
 
 const root = path.resolve(__dirname, '..');
 const runtime = path.join(root, 'resources', 'python-runtime');
@@ -9,6 +10,9 @@ const python = path.join(runtime, 'bin', 'python3');
 const caddy = path.join(root, 'resources', 'app-gateway', 'caddy');
 const packages = path.join(root, 'resources', 'python-packages');
 const lock = require('../resources/runtime-lock.json');
+const seedDirectory = path.join(root, 'resources', 'seed-apps');
+const seedExport = JSON.parse(fs.readFileSync(path.join(seedDirectory, 'aceswarm-config-export.json'), 'utf8'));
+discoverSeeds(seedExport, seedDirectory);
 if (process.platform !== 'linux' || process.arch !== lock.architecture) throw new Error('Unsupported release architecture');
 for (const file of [python, caddy, path.join(packages, 'aivudaos', 'resources', 'ui', 'dist', 'index.html'), path.join(packages, 'aivudaappstore', 'resources', 'ui', 'dist', 'index.html')]) {
   if (!fs.existsSync(file)) throw new Error(`Missing bundled resource: ${file}; run npm run bundle:runtime`);

@@ -5,10 +5,17 @@ const { execFileSync } = require('node:child_process');
 const { workspace } = require('../electron/services/workspace');
 const { resolveRuntime } = require('../electron/services/runtime');
 const { LocalServices } = require('../electron/services/local-services');
+const { discoverSeeds } = require('../electron/services/seed');
 
 async function run() {
   const sourceRoot = path.resolve(__dirname, '..');
   const resourcesPath = process.env.ACESWARM_RESOURCES;
+  if (resourcesPath) {
+    const seedDirectory = path.join(resourcesPath, 'seed-apps');
+    const document = JSON.parse(fs.readFileSync(path.join(seedDirectory, 'aceswarm-config-export.json'), 'utf8'));
+    assert.ok(!fs.existsSync(path.join(seedDirectory, 'seed-manifest.json')));
+    assert.equal(discoverSeeds(document, seedDirectory).size, document.payload.apps.length);
+  }
   const runtime = resolveRuntime({ packaged: Boolean(resourcesPath), resourcesPath, sourceRoot });
   const paths = workspace(path.join(sourceRoot, '.smoke'));
   fs.writeFileSync(path.join(paths.state, 'persistence-check'), 'kept');

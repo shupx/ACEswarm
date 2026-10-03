@@ -3,10 +3,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 function verifyArtifact(entry, directory) {
-  if (!entry || typeof entry.artifact !== 'string' || !/^[a-f0-9]{64}$/.test(entry.sha256)) throw new Error('Invalid seed artifact metadata');
+  if (!entry || typeof entry.artifact !== 'string' || !/^packages\/[^/\\]+\.(?:zip|tar|tar\.gz|tgz|tar\.xz|txz)$/.test(entry.artifact) ||
+      !/^[a-f0-9]{64}$/.test(entry.sha256)) throw new Error('Invalid seed artifact metadata');
   const artifact = path.resolve(directory, entry.artifact);
-  if (!artifact.startsWith(path.resolve(directory) + path.sep) || !fs.existsSync(artifact) ||
-      !fs.realpathSync(artifact).startsWith(fs.realpathSync(directory) + path.sep) || !fs.statSync(artifact).isFile()) {
+  if (!artifact.startsWith(path.resolve(directory, 'packages') + path.sep) || !fs.existsSync(artifact) ||
+      !fs.realpathSync(artifact).startsWith(fs.realpathSync(path.join(directory, 'packages')) + path.sep) || !fs.statSync(artifact).isFile()) {
     throw new Error(`Invalid seed artifact: ${entry.artifact}`);
   }
   const hash = crypto.createHash('sha256').update(fs.readFileSync(artifact)).digest('hex');
@@ -14,10 +15,25 @@ function verifyArtifact(entry, directory) {
   return artifact;
 }
 
-function verifySeed(entry, directory) {
-  if (!entry || !/^[a-zA-Z0-9_.-]+$/.test(entry.id) || !/^\d+\.\d+\.\d+/.test(entry.version)) throw new Error('Invalid seed identity/version');
-  if (entry.policy !== 'install-if-missing' || (entry.required !== undefined && typeof entry.required !== 'boolean')) throw new Error(`Invalid seed policy: ${entry.id}`);
-  return verifyArtifact(entry, directory);
+function discoverSeeds(document, directory) {
+  if (document.format_version !== 1 || !Array.isArray(document.payload?.apps) || !Array.isArray(document.aceswarm?.packages)) throw new Error('Invalid AivudaOS config export');
+  const packageDirectory = path.join(directory, 'packages');
+  if (!fs.statSync(packageDirectory).isDirectory() || fs.realpathSync(packageDirectory) !== path.resolve(packageDirectory)) throw new Error('Invalid seed packages directory');
+  const archives = fs.readdirSync(packageDirectory).filter((name) => /\.(?:zip|tar|tar\.gz|tgz|tar\.xz|txz)$/.test(name));
+  const entries = new Map();
+  for (const entry of document.aceswarm.packages) {
+    if (!entry || entries.has(entry.artifact)) throw new Error('Duplicate or invalid seed artifact');
+    entries.set(entry.artifact, verifyArtifact(entry, directory));
+  }
+  if (entries.size !== archives.length || archives.some((name) => !entries.has(`packages/${name}`))) throw new Error('Seed archives do not match config export');
+  const ids = new Set();
+  for (const item of document.payload.apps) {
+    if (!item || typeof item.app_id !== 'string' || !/^[a-zA-Z0-9_.-]+$/.test(item.app_id) || item.app_id === '.' || item.app_id === '..' ||
+        typeof item.version !== 'string' || !/^\d+\.\d+\.\d+(?:[-+][a-zA-Z0-9_.-]+)?$/.test(item.version) || ids.has(item.app_id)) throw new Error('Invalid or duplicate seed app in config export');
+    ids.add(item.app_id);
+  }
+  if (ids.size !== entries.size) throw new Error('Seed package count does not match config export');
+  return entries;
 }
 
 async function requestJson(url, options = {}) {
@@ -36,7 +52,15 @@ function packageForm(artifact) {
   return data;
 }
 
-async function publishSeed(entry, artifact, storeUrl, authorization) {
+async function parseSeed(artifact, storeUrl, authorization) {
+  const base = new URL('aivuda_app_store/', storeUrl);
+  const parsed = await requestJson(new URL('dev/apps/manifest/parse-package', base), {
+    method: 'POST', headers: { Authorization: authorization }, body: packageForm(artifact),
+  });
+  return parsed.manifest;
+}
+
+async function publishSeed(entry, artifact, manifest, storeUrl, authorization) {
   const base = new URL('aivuda_app_store/', storeUrl);
   const downloadUrl = new URL(`store/apps/${encodeURIComponent(entry.id)}/versions/${encodeURIComponent(entry.version)}/download-url`, base);
   try {
@@ -45,11 +69,6 @@ async function publishSeed(entry, artifact, storeUrl, authorization) {
   } catch (error) {
     if (error.status !== 404) throw error;
   }
-  const parsed = await requestJson(new URL('dev/apps/manifest/parse-package', base), {
-    method: 'POST', headers: { Authorization: authorization }, body: packageForm(artifact),
-  });
-  const manifest = parsed.manifest;
-  if (manifest?.app_id !== entry.id || String(manifest?.version) !== entry.version) throw new Error(`Seed package identity mismatch: ${entry.id}`);
   const data = packageForm(artifact);
   data.set('manifest_json', JSON.stringify(manifest));
   const detailUrl = new URL(`store/apps/${encodeURIComponent(entry.id)}`, base);
@@ -63,42 +82,32 @@ async function publishSeed(entry, artifact, storeUrl, authorization) {
   await requestJson(downloadUrl);
 }
 
-async function provision({ osUrl, storeUrl, manifestPath }) {
-  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-  if (manifest.schemaVersion !== 2 || !Array.isArray(manifest.apps)) throw new Error('Unsupported seed manifest');
-  if (!manifest.configExport && !manifest.apps.length) return;
-  if (!manifest.configExport) throw new Error('Seed configExport is required for seed apps');
-  const directory = path.dirname(manifestPath);
-  const configPath = verifyArtifact(manifest.configExport, directory);
+async function provision({ osUrl, storeUrl, configPath }) {
+  const directory = path.dirname(configPath);
+  if (!fs.statSync(configPath).isFile() || fs.realpathSync(configPath) !== path.resolve(configPath)) throw new Error('Invalid seed config export');
   const document = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-  if (document.format_version !== 1 || !Array.isArray(document.payload?.apps)) throw new Error('Invalid AivudaOS config export');
-  const ids = new Set();
-  for (const entry of manifest.apps) {
-    verifySeed(entry, directory);
-    if (ids.has(entry.id) || !document.payload.apps.some((item) => item.app_id === entry.id && item.version === entry.version)) throw new Error(`Seed missing from config export: ${entry.id}`);
-    ids.add(entry.id);
-  }
-  if (document.payload.apps.some((item) => !ids.has(item.app_id))) throw new Error('Config export references an unstaged seed app');
+  const artifacts = discoverSeeds(document, directory);
   const password = process.env.ACESWARM_SEED_ADMIN_PASSWORD;
   const storePassword = process.env.ACESWARM_SEED_STORE_PASSWORD;
-  if (!password || (manifest.apps.length && !storePassword)) throw new Error('Set ACESWARM_SEED_ADMIN_PASSWORD and ACESWARM_SEED_STORE_PASSWORD for seed provisioning');
+  if (!password || (artifacts.size && !storePassword)) throw new Error('Set ACESWARM_SEED_ADMIN_PASSWORD and ACESWARM_SEED_STORE_PASSWORD for seed provisioning');
   const osLogin = await requestJson(new URL('aivuda_os/api/auth/login', osUrl), {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: 'admin', password }),
   });
-  if (manifest.apps.length) {
+  if (artifacts.size) {
     const storeForm = new FormData();
     storeForm.set('username', 'admin'); storeForm.set('password', storePassword);
     const storeLogin = await requestJson(new URL('aivuda_app_store/dev/auth/login', storeUrl), { method: 'POST', body: storeForm });
     const authorization = `Bearer ${storeLogin.access_token}`;
-    const skipped = new Set();
-    for (const entry of manifest.apps) {
-      try { await publishSeed(entry, verifySeed(entry, directory), storeUrl, authorization); } catch (error) {
-        if (entry.required !== false) throw error;
-        skipped.add(entry.id);
-        console.warn(`Optional seed ${entry.id} skipped: ${error.message}`);
-      }
+    const expected = new Map(document.payload.apps.map((item) => [item.app_id, item.version]));
+    const seeds = [];
+    for (const artifact of artifacts.values()) {
+      const manifest = await parseSeed(artifact, storeUrl, authorization);
+      const id = manifest?.app_id;
+      const version = String(manifest?.version);
+      if (expected.get(id) !== version || seeds.some((seed) => seed.id === id)) throw new Error(`Seed package identity mismatch: ${path.basename(artifact)}`);
+      seeds.push({ id, version, artifact, manifest });
     }
-    if (skipped.size) document.payload.apps = document.payload.apps.filter((item) => !skipped.has(item.app_id));
+    for (const seed of seeds) await publishSeed(seed, seed.artifact, seed.manifest, storeUrl, authorization);
   }
   const token = encodeURIComponent(osLogin.access_token);
   const queued = await requestJson(new URL(`aivuda_os/api/config/import?token=${token}`, osUrl), {
@@ -115,4 +124,4 @@ async function provision({ osUrl, storeUrl, manifestPath }) {
   return operation.result;
 }
 
-module.exports = { provision, verifySeed, verifyArtifact, publishSeed };
+module.exports = { provision, discoverSeeds, verifyArtifact, publishSeed };
