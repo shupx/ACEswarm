@@ -5,8 +5,13 @@ const { spawn } = require('node:child_process');
 const { prepareGateway } = require('./gateway');
 const { fixed } = require('./pages');
 
-const GATEWAY_PORT = 18790;
-const STORE_GATEWAY_PORT = 18791;
+const GATEWAY_PORT = Number(process.env.ACESWARM_GATEWAY_PORT || 28790);
+const STORE_GATEWAY_PORT = Number(process.env.ACESWARM_STORE_GATEWAY_PORT || 28791);
+
+function validateFixedPort(port, name) {
+  if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error(`${name} must be an integer between 1024 and 65535`);
+  return port;
+}
 
 function freePort() {
   return new Promise((resolve, reject) => {
@@ -16,14 +21,6 @@ function freePort() {
       const port = server.address().port;
       server.close(() => resolve(port));
     });
-  });
-}
-
-function fixedPort(port) {
-  return new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.once('error', (error) => reject(new Error(`Fixed port ${port} is unavailable: ${error.message}`)));
-    server.listen(port, '127.0.0.1', () => server.close(() => resolve(port)));
   });
 }
 
@@ -73,8 +70,10 @@ class LocalServices {
   }
 
   async start() {
-    const [osPort, storePort, adminPort, gatewayPort, storeGatewayPort] = await Promise.all([
-      freePort(), freePort(), freePort(), fixedPort(GATEWAY_PORT), fixedPort(STORE_GATEWAY_PORT),
+    const gatewayPort = validateFixedPort(GATEWAY_PORT, 'ACESWARM_GATEWAY_PORT');
+    const storeGatewayPort = validateFixedPort(STORE_GATEWAY_PORT, 'ACESWARM_STORE_GATEWAY_PORT');
+    const [osPort, storePort, adminPort] = await Promise.all([
+      freePort(), freePort(), freePort(),
     ]);
     if (new Set([osPort, storePort, gatewayPort, adminPort, storeGatewayPort]).size !== 5) throw new Error('Port allocation collision; retry launch');
     const gateway = prepareGateway(this.paths, this.runtime, gatewayPort, osPort, adminPort, storeGatewayPort, storePort);
@@ -162,4 +161,4 @@ class LocalServices {
     }
   }
 }
-module.exports = { LocalServices, freePort, fixedPort, waitFor, GATEWAY_PORT, STORE_GATEWAY_PORT };
+module.exports = { LocalServices, freePort, waitFor, GATEWAY_PORT, STORE_GATEWAY_PORT };

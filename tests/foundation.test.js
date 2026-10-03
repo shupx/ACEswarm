@@ -107,8 +107,8 @@ test('free port binds loopback', async () => {
   assert.ok(port > 0 && port < 65536);
 });
 test('fixed browser gateway ports remain stable', () => {
-  assert.equal(GATEWAY_PORT, 18790);
-  assert.equal(STORE_GATEWAY_PORT, 18791);
+  assert.equal(GATEWAY_PORT, 28790);
+  assert.equal(STORE_GATEWAY_PORT, 28791);
 });
 test('seed rejects mismatched hashes', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'aceswarm-seed-'));

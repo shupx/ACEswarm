@@ -31,6 +31,25 @@ The default user workspace is:
 
 It contains local service data, installed applications, projects, experiments, logs, and bootstrap state. The AppImage itself remains read-only.
 
+Electron also keeps browser data separately from the workspace. On Linux the default location is:
+
+```text
+~/.config/ACEswarm/
+```
+
+This directory contains the Electron browser cache, cookies, local storage, IndexedDB, and the persistent `persist:aceswarm` WebView session. The browser cache is separate from `~/ACEswarm_ws` and is reused across launches while the Gateway ports remain unchanged.
+
+To clear Electron browser cache and WebView login/session data, first close ACEswarm, then remove the cache/session directories:
+
+```bash
+rm -rf ~/.config/ACEswarm/Cache \
+       ~/.config/ACEswarm/Code\ Cache \
+       ~/.config/ACEswarm/GPUCache \
+       ~/.config/ACEswarm/Partitions/persist%3Aaceswarm
+```
+
+If your system uses a custom `XDG_CONFIG_HOME`, replace `~/.config` with `$XDG_CONFIG_HOME`. Clearing these directories removes browser cache, cookies, local storage, and WebView login state; it does not remove installed apps, projects, experiments, or service data in `~/ACEswarm_ws`.
+
 To use another workspace:
 
 ```bash
