@@ -7,7 +7,7 @@ const { spawn, execFileSync } = require('node:child_process');
 const { workspace } = require('../electron/services/workspace');
 const { gatewayConfig } = require('../electron/services/gateway');
 const { fixed, resolvePage } = require('../electron/services/pages');
-const { freePort } = require('../electron/services/local-services');
+const { freePort, GATEWAY_PORT, STORE_GATEWAY_PORT } = require('../electron/services/local-services');
 const { verifyArtifact } = require('../electron/services/seed');
 const { resolveRuntime } = require('../electron/services/runtime');
 const { treeDigest } = require('../electron/services/integrity');
@@ -105,6 +105,10 @@ test('registry resolves local, installed and remote pages', () => {
 test('free port binds loopback', async () => {
   const port = await freePort();
   assert.ok(port > 0 && port < 65536);
+});
+test('fixed browser gateway ports remain stable', () => {
+  assert.equal(GATEWAY_PORT, 18790);
+  assert.equal(STORE_GATEWAY_PORT, 18791);
 });
 test('seed rejects mismatched hashes', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'aceswarm-seed-'));
