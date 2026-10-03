@@ -1,7 +1,25 @@
 ## One-command development setup
 
 
-Use **Node.js 22.x** and npm 10.x. The repository pins the expected major version in [`.nvmrc`](../.nvmrc) and `package.json` engines. 
+Use **Node.js 22.x** and npm 10.x. The repository pins the expected major version in [`.nvmrc`](../.nvmrc) and `package.json` engines. In a new shell, install and activate nvm, then install and switch to the project version:
+
+```bash
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] || { curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash; }
+. "$NVM_DIR/nvm.sh"
+NVM_NODEJS_ORG_MIRROR=https://npmmirror.com/mirrors/node nvm install
+nvm use
+nvm alias default 22
+```
+
+Verify before setup:
+
+```bash
+node --version  # v22.x
+npm --version   # 10.x
+```
+
+The repository `.npmrc` configures npmmirror for Electron and electron-builder binary downloads.
 
 From a fresh clone:
 

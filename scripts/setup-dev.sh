@@ -12,7 +12,9 @@ node_major="$(node -p 'process.versions.node.split(".")[0]')"
 [[ "$node_major" == "22" ]] || { echo "Node.js 22.x is required (found $(node --version)); run nvm install && nvm use" >&2; exit 1; }
 
 printf '%s\n' '[1/4] Initializing Git submodules'
-git submodule update --init --recursive
+# Only ACEswarm's direct submodules are required; optional nested sample repos
+# may use separate credentials and are not needed for the workbench.
+git submodule update --init
 
 printf '%s\n' '[2/4] Installing ACEswarm JavaScript dependencies'
 npm ci --include=dev
