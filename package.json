@@ -2,6 +2,10 @@
   "name": "aceswarm",
   "version": "0.1.0",
   "description": "ACEswarm robot workbench",
+  "engines": {
+    "node": "22.x",
+    "npm": ">=10 <11"
+  },
   "main": "electron/main.js",
   "scripts": {
     "start": "electron .",

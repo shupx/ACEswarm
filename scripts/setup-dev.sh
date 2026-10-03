@@ -8,6 +8,8 @@ command -v git >/dev/null || { echo "git is required" >&2; exit 1; }
 command -v node >/dev/null || { echo "Node.js is required" >&2; exit 1; }
 command -v npm >/dev/null || { echo "npm is required" >&2; exit 1; }
 command -v python3 >/dev/null || { echo "Python 3 is required" >&2; exit 1; }
+node_major="$(node -p 'process.versions.node.split(".")[0]')"
+[[ "$node_major" == "22" ]] || { echo "Node.js 22.x is required (found $(node --version)); run nvm install && nvm use" >&2; exit 1; }
 
 printf '%s\n' '[1/4] Initializing Git submodules'
 git submodule update --init --recursive

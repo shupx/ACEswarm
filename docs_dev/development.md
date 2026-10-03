@@ -1,5 +1,8 @@
 ## One-command development setup
 
+
+Use **Node.js 22.x** and npm 10.x. The repository pins the expected major version in [`.nvmrc`](../.nvmrc) and `package.json` engines. 
+
 From a fresh clone:
 
 ```bash
