@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AivudaOS 未连接</title>
+    <title>ACEswarm - 页面加载失败</title>
     <style>
       :root {
         color-scheme: light;
@@ -40,6 +40,8 @@
         line-height: 1.25;
         letter-spacing: 0;
       }
+      .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; font-weight: 600; }
+      .brand img { width: 28px; height: 28px; }
 
       p {
         margin: 0 0 16px;
@@ -99,13 +101,14 @@
   </head>
   <body>
     <main>
-      <h1>AivudaOS 页面暂时无法打开</h1>
-      <p>请确认 AivudaOS/Caddy 已启动，并且目标地址可以从本机访问。</p>
+      <div class="brand"><img src="./assets/aivuda_icon.png" alt="" />ACEswarm</div>
+      <h1>页面暂时无法打开</h1>
+      <p>请检查目标地址、网络连接，以及目标服务是否可用。</p>
 
       <dl>
         <div>
           <dt>目标地址</dt>
-          <dd><code id="target-url">http://127.0.0.1:80</code></dd>
+          <dd><code id="target-url"></code></dd>
         </div>
         <div>
           <dt>加载错误</dt>
@@ -114,16 +117,17 @@
       </dl>
 
       <button id="reload-button" type="button">重新加载</button>
-      <p class="secondary">该 Electron 壳只负责打开已部署网页，不会自动启动 AivudaOS 服务。</p>
     </main>
 
     <script>
       const params = new URLSearchParams(window.location.search);
-      document.getElementById("target-url").textContent = params.get("url") || "http://127.0.0.1:80";
+      const targetUrl = params.get("url") || "";
+      document.getElementById("target-url").textContent = targetUrl;
       document.getElementById("error-text").textContent = params.get("error") || "Unable to load target URL.";
 
+      document.getElementById("reload-button").disabled = !/^https?:/.test(targetUrl);
       document.getElementById("reload-button").addEventListener("click", () => {
-        window.location.href = params.get("url") || "http://127.0.0.1:80";
+        if (/^https?:/.test(targetUrl)) window.location.href = targetUrl;
       });
     </script>
   </body>

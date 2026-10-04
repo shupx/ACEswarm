@@ -35,7 +35,19 @@
     } catch {}
     return rawUrl;
   }
-  const api = { appKey, windowBounds, workArea, remapUrl };
+  function workspaceBounds(viewport, collapsed = false, region = 'full') {
+    const area = workArea(viewport, collapsed, true);
+    if (region === 'left' || region === 'right') {
+      const leftWidth = Math.floor(area.width / 2);
+      return { ...area, x: region === 'left' ? 0 : leftWidth, width: region === 'left' ? leftWidth : area.width - leftWidth };
+    }
+    if (region === 'top' || region === 'bottom') {
+      const topHeight = Math.floor(area.height / 2);
+      return { ...area, y: region === 'top' ? area.y : area.y + topHeight, height: region === 'top' ? topHeight : area.height - topHeight };
+    }
+    return area;
+  }
+  const api = { appKey, windowBounds, workArea, workspaceBounds, remapUrl };
   if (typeof module !== "undefined") module.exports = api;
   if (root) root.desktopState = api;
 })(typeof window === "undefined" ? null : window);

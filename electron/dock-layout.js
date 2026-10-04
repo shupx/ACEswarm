@@ -15,7 +15,7 @@ function syncPanelBodies() {
   for (const tab of tabs.values()) {
     const panel = desktopLayout.getPanel(tab.id);
     if (panel) tab.panel = panel;
-    const visible = !tab.minimized && panel?.api.isVisible && tab.anchor?.isConnected;
+    const visible = !desktopVisible && !tab.minimized && panel?.api.isVisible && tab.anchor?.isConnected;
     tab.body.hidden = !visible;
     if (!visible) continue;
     const rect = tab.anchor.getBoundingClientRect();
@@ -42,7 +42,16 @@ function panelActions(group) {
       const api = getActiveTab()?.panel?.api;
       if (!api) return;
       if (api.location.type === 'floating') api.group.api.moveTo({ position: 'right' });
-      api.isMaximized() ? api.exitMaximized() : api.maximize();
+      if (api.isMaximized()) {
+        api.exitMaximized();
+        workspaceRegion = workspaceMaximizeRestore;
+      } else {
+        workspaceMaximizeRestore = workspaceRegion;
+        workspaceRegion = 'full';
+        layoutApplicationWindows();
+        api.maximize();
+      }
+      layoutApplicationWindows(); renderDesktop(); writeShellState();
     }],
     ['panel-close', 'x', 'Close', () => closeTab(activeTabId)],
   ];
@@ -98,7 +107,7 @@ function initializeDesktopLayout() {
     createRightHeaderActionComponent: panelActions,
   });
   desktopLayout.onDidActivePanelChange((panel) => {
-    if (layoutMutation || !panel || !tabs.has(panel.id)) return;
+    if (layoutMutation || desktopVisible || !panel || !tabs.has(panel.id)) return;
     activeTabId = panel.id;
     tabs.get(panel.id).panel = panel;
     updateActiveClasses(); updateAddressFromActiveTab(); updateNavigationState();
@@ -123,12 +132,19 @@ function initializeDesktopLayout() {
   root.addEventListener('drop', () => { stackEl.classList.remove('interacting'); schedulePanelLayout(); }, true);
   root.addEventListener('pointermove', () => { if (stackEl.classList.contains('interacting')) schedulePanelLayout(); });
   layoutApplicationWindows();
+  installWorkspaceSnapping(root);
 }
 
 function addApplicationPanel(tab, options = {}) {
   const placement = tab.placement || {};
   const reference = desktopLayout.getPanel(placement.reference);
   const config = { id: tab.id, component: 'webpage', title: tab.title, renderer: 'always' };
+  if (workspaceRegion !== 'full' && desktopLayout.panels.length && !placement.reference && !placement.floating && !options.bounds) {
+    const direction = { left: 'right', right: 'left', top: 'below', bottom: 'above' }[workspaceRegion];
+    config.position = { referencePanel: desktopLayout.activePanel || desktopLayout.panels[0], direction };
+    workspaceRegion = 'full';
+    layoutApplicationWindows();
+  }
   if (placement.floating) config.floating = placement.floating;
   else if (reference) config.position = { referencePanel: reference, direction: placement.direction || 'within', index: placement.index };
   else if (options.bounds) {
@@ -145,7 +161,7 @@ function rememberPanelPlacement(tab) {
   if (!group) return;
   const rect = group.element.getBoundingClientRect();
   tab.placement = group.api.location.type === 'floating'
-    ? { floating: { x: rect.x, y: rect.y - (dockCollapsed ? 28 : 48), width: rect.width, height: rect.height } }
+    ? { floating: { x: rect.x - stackEl.getBoundingClientRect().x, y: rect.y - stackEl.getBoundingClientRect().y, width: rect.width, height: rect.height } }
     : { reference: group.panels.find((panel) => panel.id !== tab.id)?.id, index: group.panels.findIndex((panel) => panel.id === tab.id) };
   if (group.api.location.type === 'grid' && !tab.placement.reference) {
     for (const [direction, restoreDirection] of [['left', 'right'], ['right', 'left'], ['up', 'below'], ['down', 'above']]) {
@@ -169,6 +185,8 @@ function detachApplicationPanel(tab) {
 
 function floatOrDockPanel(tab) {
   if (!tab?.panel) return;
+  workspaceRegion = 'full';
+  layoutApplicationWindows();
   if (tab.panel.api.location.type === 'floating') tab.panel.group.api.moveTo({ position: 'right' });
   else {
     if (desktopLayout.hasMaximizedGroup()) desktopLayout.exitMaximizedGroup();
@@ -176,6 +194,48 @@ function floatOrDockPanel(tab) {
     desktopLayout.addFloatingGroup(tab.panel, { ...bounds, y: bounds.y - (dockCollapsed ? 28 : 48) });
   }
   schedulePanelLayout();
+}
+
+function setWorkspaceRegion(region) {
+  if (!getActiveTab()) return;
+  if (desktopLayout.panels.length === 1 && desktopLayout.panels[0].api.location.type === 'floating') {
+    desktopLayout.panels[0].group.api.moveTo({ position: 'right' });
+  }
+  workspaceRegion = region;
+  if (desktopLayout.hasMaximizedGroup()) desktopLayout.exitMaximizedGroup();
+  layoutApplicationWindows();
+  renderDesktop();
+  writeShellState();
+}
+
+function installWorkspaceSnapping(root) {
+  const preview = document.createElement('div');
+  preview.id = 'workspace-snap-preview';
+  preview.hidden = true;
+  shellEl.append(preview);
+  let drag;
+  let target;
+  root.addEventListener('pointerdown', (event) => {
+    if (!event.target.closest('.dv-tab, .dv-floating-titlebar') || event.target.closest('button, .dv-default-tab-action')) return;
+    if (desktopLayout.panels.length !== 1 || desktopLayout.panels[0].api.location.type !== 'grid') return;
+    drag = { x: event.clientX, y: event.clientY };
+  });
+  window.addEventListener('pointermove', (event) => {
+    if (!drag || Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < 12) return;
+    const top = dockCollapsed ? 28 : 48;
+    target = event.clientX <= 32 ? 'left' : event.clientX >= innerWidth - 32 ? 'right' : event.clientY <= top + 20 ? 'full' : null;
+    preview.hidden = !target;
+    if (target) {
+      const bounds = desktopState.workspaceBounds({ width: innerWidth, height: innerHeight }, dockCollapsed, target);
+      Object.assign(preview.style, { left: bounds.x + 'px', top: bounds.y + 'px', width: bounds.width + 'px', height: bounds.height + 'px' });
+    }
+  });
+  window.addEventListener('pointerup', () => {
+    const region = target;
+    drag = null; target = null; preview.hidden = true;
+    if (region) requestAnimationFrame(() => setWorkspaceRegion(region));
+  });
+  for (const event of ['pointercancel', 'blur']) window.addEventListener(event, () => { drag = null; target = null; preview.hidden = true; });
 }
 
 function restoreDesktopLayout(layout) {

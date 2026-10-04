@@ -27,6 +27,15 @@ WebViews stay mounted in permanent shell containers; Dockview content anchors
 drive their position, size, visibility and floating z-order. Moving a panel or
 minimizing it does not recreate its guest. Closing releases the WebView.
 
+Show desktop hides the entire workspace without removing Dockview panels or
+changing minimized flags. Clicking it again, or activating a running application
+from the Dock, restores the layout. Desktop visibility and the last active panel
+survive restart. A workspace may occupy the full desktop or either horizontal or
+vertical half; the unused area exposes desktop shortcuts and the background.
+A single docked window supports edge dragging with a placement preview. Opening
+a second page in a half-screen workspace fills the complementary half. Group
+maximization fills the desktop below the top panel and restores the previous region.
+
 The collapsible top panel combines System, Applications/Store Admin, pinned page entries,
 running applications, desktop actions and the clock. Its expanded/collapsed height
 (48/28 pixels) is reserved by the window manager. Maximized windows fill the
@@ -61,6 +70,11 @@ Legacy tab/bookmark state is accepted. Saved local service origins are remapped
 to the current endpoints at startup. Address entry from the trusted desktop
 authorizes HTTP(S) origins; guest navigation remains subject to the existing
 origin checks. Allowed page popups open internal application windows.
+As in aivuda-shell, the shell and persistent guest sessions bypass TLS certificate
+validation, including self-signed and hostname-mismatched certificates. This also
+applies to HTTPS subresources and WSS in those sessions; origin authorization still
+applies to page navigation. The generic ACEswarm loading-error page reports the
+target URL and Chromium error, and retries that URL when the service is available.
 
 Recording exposes the same three modes as aivuda-shell: Native captures the
 Electron content area into WebM; FFmpeg encodes window frames into MP4; FFmpeg X11 records

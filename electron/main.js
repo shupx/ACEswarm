@@ -12,11 +12,28 @@ let services;
 let window;
 let endpoints;
 const remoteOrigins = new Set();
+const certificateBypassSessions = new WeakSet();
 let paths;
 let quitting = false;
 
 let shellStatePath;
 let shellState;
+
+function installCertificateValidationBypass(targetSession) {
+  if (certificateBypassSessions.has(targetSession)) return;
+  targetSession.setCertificateVerifyProc((request, callback) => {
+    if (request.errorCode !== 0) console.warn('ACEswarm certificate verification bypass:', request.hostname, request.errorCode);
+    callback(0);
+  });
+  certificateBypassSessions.add(targetSession);
+}
+
+app.on('certificate-error', (event, _contents, url, error, _certificate, callback) => {
+  if (!/^https:|^wss:/.test(url)) { callback(false); return; }
+  event.preventDefault();
+  console.warn('ACEswarm certificate validation bypass:', new URL(url).hostname, error);
+  callback(true);
+});
 
 function sendToShell(channel, payload) {
   if (!window || window.isDestroyed()) return;
@@ -136,6 +153,7 @@ function createWindow() {
   });
   window.webContents.on('did-attach-webview', (_, contents) => {
     contents.on('before-input-event', handleDesktopShortcut);
+    installCertificateValidationBypass(contents.session);
     contents.on('will-navigate', (event, url) => { if (!allowedUrl(url)) event.preventDefault(); });
     contents.session.setPermissionRequestHandler((_, __, callback) => callback(false));
     contents.setWindowOpenHandler(({ url }) => {
@@ -178,6 +196,8 @@ process.on('SIGINT', handleTerminationSignal);
 app.whenReady().then(async () => {
   if (!app.requestSingleInstanceLock()) { app.quit(); return; }
   try {
+    installCertificateValidationBypass(session.defaultSession);
+    installCertificateValidationBypass(session.fromPartition('persist:aivuda-shell'));
     paths = workspace();
     const runtime = resolveRuntime({ packaged: app.isPackaged, resourcesPath: process.resourcesPath, sourceRoot: path.resolve(__dirname, '..') });
     services = new LocalServices(paths, runtime);

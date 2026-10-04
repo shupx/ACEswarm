@@ -122,8 +122,11 @@ splitter resizing, floating panels and preserved guest instances,
 shortcuts with guest focus, page popups, restart persistence, and screenshots
 at 1280, 850 and 390 pixels wide. It also records videos in all three modes and
 uses ffprobe/ffmpeg to verify decodable, nonblank output. It requires the development
-Python environment, Caddy, FFmpeg/ffprobe and an X11 session with a window manager;
+Python environment, Caddy, FFmpeg/ffprobe, OpenSSL and an X11 session with a window manager;
 it does not change the normal user workspace or Videos folder.
+It also checks desktop background pixels, workspace hide/restore without layout
+or guest loss, single-window half-screen snapping, desktop state across restarts,
+self-signed HTTPS loading and retrying a failed URL after its service starts.
 
 ```bash
 npm run test:desktop

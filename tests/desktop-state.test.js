@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { appKey, windowBounds, workArea, remapUrl } = require('../electron/desktop-state');
+const { appKey, windowBounds, workArea, workspaceBounds, remapUrl } = require('../electron/desktop-state');
 
 test('application identity keeps paths and query but ignores in-page anchors', () => {
   assert.equal(appKey('https://robot.local/app#status'), appKey('https://robot.local/app#settings'));
@@ -25,6 +25,24 @@ test('maximized work area fills the display below the expanded or collapsed top 
 test('invalid window geometry receives finite defaults', () => {
   const bounds = windowBounds({ width: NaN, height: Infinity, x: '20', y: null });
   for (const value of Object.values(bounds)) assert.ok(Number.isFinite(value));
+});
+
+test('workspace halves cover the work area without gaps, including odd sizes', () => {
+  for (const viewport of [{ width: 1280, height: 820 }, { width: 391, height: 845 }]) {
+    for (const collapsed of [false, true]) {
+      const full = workspaceBounds(viewport, collapsed);
+      const left = workspaceBounds(viewport, collapsed, 'left');
+      const right = workspaceBounds(viewport, collapsed, 'right');
+      const top = workspaceBounds(viewport, collapsed, 'top');
+      const bottom = workspaceBounds(viewport, collapsed, 'bottom');
+      assert.equal(left.width + right.width, full.width);
+      assert.equal(left.x + left.width, right.x);
+      assert.equal(top.height + bottom.height, full.height);
+      assert.equal(top.y + top.height, bottom.y);
+      assert.equal(right.x + right.width, viewport.width);
+      assert.equal(bottom.y + bottom.height, viewport.height);
+    }
+  }
 });
 
 test('session restore remaps local ports without altering remote robots or application routes', () => {

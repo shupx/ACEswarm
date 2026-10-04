@@ -14,6 +14,10 @@ let defaultUrl = "http://127.0.0.1:80";
 let storeUrl = "";
 let serviceOrigins = {};
 let dockCollapsed = false;
+let desktopVisible = false;
+let desktopActiveTabId = null;
+let workspaceRegion = 'full';
+let workspaceMaximizeRestore = 'full';
 let favorites = [];
 let activeTabId = null;
 let nextTabId = 1;
@@ -171,6 +175,10 @@ function buildShellStatePayload() {
   return {
     version: 3,
     layout: desktopLayout?.toJSON(),
+    desktopVisible,
+    desktopActiveTabId,
+    workspaceRegion,
+    workspaceMaximizeRestore,
     serviceOrigins,
     dockCollapsed,
     activeTabId,
@@ -1479,7 +1487,7 @@ function createTab(rawUrl, options = {}) {
       setToolsMenuOpen(false);
       setWindowMenuOpen(false);
       document.getElementById("dock-menu").hidden = true;
-      if (activeTabId !== tab.id && !tab.minimized) activateTab(tab.id);
+      if (!desktopVisible && activeTabId !== tab.id && !tab.minimized) activateTab(tab.id);
       return;
     }
     if (event.channel === "aivuda-shell:open-url-in-new-tab") {
@@ -1571,6 +1579,8 @@ function activateTab(id) {
   }
 
   activeTabId = id;
+  desktopVisible = false;
+  desktopActiveTabId = id;
   const tab = tabs.get(id);
   tab.minimized = false;
   if (!tab.panel) addApplicationPanel(tab);
@@ -1819,8 +1829,17 @@ window.aivudaShell.getStartup().then((startup) => {
       createTab(tabState.url, { ...tabState, chromeExpanded: tabState.chromeExpanded ?? savedState.chromeExpanded });
     }
     restoreDesktopLayout(startup.savedState.layout);
+    workspaceRegion = ['left', 'right', 'top', 'bottom'].includes(startup.savedState.workspaceRegion) ? startup.savedState.workspaceRegion : 'full';
+    workspaceMaximizeRestore = ['left', 'right', 'top', 'bottom'].includes(startup.savedState.workspaceMaximizeRestore) ? startup.savedState.workspaceMaximizeRestore : 'full';
+    layoutApplicationWindows();
     if (savedState.activeTabId && tabs.has(savedState.activeTabId) && !tabs.get(savedState.activeTabId).minimized) {
       activateTab(savedState.activeTabId);
+    }
+    if (startup.savedState.desktopVisible === true) {
+      desktopActiveTabId = startup.savedState.desktopActiveTabId || activeTabId;
+      desktopVisible = true;
+      activeTabId = null;
+      syncWindowToolbar();
     }
     renderScreenRecordBar();
     renderDesktop();

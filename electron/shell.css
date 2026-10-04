@@ -25,6 +25,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid #157d71; outline-
 .desktop-shortcut .app-icon { width: 40px; height: 40px; }
 .shortcut-label { font-size: 12px; line-height: 16px; max-width: 80px; overflow-wrap: anywhere; text-align: center; }
 .window-layer { position: absolute; inset: 48px 0 0; pointer-events: none; }
+.showing-desktop .window-layer { visibility: hidden; opacity: 0; }
+.showing-desktop .window-layer *, #dock-layout.workspace-hidden, #dock-layout.workspace-hidden * { visibility: hidden !important; pointer-events: none !important; }
+.workspace-layout { display: flex; justify-content: space-between; padding: 4px; }
+#workspace-snap-preview { position: absolute; border: 2px solid #157d71; background: #157d7126; pointer-events: none; z-index: 99999; }
 #dock-layout { width: 100%; height: 100%; pointer-events: auto; --dv-tabs-and-actions-container-height: 36px; --dv-activegroup-visiblepanel-tab-background-color: #edf6f3; --dv-activegroup-visiblepanel-tab-color: #174d43; --dv-paneview-header-border-color: #c5cdd1; }
 .panel-anchor { width: 100%; height: 100%; }
 .application-body { position: absolute; display: flex; flex-direction: column; overflow: hidden; background: #fff; pointer-events: auto; container-type: inline-size; }
@@ -37,6 +41,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid #157d71; outline-
 #dock-layout .dv-tab { font-size: 12px; }
 #dock-layout.empty-grid { pointer-events: none; background: transparent; }
 #dock-layout.empty-grid .dv-watermark { display: none; }
+#dock-layout.empty-grid .dv-gridview { background: transparent !important; }
 #dock-layout.empty-grid .dv-resize-container { pointer-events: auto; }
 #dock-layout .dv-resize-container { border: 1px solid #aebfbe; box-shadow: 0 14px 40px #20362c25; }
 .window-layer.interacting webview { pointer-events: none; }

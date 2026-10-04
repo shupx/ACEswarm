@@ -75,12 +75,18 @@ function minimizeApplicationWindow(tab) {
 }
 
 function showDesktop() {
-  for (const tab of tabs.values()) { tab.minimized = true; detachApplicationPanel(tab); }
+  if (desktopVisible) {
+    const tab = tabs.get(desktopActiveTabId) || [...tabs.values()].find((entry) => !entry.minimized);
+    if (tab) { activateTab(tab.id); return; }
+  }
+  desktopActiveTabId = desktopLayout?.activePanel?.id || activeTabId || desktopActiveTabId;
+  desktopVisible = true;
   activeTabId = null;
   syncWindowToolbar();
   updateAddressFromActiveTab();
   updateNavigationState();
   renderDesktop();
+  schedulePanelLayout();
   writeShellState();
 }
 
@@ -133,6 +139,9 @@ function openDockMenu(event, entry) {
 
 function renderDesktop() {
   shellEl.classList.toggle("dock-collapsed", dockCollapsed);
+  shellEl.classList.toggle('showing-desktop', desktopVisible);
+  const layoutRoot = document.getElementById('dock-layout');
+  if (layoutRoot) layoutRoot.classList.toggle('workspace-hidden', desktopVisible || !desktopLayout.panels.length);
   shellEl.classList.toggle("window-maximized", desktopLayout?.hasMaximizedGroup() === true);
   document.getElementById('dock-layout')?.classList.toggle('empty-grid', !desktopLayout?.groups.some((group) => group.api.location.type === 'grid'));
   const dock = document.getElementById("dock");
@@ -206,7 +215,9 @@ function mountApplicationWindow(tab, options) {
   tab.body.append(tab.webview);
   stackEl.append(tab.body);
   addApplicationPanel(tab, options);
-  tab.webview.addEventListener("focus", () => activateTab(tab.id));
+  tab.webview.addEventListener("focus", () => {
+    if (!desktopVisible && !tab.minimized && tab.panel?.api.isVisible) activateTab(tab.id);
+  });
   refreshDesktopIcons();
 }
 
@@ -316,6 +327,9 @@ document.getElementById("window-menu").addEventListener("click", (event) => even
 document.getElementById("window-zoom-in").onclick = () => { adjustActiveTabZoom(zoomStep); updateWindowZoom(); };
 document.getElementById("window-zoom-out").onclick = () => { adjustActiveTabZoom(-zoomStep); updateWindowZoom(); };
 document.getElementById("window-zoom-reset").onclick = () => { resetActiveTabZoom(); updateWindowZoom(); };
+for (const region of ['left', 'right', 'top', 'bottom', 'full']) {
+  document.getElementById('workspace-' + region).onclick = () => { setWindowMenuOpen(false); setWorkspaceRegion(region); };
+}
 for (const [id, action] of [["window-reload", () => reloadActiveTab()], ["window-address", toggleActiveAddressBar], ["window-devtools", toggleActiveDevtools]]) {
   document.getElementById(id).onclick = () => { setWindowMenuOpen(false); action(); };
 }
@@ -352,9 +366,9 @@ setInterval(updateDesktopClock, 30000);
 function layoutApplicationWindows() {
   setWindowMenuOpen(false);
   if (!desktopLayout) return;
-  const panelHeight = dockCollapsed ? 28 : 48;
-  stackEl.style.top = panelHeight + 'px';
-  desktopLayout.layout(innerWidth, Math.max(1, innerHeight - panelHeight));
+  const area = desktopState.workspaceBounds({ width: innerWidth, height: innerHeight }, dockCollapsed, workspaceRegion);
+  Object.assign(stackEl.style, { top: area.y + 'px', left: area.x + 'px', right: 'auto', bottom: 'auto', width: area.width + 'px', height: area.height + 'px' });
+  desktopLayout.layout(area.width, area.height);
   schedulePanelLayout();
 }
 window.addEventListener("DOMContentLoaded", () => {
