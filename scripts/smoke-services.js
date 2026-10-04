@@ -60,6 +60,15 @@ async function run() {
     } finally {
       await manager.stop();
       assert.deepEqual(manager.failures, []);
+      for (const child of [...manager.children, manager.guardian]) {
+        assert.ok(child.exitCode !== null || child.signalCode !== null, `Process ${child.pid} stopped`);
+        assert.throws(() => process.kill(child.pid, 0), { code: 'ESRCH' });
+      }
+      if (manager.endpoints) {
+        for (const url of Object.values(manager.endpoints)) {
+          await assert.rejects(fetch(url, { signal: AbortSignal.timeout(1000) }), undefined, `${url} released`);
+        }
+      }
     }
   }
   console.log('Two clean startups and shutdowns; workspace survives restart');

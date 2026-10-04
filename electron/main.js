@@ -8,7 +8,7 @@ const { fixed, resolvePage } = require('./services/pages');
 const { provision } = require('./services/seed');
 const { listItems, createItem } = require('./services/workspace-items');
 const { ControlServer } = require('./services/control-server');
-const recording = require('./services/recording')(() => window, (failure) => sendToShell('aivuda-shell:recording-error', failure));
+const recording = require('./services/recording')(() => window, (failure) => sendToShell('aivuda-shell:recording-error', failure), (child) => services?.trackRecording(child));
 
 let services;
 let window;
@@ -153,12 +153,23 @@ function routePagePopup(url) {
 function handleTerminationSignal() {
   if (quitting) return;
   quitting = true;
-  Promise.resolve(window?.webContents.executeJavaScript('window.__aivudaFinalizeActiveRecordingBeforeClose?.()'))
-    .catch(() => {})
-    .finally(() => recording.stop())
-    .finally(() => control?.stop())
-    .finally(() => services?.stop())
-    .finally(() => app.quit());
+  shutdown().finally(() => app.quit());
+}
+async function shutdown() {
+  const finalizeRecording = async () => {
+    let timer;
+    try {
+      await Promise.race([
+        Promise.resolve().then(() => window && !window.isDestroyed()
+          ? window.webContents.executeJavaScript('window.__aivudaFinalizeActiveRecordingBeforeClose?.()') : undefined),
+        new Promise((resolve) => { timer = setTimeout(resolve, 3000); }),
+      ]);
+    } catch (_) { /* renderer may already be gone */ }
+    finally { clearTimeout(timer); await recording.stop(); }
+  };
+  const recordingResult = await Promise.allSettled([finalizeRecording()]);
+  const results = [...recordingResult, ...await Promise.allSettled([control?.stop(), services?.stop()])];
+  for (const result of results) if (result.status === 'rejected') console.error('ACEswarm shutdown:', result.reason);
 }
 process.on('SIGTERM', handleTerminationSignal);
 process.on('SIGINT', handleTerminationSignal);
@@ -250,11 +261,6 @@ app.on('before-quit', (event) => {
   if (quitting || !services) return;
   event.preventDefault();
   quitting = true;
-  Promise.resolve(window?.webContents.executeJavaScript('window.__aivudaFinalizeActiveRecordingBeforeClose?.()'))
-    .catch(() => {})
-    .finally(() => recording.stop())
-    .finally(() => control?.stop())
-    .finally(() => services.stop())
-    .finally(() => app.quit());
+  shutdown().finally(() => app.quit());
 });
 app.on('window-all-closed', () => app.quit());

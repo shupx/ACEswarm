@@ -35,6 +35,14 @@ class ControlServer {
     return this.url;
   }
   setBootstrap(status, details = {}) { this.bootstrap = { status, ...details }; }
-  async stop() { if (!this.server) return; await new Promise((resolve) => this.server.close(resolve)); this.server = null; }
+  async stop() {
+    if (!this.server) return;
+    const server = this.server;
+    this.server = null;
+    await new Promise((resolve) => {
+      server.close(resolve);
+      server.closeAllConnections();
+    });
+  }
 }
 module.exports = { ControlServer };

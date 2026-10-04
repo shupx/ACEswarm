@@ -8,6 +8,7 @@ const { app, dialog, screen } = require("electron");
 module.exports = function createRecordingController(
   getWindow,
   onFailure = () => {},
+  onSpawn = () => {},
 ) {
   let mainWindow = null;
   let activeFfmpegRecording = null;
@@ -375,6 +376,7 @@ module.exports = function createRecordingController(
       const child = spawn("ffmpeg", args, {
         stdio: ["pipe", "ignore", "pipe"],
       });
+      onSpawn(child);
 
       activeFfmpegRecording = {
         mode: "window",
@@ -497,6 +499,7 @@ module.exports = function createRecordingController(
       const child = spawn("ffmpeg", args, {
         stdio: ["ignore", "ignore", "pipe"],
       });
+      onSpawn(child);
 
       activeFfmpegRecording = {
         mode: "x11",

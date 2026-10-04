@@ -131,6 +131,14 @@ ACESWARM_TEST_WINDOW_MANAGER=/usr/bin/openbox xvfb-run -a npm run test:desktop
 
 Screenshots and sample recordings are written to `.smoke/desktop/`.
 
+Run `xvfb-run -a npm run test:cleanup` to verify real Electron window close,
+SIGTERM, and SIGKILL during FFmpeg recording. The test checks that subprocesses
+exit, gateway ports are released, and the stdio MCP has no Chromium subprocesses.
+Services run in separate process groups. An independent Node guardian monitors
+Electron's pipe and stops those groups and active FFmpeg recordings if Electron
+crashes. Normal shutdown sends SIGTERM, escalates to SIGKILL after five seconds,
+and waits for process termination. Forced exit cannot guarantee a saved recording.
+
 Test packaged resources without opening an Electron window:
 
 ```bash

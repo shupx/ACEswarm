@@ -48,6 +48,16 @@ class LocalServices {
   }
 
   launch(name, binary, args, environment = {}, keepStdin = false) {
+    if (this.stopping) throw new Error('Services are shutting down');
+    if (!this.guardian) {
+      this.guardian = spawn(process.execPath, [path.join(__dirname, 'process-guardian.js')], {
+        env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+        detached: true,
+        stdio: ['pipe', 'ignore', 'ignore'],
+      });
+      this.guardian.on('error', (error) => this.failures.push(`Process guardian: ${error.message}`));
+      this.guardian.stdin.on('error', (error) => this.failures.push(`Process guardian pipe: ${error.message}`));
+    }
     const log = fs.createWriteStream(path.join(this.paths.logs, `${name}.log`), { flags: 'a' });
     const env = { ...process.env, ...environment };
     if (!this.runtime.packaged) delete env.PYTHONHOME;
@@ -66,6 +76,7 @@ class LocalServices {
       if (!this.stopping) this.failures.push(`${name} exited (${code ?? signal}); see ${path.join(this.paths.logs, `${name}.log`)}`);
     });
     this.children.push(child);
+    if (child.pid) this.guardian.stdin.write(`${child.pid}\n`);
     return child;
   }
 
@@ -117,9 +128,19 @@ class LocalServices {
   startMcp(controlUrl) {
     const child = this.launch('aceswarm-mcp', process.execPath, [path.join(__dirname, 'mcp-server.js')], {
       ACESWARM_CONTROL_URL: controlUrl,
+      ELECTRON_RUN_AS_NODE: '1',
     }, true);
     this.mcp = child;
     return child;
+  }
+
+  trackRecording(child) {
+    if (!child.pid || !this.guardian) return;
+    // Negative identifiers track a single PID instead of a detached process group.
+    this.guardian.stdin.write(`${-child.pid}\n`);
+    child.once('exit', () => {
+      if (!this.guardian.stdin.destroyed) this.guardian.stdin.write(`remove ${-child.pid}\n`);
+    });
   }
 
   startPackageMcps() {
@@ -143,15 +164,43 @@ class LocalServices {
     return this.launch(name, this.runtime.python, ['-m', moduleName], environment, true);
   }
 
-  async stop() {
+  stop() {
+    if (!this.stopPromise) this.stopPromise = this.stopChildren();
+    return this.stopPromise;
+  }
+
+  async stopChildren() {
     this.stopping = true;
     const children = [...this.children].reverse();
     for (const child of children) this.signalGroup(child, 'SIGTERM');
+    const deadline = Date.now() + 5000;
+    while (children.some((child) => this.groupAlive(child)) && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    for (const child of children) if (this.groupAlive(child)) this.signalGroup(child, 'SIGKILL');
     await Promise.all(children.map((child) => new Promise((resolve) => {
       if (!child.pid || child.exitCode !== null || child.signalCode !== null) return resolve();
-      const timer = setTimeout(() => { this.signalGroup(child, 'SIGKILL'); resolve(); }, 5000);
-      child.once('exit', () => { clearTimeout(timer); resolve(); });
+      child.once('exit', resolve);
     })));
+    const killDeadline = Date.now() + 1000;
+    while (children.some((child) => this.groupAlive(child)) && Date.now() < killDeadline) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    for (const child of children) if (this.groupAlive(child)) this.failures.push(`Shutdown process group ${child.pid} still exists`);
+    if (this.guardian) {
+      const guardian = this.guardian;
+      const exited = new Promise((resolve) => {
+        if (guardian.exitCode !== null || guardian.signalCode !== null) return resolve();
+        guardian.once('exit', resolve);
+      });
+      guardian.kill('SIGTERM');
+      await exited;
+    }
+  }
+
+  groupAlive(child) {
+    if (!child.pid) return false;
+    try { process.kill(-child.pid, 0); return true; } catch (error) { return error.code !== 'ESRCH'; }
   }
 
   signalGroup(child, signal) {

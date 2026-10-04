@@ -71,4 +71,5 @@ test('service lifecycle auto-starts ACEswarm MCP with loopback control URL', () 
   assert.equal(invocation[0], 'aceswarm-mcp');
   assert.equal(invocation[1], process.execPath);
   assert.equal(invocation[3].ACESWARM_CONTROL_URL, 'http://127.0.0.1:1234');
+  assert.equal(invocation[3].ELECTRON_RUN_AS_NODE, '1');
 });
