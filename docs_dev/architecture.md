@@ -18,6 +18,9 @@ AivudaOS and AivudaAppStore remain independent distributions. ACEswarm launches 
 
 ## Desktop shell
 
+First launch shows the desktop with Applications and Store Admin shortcuts,
+without opening any application windows. Subsequent launches restore the saved session.
+
 The Electron renderer uses plain JavaScript, Dockview Core for tab groups,
 nested splits and floating panels, and Lucide for controls. Tabs can be dragged
 to group edges to split or onto tab bars to merge; splitters resize both sides.

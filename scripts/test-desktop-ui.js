@@ -171,9 +171,16 @@ async function run() {
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const robotUrl = 'http://127.0.0.1:' + server.address().port + '/robot';
   let page = await launch();
+  await count(page, 0);
+  assert.equal(await page.evaluate(() => desktopVisible), true);
+  assert.equal(await page.evaluate(() => activeTabId), null);
+  assert.equal(await page.locator('#dock-layout').isVisible(), false);
+  assert.deepEqual(await page.locator('#desktop-shortcuts .shortcut-label').allTextContents(), ['Applications', 'Store Admin']);
+  await page.screenshot({ path: path.join(screenshots, 'desktop-first-launch.png') });
+  await page.locator('#desktop-shortcuts .desktop-shortcut').first().click();
   await count(page, 1);
   await page.waitForFunction(() => getActiveTab().webview.getURL().startsWith('http:'));
-  console.log('PASS: real Electron desktop and local Applications page start');
+  console.log('PASS: first launch shows an empty desktop; Applications opens from its shortcut');
   await page.waitForFunction(() => getActiveTab().title === 'Applications');
   assert.equal(await page.evaluate(() => resolveTabDisplayTitle('AivudaOS', defaultUrl)), 'Applications');
   const initialId = await page.evaluate(() => activeTabId);

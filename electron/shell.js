@@ -1850,7 +1850,7 @@ window.aivudaShell.getStartup().then((startup) => {
     return;
   }
 
-  createTab(startup.initialUrl || defaultUrl);
+  desktopVisible = true;
   setChromeExpanded(false);
   renderDesktop();
   renderScreenRecordBar();
