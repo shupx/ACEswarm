@@ -8,18 +8,18 @@ test('application identity keeps paths and query but ignores in-page anchors', (
   assert.notEqual(appKey('https://robot.local/app?id=a'), appKey('https://robot.local/app?id=b'));
 });
 
-test('restored windows remain between desktop bar and Dock after viewport shrinks', () => {
+test('restored windows remain below the top panel after viewport shrinks', () => {
   for (const viewport of [{ width: 1280, height: 820 }, { width: 850, height: 550 }, { width: 390, height: 844 }]) {
     const bounds = windowBounds({ x: 4000, y: -100, width: 3000, height: 2000 }, viewport);
-    assert.ok(bounds.x >= 72 && bounds.y >= 48);
+    assert.ok(bounds.x >= 8 && bounds.y >= 56);
     assert.ok(bounds.x + bounds.width <= viewport.width - 8);
     assert.ok(bounds.y + bounds.height <= viewport.height - 8);
   }
 });
 
-test('maximized work area fills the display except the expanded or collapsed left Dock', () => {
-  assert.deepEqual(workArea({ width: 1280, height: 820 }, false, true), { x: 64, y: 0, width: 1216, height: 820 });
-  assert.deepEqual(workArea({ width: 1280, height: 820 }, true, true), { x: 24, y: 0, width: 1256, height: 820 });
+test('maximized work area fills the display below the expanded or collapsed top panel', () => {
+  assert.deepEqual(workArea({ width: 1280, height: 820 }, false, true), { x: 0, y: 48, width: 1280, height: 772 });
+  assert.deepEqual(workArea({ width: 1280, height: 820 }, true, true), { x: 0, y: 28, width: 1280, height: 792 });
 });
 
 test('invalid window geometry receives finite defaults', () => {

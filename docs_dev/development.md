@@ -117,7 +117,8 @@ npm run smoke
 
 The desktop integration test launches the actual Electron main process and local
 services using a temporary browser profile and workspace. It checks page loading,
-Dock pin/unpin, window controls, page popups, restart persistence, and screenshots
+top-panel Dock pin/unpin and collapse, System menus, window zoom/address controls,
+shortcuts with guest focus, page popups, restart persistence, and screenshots
 at 1280, 850 and 390 pixels wide. It also records videos in all three modes and
 uses ffprobe/ffmpeg to verify decodable, nonblank output. It requires the development
 Python environment, Caddy, FFmpeg/ffprobe and an X11 session with a window manager;
@@ -135,7 +136,7 @@ start/pause/resume/stop cycles. It records the application's content area as Web
 through Electron frame capture and browser MediaRecorder, without OS title bars.
 
 Run `xvfb-run -a npm run test:cleanup` to verify real Electron window close,
-SIGTERM, and SIGKILL during FFmpeg recording. The test checks that subprocesses
+System-menu quit, SIGTERM, and SIGKILL during FFmpeg recording. The test checks that subprocesses
 exit, gateway ports are released, and the stdio MCP has no Chromium subprocesses.
 Services run in separate process groups. An independent Node guardian monitors
 Electron's pipe and stops those groups and active FFmpeg recordings if Electron

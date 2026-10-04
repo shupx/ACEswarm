@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('aceswarm', {
   settingsTarget: () => ipcRenderer.invoke('control:settings'), storeTarget: () => ipcRenderer.invoke('control:store'), bootstrap: () => ipcRenderer.invoke('control:bootstrap'),
 });
 contextBridge.exposeInMainWorld('aivudaShell', {
+  desktopCommand: (command) => ipcRenderer.invoke('aivuda-shell:desktop-command', command),
   onRecordingError: (callback) => on('aivuda-shell:recording-error', callback, true),
   authorizeUrl: (url) => ipcRenderer.invoke('aivuda-shell:authorize-url', url),
   routePagePopup: (url) => ipcRenderer.invoke('aivuda-shell:route-page-popup', url),

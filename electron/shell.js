@@ -346,6 +346,7 @@ function adjustActiveTabZoom(delta) {
   const nextZoom = clampZoomFactor(Math.round((currentZoom + delta) * 100) / 100);
   tab.webview.setZoomFactor(nextZoom);
   setStatus(`Zoom ${Math.round(nextZoom * 100)}%`);
+  updateWindowZoom();
 }
 
 function resetActiveTabZoom() {
@@ -356,6 +357,7 @@ function resetActiveTabZoom() {
 
   tab.webview.setZoomFactor(1);
   setStatus("Zoom 100%");
+  updateWindowZoom();
 }
 
 function isZoomInShortcut(event) {
@@ -1471,6 +1473,9 @@ function createTab(rawUrl, options = {}) {
 
   webview.addEventListener("ipc-message", (event) => {
     if (event.channel === "aivuda-shell:activate-window") {
+      setToolsMenuOpen(false);
+      setWindowMenuOpen(false);
+      document.getElementById("dock-menu").hidden = true;
       if (activeTabId !== tab.id && !tab.minimized) activateTab(tab.id);
       return;
     }
@@ -1610,6 +1615,13 @@ function setToolsMenuOpen(isOpen) {
   if (!toolsButton || !toolsMenu) return;
   toolsMenu.hidden = !isOpen;
   toolsButton.setAttribute("aria-expanded", String(isOpen));
+  if (isOpen) {
+    setWindowMenuOpen(false);
+    document.getElementById("dock-menu").hidden = true;
+    const tab = getActiveTab();
+    for (const id of ["system-reload", "system-window-tools", "system-devtools"]) document.getElementById(id).disabled = !tab?.ready;
+    toolsMenu.querySelector("button")?.focus();
+  }
 }
 
 collapseChromeButton.addEventListener("click", () => {
@@ -1628,6 +1640,15 @@ toolsButton?.addEventListener("click", (event) => {
   event.stopPropagation();
   setToolsMenuOpen(toolsMenu?.hidden !== false);
 });
+toolsMenu.addEventListener("click", (event) => event.stopPropagation());
+for (const [id, action] of [
+  ["system-open-page", showOpenPageDialog], ["system-desktop", showDesktop],
+  ["system-address", toggleActiveAddressBar], ["system-reload", reloadActiveTab],
+  ["system-window-tools", () => { const tab = getActiveTab(); if (tab) openWindowMenu(tab); }],
+  ["system-devtools", toggleActiveDevtools],
+  ["system-fullscreen", () => window.aivudaShell.desktopCommand("fullscreen")],
+  ["system-quit", () => window.aivudaShell.desktopCommand("quit")],
+]) document.getElementById(id).onclick = () => { setToolsMenuOpen(false); action(); };
 document.getElementById("tools-fps")?.addEventListener("click", () => {
   setToolsMenuOpen(false);
   setPerformanceOverlayVisible(true);
@@ -1713,20 +1734,9 @@ window.aivudaShell.onHideBrowserChrome(() => {
   setChromeExpanded(false);
 });
 window.aivudaShell.onToggleBrowserChrome(() => {
-  if (!getActiveTab()) { showOpenPageDialog(); return; }
-  const isExpanded = shellEl.classList.contains("expanded");
-  setChromeExpanded(!isExpanded);
-  if (!isExpanded) {
-    addressInput.focus();
-    addressInput.select();
-  }
+  toggleActiveAddressBar();
 });
-window.aivudaShell.onToggleDevtools(() => {
-  const tab = getActiveTab();
-  if (tab) {
-    tab.webview.isDevToolsOpened() ? tab.webview.closeDevTools() : tab.webview.openDevTools();
-  }
-});
+window.aivudaShell.onToggleDevtools(toggleActiveDevtools);
 window.aivudaShell.onZoomIn(() => {
   adjustActiveTabZoom(zoomStep);
 });

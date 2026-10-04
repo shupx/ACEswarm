@@ -24,7 +24,7 @@ function running(pid) {
 async function run() {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'aceswarm-exit-'));
   try {
-    for (const mode of ['close', 'SIGTERM', 'SIGKILL']) {
+    for (const mode of ['close', 'system-quit', 'SIGTERM', 'SIGKILL']) {
       const gateway = await freePort();
       const store = await freePort();
       const application = await electron.launch({
@@ -53,7 +53,10 @@ async function run() {
         if (mode === 'close') await application.close();
         else {
           const exited = new Promise((resolve) => owner.once('exit', resolve));
-          owner.kill(mode);
+          if (mode === 'system-quit') {
+            await page.locator('#tools-button').click();
+            await page.locator('#system-quit').click();
+          } else owner.kill(mode);
           await exited;
         }
         const deadline = Date.now() + 12000;

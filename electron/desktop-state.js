@@ -5,9 +5,9 @@
     catch { return String(rawUrl || ""); }
   }
   function workArea(viewport, collapsed = false, maximized = false) {
-    const dockWidth = collapsed ? 24 : 64;
-    const x = dockWidth + (maximized ? 0 : 8);
-    const y = maximized ? 0 : 48;
+    const panelHeight = collapsed ? 28 : 48;
+    const x = maximized ? 0 : 8;
+    const y = panelHeight + (maximized ? 0 : 8);
     return { x, y, width: Math.max(1, viewport.width - x - (maximized ? 0 : 8)), height: Math.max(1, viewport.height - y - (maximized ? 0 : 8)) };
   }
   function windowBounds(raw = {}, viewport = { width: 1280, height: 820 }, index = 0, collapsed = false) {

@@ -23,10 +23,15 @@ application windows, and Lucide for controls. Each window owns an independent
 WebView using the existing persistent browser session. Minimizing hides the
 window without recreating its page; closing releases the WebView.
 
-The collapsible left Dock combines Home/AppStore, pinned page entries, and running applications.
-Its expanded/collapsed width is reserved by the window manager. Maximized windows
-fill the remaining viewport, including the space normally used by the desktop
-header; their restore geometry is retained when the Dock is toggled.
+The collapsible top panel combines System, Home/AppStore, pinned page entries,
+running applications, desktop actions and the clock. Its expanded/collapsed height
+(48/28 pixels) is reserved by the window manager. Maximized windows fill the
+viewport below it; their restore geometry is retained when the panel is toggled.
+The native application menu is removed. System contains global recording,
+performance, fullscreen, browser data and quit commands, plus current-page actions.
+Each window's upper-right controls expose the address bar, pinning and a menu for
+page zoom, reload and developer tools. Zoom retains Chromium's shared browser
+session behavior. Main-process input handlers preserve shortcuts even in guests.
 Applications are identified by their launch URL (ignoring the fragment), separately
 from a window's current navigation URL. Multiple windows share a Dock entry;
 ordinary clicks activate an existing window, while the context menu can open

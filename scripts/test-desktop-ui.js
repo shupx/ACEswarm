@@ -55,6 +55,16 @@ async function count(page, expected) {
   await page.waitForFunction((value) => tabs.size === value, expected);
 }
 
+async function sendDesktopShortcut(page, keyCode, guest = true) {
+  const id = guest ? await page.evaluate(() => getActiveTab().webview.getWebContentsId()) : null;
+  // CDP keyboard input bypasses Electron's before-input-event handler.
+  await application.evaluate(({ webContents, BrowserWindow }, { id, keyCode }) => {
+    const contents = id ? webContents.fromId(id) : BrowserWindow.getAllWindows()[0].webContents;
+    contents.sendInputEvent({ type: 'keyDown', keyCode, modifiers: ['control'] });
+    contents.sendInputEvent({ type: 'keyUp', keyCode, modifiers: ['control'] });
+  }, { id, keyCode });
+}
+
 async function openPage(page, url) {
   await page.locator('#new-tab').click();
   await page.locator('#open-page-url').fill(url);
@@ -107,6 +117,13 @@ async function run() {
   await count(page, 1);
   await page.waitForFunction(() => getActiveTab().webview.getURL().startsWith('http:'));
   console.log('PASS: real Electron desktop and local Home page start');
+  assert.equal(await application.evaluate(({ Menu }) => Menu.getApplicationMenu()), null);
+  assert.equal(await page.evaluate(() => document.querySelector('#dock').closest('.desktop-bar') !== null), true);
+  await page.locator('#tools-button').click();
+  await page.keyboard.press('ArrowDown');
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'system-desktop');
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('#tools-menu').isVisible(), false);
 
   await openPage(page, robotUrl);
   await count(page, 2);
@@ -132,16 +149,52 @@ async function run() {
   await page.locator('#' + robotId + ' .wb-browser').click();
   assert.equal(await page.locator('#browser-toolbar').isVisible(), true);
   await page.locator('#collapse-chrome').click();
+  await page.locator('#' + robotId + ' webview').click({ position: { x: 450, y: 200 } });
+  await sendDesktopShortcut(page, 'L');
+  await page.waitForFunction(() => !document.getElementById('browser-toolbar').hidden);
+  await sendDesktopShortcut(page, 'L', false);
+  await page.waitForFunction(() => document.getElementById('browser-toolbar').hidden);
+  await sendDesktopShortcut(page, '=');
+  await page.waitForFunction(() => Math.abs(getActiveTab().webview.getZoomFactor() - 1.1) < 0.01);
+  await sendDesktopShortcut(page, '0');
+  await page.waitForFunction(() => getActiveTab().webview.getZoomFactor() === 1);
   assert.equal(await page.locator('#browser-toolbar').isVisible(), false);
+  await page.locator('#' + robotId + ' .wb-menu').click();
+  assert.equal(await page.locator('#window-menu').isVisible(), true);
+  await page.locator('#' + robotId + ' .wb-menu').click();
+  assert.equal(await page.locator('#window-menu').isVisible(), false);
+  await page.locator('#' + robotId + ' .wb-menu').click();
+  await page.locator('#window-zoom-in').click();
+  assert.equal(await page.locator('#window-zoom-reset').textContent(), '110%');
+  assert.ok(Math.abs(await page.evaluate(() => getActiveTab().webview.getZoomFactor()) - 1.1) < 0.01);
+  await page.locator('#window-zoom-out').click();
+  assert.equal(await page.locator('#window-zoom-reset').textContent(), '100%');
+  await page.locator('#window-zoom-in').click();
+  await page.locator('#window-zoom-reset').click();
+  assert.equal(await page.locator('#window-zoom-reset').textContent(), '100%');
+  await page.screenshot({ path: path.join(screenshots, 'desktop-window-controls.png') });
+  await page.locator('#window-address').click();
+  assert.equal(await page.locator('#browser-toolbar').isVisible(), true);
+  await page.locator('#collapse-chrome').click();
+  await page.locator('#tools-button').click();
+  await page.locator('#system-address').click();
+  assert.equal(await page.locator('#browser-toolbar').isVisible(), true);
+  await page.locator('#collapse-chrome').click();
   await page.locator('#' + robotId + ' .wb-max').click();
   assert.equal(await page.evaluate((id) => tabs.get(id).window.max, robotId), true);
-  assert.deepEqual(await page.locator('#' + robotId).boundingBox(), await page.evaluate(() => ({ x: 64, y: 0, width: innerWidth - 64, height: innerHeight })));
-  await page.screenshot({ path: path.join(screenshots, 'desktop-maximized-left-dock.png') });
+  assert.deepEqual(await page.locator('#' + robotId).boundingBox(), await page.evaluate(() => ({ x: 0, y: 48, width: innerWidth, height: innerHeight - 48 })));
+  await page.locator('#tools-button').click();
+  await page.screenshot({ path: path.join(screenshots, 'desktop-system-menu.png') });
+  await page.keyboard.press('Escape');
+  await page.screenshot({ path: path.join(screenshots, 'desktop-maximized-top-dock.png') });
   await page.locator('#toggle-dock').click();
   assert.equal(await page.evaluate(() => dockCollapsed), true);
   const maximized = await page.locator('#' + robotId).boundingBox();
-  assert.equal(maximized.x, 24); assert.equal(maximized.width, 1256);
-  assert.equal(maximized.y, 0);
+  assert.equal(maximized.x, 0); assert.equal(maximized.width, 1280);
+  assert.equal(maximized.y, 28); assert.equal(maximized.height, 792);
+  await page.locator('#tools-button').click();
+  assert.equal(await page.locator('#tools-menu').isVisible(), true);
+  await page.keyboard.press('Escape');
   await page.screenshot({ path: path.join(screenshots, 'desktop-maximized-collapsed-dock.png') });
   await page.locator('#toggle-dock').click();
   await page.locator('#' + robotId + ' .wb-max').click();
@@ -169,7 +222,7 @@ async function run() {
   await page.waitForFunction(() => activeTabId === 'tab-1');
   await page.locator('#dock button[data-app-url="' + robotUrl + '"]').click();
   await page.waitForFunction((id) => activeTabId === id, robotId);
-  console.log('PASS: address toolbar, maximize, restore, drag and resize');
+  console.log('PASS: top panel, System menu, per-window zoom/address controls, maximize, restore, drag and resize');
 
   await page.evaluate(() => getActiveTab().webview.executeJavaScript('document.getElementById("popup").click()'));
   await count(page, 3);
@@ -207,6 +260,12 @@ async function run() {
   await page.waitForFunction(() => innerWidth === 390);
   await page.waitForFunction(() => [...tabs.values()].every((tab) => tab.window.window.getBoundingClientRect().right <= innerWidth));
   await page.screenshot({ path: path.join(screenshots, 'desktop-390.png') });
+  await page.locator('#tools-button').click();
+  const systemMenu = await page.locator('#tools-menu').boundingBox();
+  assert.ok(systemMenu.x >= 0 && systemMenu.x + systemMenu.width <= 390);
+  assert.ok(systemMenu.y + systemMenu.height <= 844);
+  await page.screenshot({ path: path.join(screenshots, 'desktop-system-390.png') });
+  await page.keyboard.press('Escape');
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await application.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0].setContentSize(1280, 820); });
   await page.waitForFunction(() => innerWidth === 1280);

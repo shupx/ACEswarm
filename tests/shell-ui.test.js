@@ -21,13 +21,14 @@ test('desktop shell exposes application windows, Dock, address bar and tools', (
   assert.match(renderer, /setToolsMenuOpen/);
 });
 
-test('browser chrome can be restored after collapse through the application menu', () => {
+test('System and window controls replace the native application menu', () => {
   const main = fs.readFileSync(path.join(root, 'electron/main.js'), 'utf8');
-  assert.match(main, /Menu\.setApplicationMenu/);
-  assert.match(main, /Toggle Address Bar/);
-  assert.match(main, /CmdOrCtrl\+L/);
-  assert.match(main, /aivuda-shell:show-browser-chrome/);
-  assert.match(main, /label: 'Address Bar'/);
+  assert.match(main, /Menu\.setApplicationMenu\(null\)/);
+  assert.match(main, /before-input-event/);
+  assert.match(html, /aria-label="System"/);
+  assert.match(html, /id="system-address"/);
+  assert.match(html, /id="window-zoom-in"/);
+  assert.doesNotMatch(main, /label: 'File'|label: 'View'|label: 'Address Bar'/);
 });
 
 test('browser shell preserves FPS overlay and recording controls', () => {

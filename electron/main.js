@@ -28,44 +28,27 @@ function sendToShell(channel, payload) {
 }
 
 function createApplicationMenu() {
-  const template = [
-    {
-      label: 'File',
-      submenu: [
-        { label: 'New Window', accelerator: 'CmdOrCtrl+T', click: () => sendToShell('aivuda-shell:new-tab', { url: endpoints?.os }) },
-        { label: 'Close Window', accelerator: 'CmdOrCtrl+W', click: () => sendToShell('aivuda-shell:close-current-tab') },
-        { type: 'separator' },
-        { role: 'quit' },
-      ],
-    },
-    {
-      label: 'View',
-      submenu: [
-        { label: 'Reload Window', accelerator: 'CmdOrCtrl+R', click: () => sendToShell('aivuda-shell:reload-current-tab') },
-        { label: 'Toggle Address Bar', accelerator: 'CmdOrCtrl+L', click: () => sendToShell('aivuda-shell:toggle-browser-chrome') },
-        { label: 'Show Address Bar', click: () => sendToShell('aivuda-shell:show-browser-chrome') },
-        { label: 'Hide Address Bar', accelerator: 'Escape', click: () => sendToShell('aivuda-shell:hide-browser-chrome') },
-        { label: 'Toggle Developer Tools', accelerator: process.platform === 'darwin' ? 'Alt+Command+I' : 'Ctrl+Shift+I', click: () => sendToShell('aivuda-shell:toggle-devtools') },
-        { type: 'separator' },
-        { label: 'Actual Size', accelerator: 'CmdOrCtrl+0', click: () => sendToShell('aivuda-shell:reset-zoom') },
-        { label: 'Zoom In', accelerator: 'CmdOrCtrl+Plus', click: () => sendToShell('aivuda-shell:zoom-in') },
-        { label: 'Zoom Out', accelerator: 'CmdOrCtrl+-', click: () => sendToShell('aivuda-shell:zoom-out') },
-        { type: 'separator' },
-        { role: 'togglefullscreen' },
-      ],
-    },
-    { label: 'Address Bar', click: () => sendToShell('aivuda-shell:toggle-browser-chrome') },
-    {
-      label: 'Tools',
-      submenu: [
-        { label: 'Show FPS/GPU Overlay', accelerator: 'CmdOrCtrl+Shift+P', click: () => sendToShell('aivuda-shell:show-performance-overlay') },
-        { label: 'Toggle Screen Record Bar', accelerator: 'CmdOrCtrl+Shift+R', click: () => sendToShell('aivuda-shell:toggle-screen-record-bar') },
-        { type: 'separator' },
-        { label: 'Clear Browser Data', accelerator: 'CmdOrCtrl+Shift+Backspace', click: () => sendToShell('aivuda-shell:clear-browser-data') },
-      ],
-    },
-  ];
-  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+  Menu.setApplicationMenu(null);
+}
+
+function handleDesktopShortcut(event, input) {
+  if (input.type !== 'keyDown' || input.alt) return;
+  const key = input.key.toLowerCase();
+  if (key === 'f11') {
+    event.preventDefault();
+    window?.setFullScreen(!window.isFullScreen());
+    return;
+  }
+  if (!input.control && !input.meta) return;
+  if (key === 'q' && !input.shift) { event.preventDefault(); app.quit(); return; }
+  const commands = input.shift ? {
+    i: 'toggle-devtools', p: 'show-performance-overlay', r: 'toggle-screen-record-bar', backspace: 'clear-browser-data',
+  } : { t: 'new-tab', w: 'close-current-tab', r: 'reload-current-tab', l: 'toggle-browser-chrome', '0': 'reset-zoom', '-': 'zoom-out' };
+  const command = key === '+' || key === '=' ? 'zoom-in' : commands[key];
+  if (command) {
+    event.preventDefault();
+    sendToShell(`aivuda-shell:${command}`, command === 'new-tab' ? { url: endpoints?.os } : undefined);
+  }
 }
 
 function readShellState() {
@@ -103,6 +86,8 @@ function createWindow() {
     webPreferences: { preload: path.join(__dirname, 'preload.js'), webviewTag: true, contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
   window.loadFile(path.join(__dirname, 'shell.html'));
+  window.setMenuBarVisibility(false);
+  window.webContents.on('before-input-event', handleDesktopShortcut);
   let finalizingClose = false;
   window.on('close', (event) => {
     if (quitting) return;
@@ -136,6 +121,7 @@ function createWindow() {
     preferences.preload = path.join(__dirname, 'guest-preload.js');
   });
   window.webContents.on('did-attach-webview', (_, contents) => {
+    contents.on('before-input-event', handleDesktopShortcut);
     contents.on('will-navigate', (event, url) => { if (!allowedUrl(url)) event.preventDefault(); });
     contents.session.setPermissionRequestHandler((_, __, callback) => callback(false));
     contents.setWindowOpenHandler(({ url }) => {
@@ -191,6 +177,13 @@ app.whenReady().then(async () => {
     services.startMcp(endpoints.control);
     services.startPackageMcps();
     createApplicationMenu();
+    ipcMain.handle('aivuda-shell:desktop-command', (event, command) => {
+      if (event.sender !== window?.webContents) return { ok: false, error: 'Only the desktop can run system commands.' };
+      if (command === 'quit') app.quit();
+      else if (command === 'fullscreen') window.setFullScreen(!window.isFullScreen());
+      else return { ok: false, error: 'Unknown system command.' };
+      return { ok: true };
+    });
     ipcMain.handle('control:pages', () => fixed);
     ipcMain.handle('control:resolve', (_, id, context) => {
       const page = resolvePage(id, endpoints, context);

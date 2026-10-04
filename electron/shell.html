@@ -4,26 +4,48 @@
 <body>
   <main id="shell" class="shell">
     <header class="desktop-bar">
-      <div class="brand"><img src="./assets/aivuda_icon.png" alt="" /><strong>ACEswarm</strong><span>Workspace</span></div>
+        <div class="tools-menu-wrap">
+          <button id="tools-button" class="system-button" title="ACEswarm System" aria-label="System" aria-haspopup="menu" aria-expanded="false"><img src="./assets/aivuda_icon.png" alt="" /><span>System</span><i data-lucide="chevron-down"></i></button>
+          <div id="tools-menu" class="tools-menu" role="menu" aria-label="System" hidden>
+            <button id="system-open-page" role="menuitem"><i data-lucide="plus"></i>Open page</button>
+            <button id="system-desktop" role="menuitem"><i data-lucide="panels-top-left"></i>Show desktop</button>
+            <hr />
+            <button id="system-address" role="menuitem"><i data-lucide="globe"></i>Address bar</button>
+            <button id="system-reload" role="menuitem"><i data-lucide="rotate-cw"></i>Reload page</button>
+            <button id="system-window-tools" role="menuitem"><i data-lucide="sliders-horizontal"></i>Window controls</button>
+            <button id="system-devtools" role="menuitem"><i data-lucide="code"></i>Developer tools</button>
+            <hr />
+            <button id="tools-fps" role="menuitem"><i data-lucide="activity"></i>FPS / GPU Overlay</button>
+            <button id="tools-record" role="menuitem"><i data-lucide="video"></i>Screen Record</button>
+            <button id="system-fullscreen" role="menuitem"><i data-lucide="expand"></i>Fullscreen</button>
+            <button id="tools-clear-data" role="menuitem"><i data-lucide="eraser"></i>Clear Browser Data</button>
+            <hr />
+            <button id="system-quit" role="menuitem"><i data-lucide="power"></i>Quit ACEswarm</button>
+          </div>
+        </div>
+      <button id="toggle-dock" class="dock-toggle" title="Collapse panel" aria-label="Collapse panel" aria-expanded="true"><i data-lucide="chevron-up"></i></button>
+      <nav id="dock" class="dock" aria-label="Application Dock"></nav>
       <span id="window-count">Desktop</span>
       <div class="desktop-actions">
         <button id="show-desktop" class="icon-button" title="Show desktop" aria-label="Show desktop"><i data-lucide="panels-top-left"></i></button>
         <button id="new-tab" class="icon-button" title="Open page" aria-label="Open page"><i data-lucide="plus"></i></button>
-        <div class="tools-menu-wrap">
-          <button id="tools-button" class="icon-button" title="Tools" aria-label="Tools" aria-haspopup="true" aria-expanded="false"><i data-lucide="settings-2"></i></button>
-          <div id="tools-menu" class="tools-menu" role="menu" hidden>
-            <button id="tools-fps" role="menuitem">FPS / GPU Overlay</button>
-            <button id="tools-record" role="menuitem">Screen Record</button>
-            <button id="tools-clear-data" role="menuitem">Clear Browser Data</button>
-          </div>
-        </div>
         <time id="desktop-clock"></time>
       </div>
     </header>
     <section id="desktop-shortcuts" class="desktop-shortcuts" aria-label="Desktop applications"></section>
     <section id="webview-stack" class="window-layer" aria-label="Application windows"></section>
-    <nav id="dock" class="dock" aria-label="Application Dock"></nav>
     <div id="dock-menu" class="dock-menu" role="menu" hidden></div>
+    <div id="window-menu" class="window-menu" role="menu" aria-label="Window controls" hidden>
+      <div class="window-zoom" role="group" aria-label="Page zoom">
+        <button id="window-zoom-out" class="icon-button" title="Zoom out" aria-label="Zoom out"><i data-lucide="zoom-out"></i></button>
+        <button id="window-zoom-reset" title="Reset zoom" aria-label="Reset zoom">100%</button>
+        <button id="window-zoom-in" class="icon-button" title="Zoom in" aria-label="Zoom in"><i data-lucide="zoom-in"></i></button>
+      </div>
+      <hr />
+      <button id="window-reload" role="menuitem"><i data-lucide="rotate-cw"></i>Reload page</button>
+      <button id="window-address" role="menuitem"><i data-lucide="globe"></i>Address bar</button>
+      <button id="window-devtools" role="menuitem"><i data-lucide="code"></i>Developer tools</button>
+    </div>
   </main>
   <div id="browser-toolbar" class="browser-toolbar" hidden>
     <button id="back-button" class="icon-button" title="Back" aria-label="Back"><i data-lucide="arrow-left"></i></button>

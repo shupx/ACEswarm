@@ -125,7 +125,10 @@ function openDockMenu(event, entry) {
   }
   menu.hidden = false;
   menu.style.left = Math.max(8, Math.min(event.clientX, innerWidth - menu.offsetWidth - 8)) + "px";
-  menu.style.top = Math.max(52, Math.min(event.clientY - menu.offsetHeight, innerHeight - menu.offsetHeight - 8)) + "px";
+  setToolsMenuOpen(false);
+  setWindowMenuOpen(false);
+  const panelHeight = dockCollapsed ? 28 : 48;
+  menu.style.top = Math.max(panelHeight + 4, Math.min(event.clientY + 8, innerHeight - menu.offsetHeight - 8)) + "px";
   menu.querySelector("button")?.focus();
 }
 
@@ -136,25 +139,12 @@ function renderDesktop() {
   const shortcuts = document.getElementById("desktop-shortcuts");
   dock.replaceChildren();
   shortcuts.replaceChildren();
-  const toggle = document.createElement("button");
-  toggle.id = "toggle-dock";
-  toggle.className = "dock-toggle";
-  toggle.title = dockCollapsed ? "Expand Dock" : "Collapse Dock";
+  const toggle = document.getElementById("toggle-dock");
+  toggle.title = dockCollapsed ? "Expand panel" : "Collapse panel";
   toggle.setAttribute("aria-label", toggle.title);
   toggle.setAttribute("aria-expanded", String(!dockCollapsed));
-  toggle.append(desktopIcon(dockCollapsed ? "chevron-right" : "chevron-left"));
+  toggle.replaceChildren(desktopIcon(dockCollapsed ? "chevron-down" : "chevron-up"));
   toggle.onclick = () => { dockCollapsed = !dockCollapsed; layoutApplicationWindows(); renderDesktop(); writeShellState(); };
-  dock.append(toggle);
-  const desktop = document.createElement("button");
-  desktop.className = "dock-item";
-  desktop.title = "Show desktop";
-  desktop.setAttribute("aria-label", "Show desktop");
-  desktop.append(desktopIcon("panels-top-left"));
-  desktop.onclick = showDesktop;
-  dock.append(desktop);
-  const divider = document.createElement("span");
-  divider.className = "dock-divider";
-  dock.append(divider);
   const items = document.createElement("div");
   items.className = "dock-items";
   dock.append(items);
@@ -188,15 +178,6 @@ function renderDesktop() {
       shortcuts.append(shortcut);
     }
   }
-  const utilities = document.createElement("div");
-  utilities.className = "dock-utilities";
-  for (const [icon, title, action] of [["plus", "Open page", showOpenPageDialog], ["video", "Screen Record", showScreenRecordBar]]) {
-    const button = document.createElement("button");
-    button.className = "dock-item";
-    button.title = title; button.setAttribute("aria-label", title);
-    button.append(desktopIcon(icon)); button.onclick = action; utilities.append(button);
-  }
-  dock.append(utilities);
   document.getElementById("window-count").textContent = tabs.size ? tabs.size + (tabs.size === 1 ? " window" : " windows") : "Desktop";
   refreshDesktopIcons();
 }
@@ -207,7 +188,7 @@ function mountApplicationWindow(tab, options) {
   const area = desktopState.workArea(viewport, dockCollapsed);
   const win = new WinBox({
     id: tab.id, title: tab.title, root: stackEl, ...bounds,
-    top: 48, bottom: 8, left: area.x, right: 8, minwidth: Math.min(240, area.width), minheight: 220,
+    top: area.y, bottom: 8, left: area.x, right: 8, minwidth: Math.min(240, area.width), minheight: Math.min(220, area.height),
     header: 36, class: ["no-full", "no-animation"],
   });
   tab.window = win;
@@ -228,21 +209,25 @@ function mountApplicationWindow(tab, options) {
   win.onmaximize = win.onrestore = () => { layoutApplicationWindows(); renderDesktop(); writeShellState(); };
   win.addControl({ class: "wb-browser", click: () => { activateTab(tab.id); setChromeExpanded(!tab.chromeExpanded); } });
   win.addControl({ class: "wb-pin", click: () => pinApplication({ url: tab.appUrl, title: tab.title, favicon: tab.favicon }) });
+  win.addControl({ class: "wb-menu", click: () => openWindowMenu(tab) });
   // Replace WinBox's taskbar minimizer: our Dock hides the full window intact.
   const builtinMinimize = win.window.querySelector(".wb-min");
   builtinMinimize.replaceWith(builtinMinimize.cloneNode(true));
-  const controls = { "wb-browser": ["globe", "Address bar"], "wb-pin": ["pin", "Pin to Dock"], "wb-min": ["minus", "Minimize"], "wb-max": ["maximize-2", "Maximize or restore"], "wb-close": ["x", "Close"] };
+  const controls = { "wb-browser": ["globe", "Address bar"], "wb-pin": ["pin", "Pin to Dock"], "wb-menu": ["ellipsis", "Window controls"], "wb-min": ["minus", "Minimize"], "wb-max": ["maximize-2", "Maximize or restore"], "wb-close": ["x", "Close"] };
   for (const [className, [icon, title]] of Object.entries(controls)) {
     const node = win.window.querySelector("." + className);
     node.replaceChildren(desktopIcon(icon));
     node.title = title; node.setAttribute("role", "button"); node.setAttribute("aria-label", title); node.tabIndex = 0;
     node.onkeydown = (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); node.click(); } };
   }
+  win.window.querySelector(".wb-menu").setAttribute("aria-haspopup", "menu");
+  win.window.querySelector(".wb-menu").setAttribute("aria-expanded", "false");
   win.window.querySelector(".wb-min").onclick = (event) => { event.stopPropagation(); minimizeApplicationWindow(tab); };
   win.window.addEventListener("pointerdown", (event) => {
     if (!event.target.closest(".wb-body")) {
       stackEl.classList.add("interacting");
       setToolsMenuOpen(false);
+      if (!event.target.closest(".wb-menu")) setWindowMenuOpen(false);
       document.getElementById("dock-menu").hidden = true;
     }
     activateTab(tab.id);
@@ -253,6 +238,7 @@ function mountApplicationWindow(tab, options) {
 }
 
 function removeApplicationWindow(tab) {
+  if (document.getElementById("window-menu").dataset.windowId === tab.id) setWindowMenuOpen(false);
   tab.ready = false;
   const toolbar = document.getElementById("browser-toolbar");
   if (tab.window.body.contains(toolbar)) { toolbar.hidden = true; document.body.append(toolbar); }
@@ -264,6 +250,50 @@ function removeApplicationWindow(tab) {
     if (next) activateTab(next.id);
   }
   updateAddressFromActiveTab(); updateNavigationState(); renderDesktop(); writeShellState();
+}
+
+function setWindowMenuOpen(isOpen) {
+  const menu = document.getElementById("window-menu");
+  menu.hidden = !isOpen;
+  const tab = tabs.get(menu.dataset.windowId);
+  tab?.window.window.querySelector(".wb-menu")?.setAttribute("aria-expanded", String(isOpen));
+}
+
+function updateWindowZoom() {
+  const menu = document.getElementById("window-menu");
+  const tab = tabs.get(menu.dataset.windowId);
+  let zoom = 1;
+  try { zoom = tab?.webview.getZoomFactor() || 1; } catch (_) {}
+  document.getElementById("window-zoom-reset").textContent = Math.round(zoom * 100) + "%";
+  document.getElementById("window-zoom-out").disabled = zoom <= minZoomFactor;
+  document.getElementById("window-zoom-in").disabled = zoom >= maxZoomFactor;
+}
+
+function openWindowMenu(tab) {
+  const menu = document.getElementById("window-menu");
+  if (!menu.hidden && menu.dataset.windowId === tab.id) { setWindowMenuOpen(false); return; }
+  setToolsMenuOpen(false);
+  document.getElementById("dock-menu").hidden = true;
+  activateTab(tab.id);
+  menu.dataset.windowId = tab.id;
+  setWindowMenuOpen(true);
+  updateWindowZoom();
+  const rect = tab.window.window.querySelector(".wb-menu").getBoundingClientRect();
+  menu.style.left = Math.max(8, Math.min(rect.right - menu.offsetWidth, innerWidth - menu.offsetWidth - 8)) + "px";
+  menu.style.top = Math.max(dockCollapsed ? 32 : 52, Math.min(rect.bottom + 4, innerHeight - menu.offsetHeight - 8)) + "px";
+  menu.querySelector("button:not(:disabled)")?.focus();
+}
+
+function toggleActiveDevtools() {
+  const tab = getActiveTab();
+  if (tab) tab.webview.isDevToolsOpened() ? tab.webview.closeDevTools() : tab.webview.openDevTools();
+}
+
+function toggleActiveAddressBar() {
+  const tab = getActiveTab();
+  if (!tab) { showOpenPageDialog(); return; }
+  setChromeExpanded(!tab.chromeExpanded);
+  if (tab.chromeExpanded) { addressInput.focus(); addressInput.select(); }
 }
 
 function syncWindowToolbar() {
@@ -307,7 +337,36 @@ document.getElementById("open-page-form").onsubmit = async (event) => {
   }
 };
 document.addEventListener("click", () => { document.getElementById("dock-menu").hidden = true; });
-document.addEventListener("keydown", (event) => { if (event.key === "Escape") document.getElementById("dock-menu").hidden = true; });
+document.getElementById("window-menu").addEventListener("click", (event) => event.stopPropagation());
+document.getElementById("window-zoom-in").onclick = () => { adjustActiveTabZoom(zoomStep); updateWindowZoom(); };
+document.getElementById("window-zoom-out").onclick = () => { adjustActiveTabZoom(-zoomStep); updateWindowZoom(); };
+document.getElementById("window-zoom-reset").onclick = () => { resetActiveTabZoom(); updateWindowZoom(); };
+for (const [id, action] of [["window-reload", () => reloadActiveTab()], ["window-address", toggleActiveAddressBar], ["window-devtools", toggleActiveDevtools]]) {
+  document.getElementById(id).onclick = () => { setWindowMenuOpen(false); action(); };
+}
+document.addEventListener("click", (event) => { if (!event.target.closest(".wb-menu")) setWindowMenuOpen(false); });
+document.addEventListener("keydown", (event) => {
+  const menus = [document.getElementById("tools-menu"), document.getElementById("dock-menu"), document.getElementById("window-menu")];
+  const menu = menus.find((entry) => !entry.hidden);
+  if (!menu) {
+    if (event.key === "Escape" && !document.querySelector("dialog[open]")) setChromeExpanded(false);
+    return;
+  }
+  if (event.key === "Escape") {
+    event.preventDefault();
+    if (menu.id === "tools-menu") { setToolsMenuOpen(false); toolsButton.focus(); }
+    else if (menu.id === "window-menu") {
+      setWindowMenuOpen(false);
+      tabs.get(menu.dataset.windowId)?.window.window.querySelector(".wb-menu")?.focus();
+    } else menu.hidden = true;
+  } else if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+    event.preventDefault();
+    const items = [...menu.querySelectorAll("button:not(:disabled)")];
+    const index = items.indexOf(document.activeElement);
+    const next = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : (index + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+    items[next]?.focus();
+  }
+});
 for (const event of ["pointerup", "pointercancel", "blur"]) window.addEventListener(event, () => stackEl.classList.remove("interacting"));
 function updateDesktopClock() {
   document.getElementById("desktop-clock").textContent = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -316,6 +375,7 @@ updateDesktopClock();
 setInterval(updateDesktopClock, 30000);
 
 function layoutApplicationWindows() {
+  setWindowMenuOpen(false);
   const viewport = { width: innerWidth, height: innerHeight };
   for (const tab of tabs.values()) {
     const win = tab.window;
@@ -330,4 +390,7 @@ function layoutApplicationWindows() {
     }
   }
 }
-window.addEventListener("resize", () => requestAnimationFrame(layoutApplicationWindows));
+// shell.js initializes the shared state after this script loads.
+window.addEventListener("DOMContentLoaded", () => {
+  window.addEventListener("resize", () => requestAnimationFrame(layoutApplicationWindows));
+});
