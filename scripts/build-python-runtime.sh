@@ -50,6 +50,7 @@ python="$runtime/bin/python3"
 export SOURCE_DATE_EPOCH=1790899200
 pip_options=(--retries 0)
 if [[ "${ACESWARM_OFFLINE:-0}" == 1 ]]; then pip_options+=(--no-index --find-links "$wheels"); fi
+constraints=(--constraint "$root/resources/python-constraints.txt")
 for source in aivudaOS aivudaAppStore; do
   [[ -d "$root/$source" && -f "$root/$source/pyproject.toml" ]] || {
     echo "Missing git submodule source: $root/$source; run git submodule update --init --recursive" >&2
@@ -72,8 +73,12 @@ done
 export NODE_ENV=development
 # Rebuild the two source distributions at the current submodule revisions.
 rm -f "$wheels"/aivudaos-*.whl "$wheels"/aivudaappstore-*.whl
-"$python" -m pip wheel "${pip_options[@]}" --no-build-isolation --wheel-dir "$wheels" \
+build_wheels="$staging/wheels"
+mkdir -p "$build_wheels"
+"$python" -m pip wheel "${pip_options[@]}" "${constraints[@]}" --no-build-isolation --wheel-dir "$build_wheels" \
   "$staging/aivudaOS" "$staging/aivudaAppStore"
+rm -f "$wheels"/*.whl
+cp "$build_wheels"/*.whl "$wheels"/
 find "$wheels" -maxdepth 1 -name '*.whl' -type f \
   ! -name 'aivudaos-*.whl' ! -name 'aivudaappstore-*.whl' \
   -printf '%f\n' | sort | (cd "$wheels" && xargs sha256sum) > "$root/resources/wheels.lock.generated"
@@ -86,7 +91,7 @@ else
 fi
 rm -rf "$packages"
 mkdir -p "$packages"
-"$python" -m pip install --no-index --find-links "$wheels" --target "$packages" \
+"$python" -m pip install --no-index --find-links "$wheels" "${constraints[@]}" --target "$packages" \
   aivudaos aivudaappstore
 for ui in "$packages/aivudaos/resources/ui/dist/index.html" "$packages/aivudaappstore/resources/ui/dist/index.html"; do
   [[ -f "$ui" ]] || { echo "Published package UI resource missing: $ui" >&2; exit 1; }

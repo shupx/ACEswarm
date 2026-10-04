@@ -1,0 +1,3 @@
+# Keep the packaged runtime reproducible across rebuilds.
+# uvicorn[standard] accepts any recent websockets release otherwise.
+websockets==17.1

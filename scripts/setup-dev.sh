@@ -22,7 +22,9 @@ if [[ ! -x "$ROOT/.venv/bin/python" ]]; then
   python3 -m venv "$ROOT/.venv"
 fi
 "$ROOT/.venv/bin/python" -m pip install --upgrade pip
-"$ROOT/.venv/bin/python" -m pip install -r "$ROOT/aivudaOS/requirements.txt" -r "$ROOT/aivudaAppStore/requirements.txt"
+"$ROOT/.venv/bin/python" -m pip install \
+  -r "$ROOT/aivudaOS/requirements.txt" \
+  -r "$ROOT/aivudaAppStore/requirements.txt"
 
 printf '%s\n' '[4/4] Building the submodule frontends and private development runtime'
 # This also downloads/locks the development Caddy binary and creates a self-contained Python runtime.
