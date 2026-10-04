@@ -31,15 +31,7 @@ ACEswarm_ws/
 
 ## Local ports
 
-Ports are allocated dynamically on every launch:
-
-```text
-AivudaOS Uvicorn       127.0.0.1:<dynamic>
-AivudaAppStore Uvicorn 127.0.0.1:<dynamic>
-Caddy Gateway          127.0.0.1:<dynamic>
-Caddy admin            127.0.0.1:<dynamic>
-ACEswarm Control API   127.0.0.1:<dynamic>
-```
+see [Ports and local listeners](ports.md)
 
 The embedded services do not bind ports 80/443 and do not require Avahi.
 

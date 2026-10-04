@@ -1,5 +1,12 @@
-## One-command development setup
+## Environment
 
+ubuntu22.04, nodejs 20.x, npm 10.x, python 3.11.x, pip 23.x, virtualenv 20.x.
+
+Set pip mirror for faster installation in China:
+
+```bash
+pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+```
 
 Use **Node.js 22.x** and npm 10.x. The repository pins the expected major version in [`.nvmrc`](../.nvmrc) and `package.json` engines. 
 
@@ -24,6 +31,9 @@ npm config get registry
 ```
 
 The repository `.npmrc` configures npmmirror for Electron and electron-builder binary downloads.
+
+
+## One-command development setup
 
 From a fresh clone:
 
