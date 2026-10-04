@@ -12,7 +12,7 @@
     "test": "node --test tests/*.test.js",
     "test:desktop": "node scripts/test-desktop-ui.js",
     "test:cleanup": "node scripts/test-process-cleanup.js",
-    "check": "node --check electron/main.js && node --check electron/preload.js && node --check electron/services/local-services.js && node --check electron/services/recording.js && node --check electron/desktop-state.js && node --check electron/desktop.js && node --check electron/shell.js && node --check scripts/smoke-services.js && node --check scripts/test-desktop-ui.js && node --check scripts/test-process-cleanup.js && node --test tests/*.test.js",
+    "check": "node --check electron/main.js && node --check electron/preload.js && node --check electron/services/local-services.js && node --check electron/services/recording.js && node --check electron/desktop-state.js && node --check electron/desktop.js && node --check electron/dock-layout.js && node --check electron/shell.js && node --check scripts/smoke-services.js && node --check scripts/test-desktop-ui.js && node --check scripts/test-process-cleanup.js && node --test tests/*.test.js",
     "smoke": "node scripts/smoke-services.js",
     "dev": "bash scripts/start-dev.sh",
     "build:dev-frontends": "bash scripts/build-dev-frontends.sh",
@@ -70,7 +70,7 @@
     "electron@40.10.2": true
   },
   "dependencies": {
-    "lucide": "1.52.0",
-    "winbox": "0.2.82"
+    "dockview-core": "8.4.0",
+    "lucide": "1.52.0"
   }
 }

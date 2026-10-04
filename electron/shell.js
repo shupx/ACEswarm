@@ -169,7 +169,8 @@ function normalizeSavedShellState(rawState) {
 
 function buildShellStatePayload() {
   return {
-    version: 2,
+    version: 3,
+    layout: desktopLayout?.toJSON(),
     serviceOrigins,
     dockCollapsed,
     activeTabId,
@@ -187,8 +188,7 @@ function buildShellStatePayload() {
       favicon: tab.favicon,
       chromeExpanded: tab.chromeExpanded,
       minimized: tab.minimized,
-      maximized: tab.window?.max === true,
-      bounds: tab.window ? { x: tab.window.x, y: tab.window.y, width: tab.window.width, height: tab.window.height } : undefined,
+      placement: tab.placement,
     })),
   };
 }
@@ -312,7 +312,7 @@ function resolveTabDisplayTitle(title, rawUrl) {
 function updateTabTitle(tab, title) {
   const nextTitle = resolveTabDisplayTitle(title, getTabUrl(tab));
   tab.title = nextTitle;
-  tab.window?.setTitle(nextTitle);
+  tab.panel?.api.setTitle(nextTitle);
   renderDesktop();
   writeShellState();
 }
@@ -1558,7 +1558,10 @@ function createTab(rawUrl, options = {}) {
     webview.src = `${offlineUrl}?${params.toString()}`;
   });
   activateTab(id);
-  if (options.minimized) minimizeApplicationWindow(tab);
+  if (options.minimized) {
+    minimizeApplicationWindow(tab);
+    if (options.placement) tab.placement = options.placement;
+  }
   return tab;
 }
 
@@ -1570,8 +1573,9 @@ function activateTab(id) {
   activeTabId = id;
   const tab = tabs.get(id);
   tab.minimized = false;
-  tab.window.show();
-  tab.window.focus();
+  if (!tab.panel) addApplicationPanel(tab);
+  tab.panel.api.setActive();
+  schedulePanelLayout();
   updateActiveClasses();
   updateAddressFromActiveTab();
   updateNavigationState();
@@ -1585,7 +1589,7 @@ function closeTab(id) {
     return;
   }
 
-  tab.window.close();
+  removeApplicationWindow(tab);
 }
 
 function reloadActiveTab() {
@@ -1814,6 +1818,7 @@ window.aivudaShell.getStartup().then((startup) => {
     for (const tabState of restoredTabs) {
       createTab(tabState.url, { ...tabState, chromeExpanded: tabState.chromeExpanded ?? savedState.chromeExpanded });
     }
+    restoreDesktopLayout(startup.savedState.layout);
     if (savedState.activeTabId && tabs.has(savedState.activeTabId) && !tabs.get(savedState.activeTabId).minimized) {
       activateTab(savedState.activeTabId);
     }

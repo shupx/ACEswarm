@@ -18,15 +18,19 @@ AivudaOS and AivudaAppStore remain independent distributions. ACEswarm launches 
 
 ## Desktop shell
 
-The Electron renderer uses plain JavaScript, WinBox.js for movable/resizable
-application windows, and Lucide for controls. Each window owns an independent
-WebView using the existing persistent browser session. Minimizing hides the
-window without recreating its page; closing releases the WebView.
+The Electron renderer uses plain JavaScript, Dockview Core for tab groups,
+nested splits and floating panels, and Lucide for controls. Tabs can be dragged
+to group edges to split or onto tab bars to merge; splitters resize both sides.
+Group controls provide floating/docking, minimizing and maximizing.
+Each application owns an independent WebView using the persistent browser session.
+WebViews stay mounted in permanent shell containers; Dockview content anchors
+drive their position, size, visibility and floating z-order. Moving a panel or
+minimizing it does not recreate its guest. Closing releases the WebView.
 
 The collapsible top panel combines System, Applications/Store Admin, pinned page entries,
 running applications, desktop actions and the clock. Its expanded/collapsed height
 (48/28 pixels) is reserved by the window manager. Maximized windows fill the
-viewport below it; their restore geometry is retained when the panel is toggled.
+viewport below it; Dockview recomputes the available workspace when it is toggled.
 Expanded Dock entries show icons; collapsed entries show application names,
 running state and window counts in a horizontally scrollable row. Applications
 hosts AivudaOS, including its Online Store for downloads. Store Admin hosts the
@@ -45,7 +49,11 @@ another window, switch windows, pin/unpin, reorder pinned entries, or close them
 Pinned entries also appear as desktop shortcuts.
 
 The existing shell-state file stores bookmarks, application launch URLs, page
-URLs, window geometry, minimize/maximize state and address-bar visibility.
+URLs, minimized panel placement, address-bar visibility and the serialized Dockview
+layout (split proportions, tab order, floating bounds and maximized groups).
+State version 3 accepts legacy tabs/bookmarks and WinBox bounds; legacy floating
+windows are migrated into Dockview floating panels. Invalid layouts fall back to
+the restored page list.
 The outer Electron window stores its normal size and maximized state separately
 in `window-state.json` under the Electron user-data directory. Restored dimensions
 are constrained by the primary display's work area and the window's minimum size.
@@ -73,6 +81,8 @@ ACEswarm/
 │   ├── main.js                 # Electron main process and IPC
 │   ├── preload.js              # Security bridge
 │   ├── shell.html/js/css       # Workbench shell
+│   ├── desktop.js             # Dock and application operations
+│   ├── dock-layout.js         # Dockview and stable WebView containers
 │   └── services/
 │       ├── local-services.js   # Service lifecycle, ports, health checks
 │       ├── runtime.js          # Runtime and package resolution

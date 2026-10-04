@@ -3,11 +3,10 @@
 body { margin: 0; height: 100vh; overflow: hidden; }
 button, input { font: inherit; }
 button { cursor: pointer; }
-button:focus-visible, input:focus-visible, .wb-control span:focus-visible { outline: 2px solid #157d71; outline-offset: 2px; }
+button:focus-visible, input:focus-visible { outline: 2px solid #157d71; outline-offset: 2px; }
 [hidden] { display: none !important; }
 .shell { --panel-height: 48px; height: 100vh; background: linear-gradient(120deg, #d5e5e2, #e8edef 55%, #d5dce3); }
 .shell.dock-collapsed { --panel-height: 28px; }
-.window-layer .winbox.max { border: 0; border-radius: 0; box-shadow: none; }
 .desktop-bar { height: var(--panel-height); display: flex; align-items: center; padding: 0 10px; gap: 8px; background: #f9fbfc; border-bottom: 1px solid #c5cdd1; position: relative; z-index: 100000; }
 .system-button { display: flex; align-items: center; gap: 7px; height: 36px; padding: 0 8px; border: 0; border-radius: 5px; background: transparent; color: #354746; font-size: 13px; }
 .system-button:hover, .system-button[aria-expanded="true"] { background: #e3e9e9; }
@@ -25,22 +24,23 @@ button:focus-visible, input:focus-visible, .wb-control span:focus-visible { outl
 .desktop-shortcut:hover { background: #ffffff70; border-color: #b6c9c7; }
 .desktop-shortcut .app-icon { width: 40px; height: 40px; }
 .shortcut-label { font-size: 12px; line-height: 16px; max-width: 80px; overflow-wrap: anywhere; text-align: center; }
-.window-layer { position: absolute; inset: 0; pointer-events: none; }
-.window-layer .winbox { pointer-events: auto; background: #f8fafb; border: 1px solid #aebfbe; border-radius: 7px 7px 0 0; box-shadow: 0 14px 40px #20362c25; }
-.window-layer .winbox.focus { border-color: #4a9187; box-shadow: 0 18px 50px #17382d33; }
-.winbox .wb-header { background: #f8fafb; color: #43575a; border-bottom: 1px solid #d4dede; }
-.winbox.focus .wb-header { background: #edf6f3; color: #174d43; }
-.winbox .wb-title { font-family: inherit; font-size: 13px; font-weight: 600; padding-left: 12px; }
-.winbox .wb-control { display: flex; align-items: center; }
-.winbox .wb-control span { background-image: none; width: 30px; display: inline-grid; place-items: center; color: #526a69; }
-.winbox.no-full .wb-control .wb-full { display: none; }
-.winbox .wb-control svg { width: 16px; height: 16px; pointer-events: none; }
-.winbox .wb-control span:hover { background: #dce8e5; }
-.winbox .wb-control .wb-close:hover { background: #c94145; color: white; }
-.winbox .wb-body { background: #fff; display: flex; flex-direction: column; margin: 0; overflow: hidden; container-type: inline-size; }
-.winbox .wb-body webview { display: flex; width: 100%; flex: 1 1 0; min-height: 0; }
-.winbox.dock-minimized { display: none !important; }
+.window-layer { position: absolute; inset: 48px 0 0; pointer-events: none; }
+#dock-layout { width: 100%; height: 100%; pointer-events: auto; --dv-tabs-and-actions-container-height: 36px; --dv-activegroup-visiblepanel-tab-background-color: #edf6f3; --dv-activegroup-visiblepanel-tab-color: #174d43; --dv-paneview-header-border-color: #c5cdd1; }
+.panel-anchor { width: 100%; height: 100%; }
+.application-body { position: absolute; display: flex; flex-direction: column; overflow: hidden; background: #fff; pointer-events: auto; container-type: inline-size; }
+.application-body webview { display: flex; width: 100%; flex: 1 1 0; min-width: 0; min-height: 0; }
+.panel-controls { display: flex; align-items: center; flex-shrink: 0; }
+.panel-controls .icon-button { width: 27px; height: 30px; }
+#dock-layout .dv-groupview { container-type: inline-size; }
+@container (max-width: 360px) { .panel-controls .panel-browser, .panel-controls .panel-pin, .panel-controls .panel-min { display: none; } }
+.panel-close:hover { background: #c94145; color: white; }
+#dock-layout .dv-tab { font-size: 12px; }
+#dock-layout.empty-grid { pointer-events: none; background: transparent; }
+#dock-layout.empty-grid .dv-watermark { display: none; }
+#dock-layout.empty-grid .dv-resize-container { pointer-events: auto; }
+#dock-layout .dv-resize-container { border: 1px solid #aebfbe; box-shadow: 0 14px 40px #20362c25; }
 .window-layer.interacting webview { pointer-events: none; }
+.window-layer.interacting .application-body { pointer-events: none; }
 .browser-toolbar { background: #f8fafb; border-bottom: 1px solid #d4dede; display: flex; align-items: center; padding: 5px 7px; gap: 3px; flex: 0 0 42px; }
 #address-input { min-width: 50px; flex: 1; height: 29px; border: 1px solid #ccd5d7; border-radius: 5px; padding: 0 8px; background: #fff; font-size: 12px; color: #3a4b4e; }
 #status-text { font-size: 11px; color: #758185; padding: 0 5px; }

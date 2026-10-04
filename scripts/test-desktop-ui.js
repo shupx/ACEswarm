@@ -64,6 +64,15 @@ async function count(page, expected) {
   await page.waitForFunction((value) => tabs.size === value, expected);
 }
 
+async function waitForGuestLayout(page) {
+  await page.waitForFunction(async () => {
+    const visible = [...tabs.values()].filter((tab) => tab.ready && !tab.body.hidden);
+    const matches = await Promise.all(visible.map(async (tab) =>
+      Math.abs(await tab.webview.executeJavaScript('innerWidth') * tab.webview.getZoomFactor() - tab.body.clientWidth) < 2));
+    return matches.every(Boolean);
+  });
+}
+
 async function sendDesktopShortcut(page, keyCode, guest = true) {
   const id = guest ? await page.evaluate(() => getActiveTab().webview.getWebContentsId()) : null;
   // CDP keyboard input bypasses Electron's before-input-event handler.
@@ -155,13 +164,13 @@ async function run() {
   await page.waitForFunction(() => getActiveTab().title === 'Robot Console');
   const robotId = await page.evaluate(() => activeTabId);
   assert.equal(await page.evaluate(() => getActiveTab().webview.executeJavaScript('document.getElementById("live").textContent')), 'Connected');
-  await page.locator('#' + robotId + ' .wb-pin').click();
+  await page.locator('.panel-controls[data-panel-id="' + robotId + '"] .panel-pin').click();
   await page.waitForFunction((url) => favorites.some((entry) => entry.url === url), robotUrl);
   assert.equal(await page.locator('#desktop-shortcuts .desktop-shortcut').count(), 3);
   console.log('PASS: custom page loads, receives title, and pins to Dock and desktop');
 
   await page.evaluate(() => getActiveTab().webview.executeJavaScript('window.testInstance = "preserved"'));
-  await page.locator('#' + robotId + ' .wb-min').click();
+  await page.locator('.panel-controls[data-panel-id="' + robotId + '"] .panel-min').click();
   await page.waitForFunction((id) => tabs.get(id).minimized, robotId);
   assert.equal(await page.locator('#' + robotId).isVisible(), false);
   assert.equal(await page.evaluate((id) => tabs.get(id).webview.getURL(), robotId), robotUrl);
@@ -171,7 +180,7 @@ async function run() {
   assert.equal(await page.evaluate(() => getActiveTab().webview.executeJavaScript('window.testInstance')), 'preserved');
   console.log('PASS: minimize keeps WebView alive; Dock restores without duplicate windows');
 
-  await page.locator('#' + robotId + ' .wb-browser').click();
+  await page.locator('.panel-controls[data-panel-id="' + robotId + '"] .panel-browser').click();
   assert.equal(await page.locator('#browser-toolbar').isVisible(), true);
   await page.locator('#collapse-chrome').click();
   await page.locator('#' + robotId + ' webview').click({ position: { x: 450, y: 200 } });
@@ -184,11 +193,11 @@ async function run() {
   await sendDesktopShortcut(page, '0');
   await page.waitForFunction(() => getActiveTab().webview.getZoomFactor() === 1);
   assert.equal(await page.locator('#browser-toolbar').isVisible(), false);
-  await page.locator('#' + robotId + ' .wb-menu').click();
+  await page.locator('.panel-controls[data-panel-id="' + robotId + '"] .panel-menu').click();
   assert.equal(await page.locator('#window-menu').isVisible(), true);
-  await page.locator('#' + robotId + ' .wb-menu').click();
+  await page.locator('.panel-controls[data-panel-id="' + robotId + '"] .panel-menu').click();
   assert.equal(await page.locator('#window-menu').isVisible(), false);
-  await page.locator('#' + robotId + ' .wb-menu').click();
+  await page.locator('.panel-controls[data-panel-id="' + robotId + '"] .panel-menu').click();
   await page.locator('#window-zoom-in').click();
   assert.equal(await page.locator('#window-zoom-reset').textContent(), '110%');
   assert.ok(Math.abs(await page.evaluate(() => getActiveTab().webview.getZoomFactor()) - 1.1) < 0.01);
@@ -205,16 +214,22 @@ async function run() {
   await page.locator('#system-address').click();
   assert.equal(await page.locator('#browser-toolbar').isVisible(), true);
   await page.locator('#collapse-chrome').click();
-  await page.locator('#' + robotId + ' .wb-max').click();
-  assert.equal(await page.evaluate((id) => tabs.get(id).window.max, robotId), true);
-  assert.deepEqual(await page.locator('#' + robotId).boundingBox(), await page.evaluate(() => ({ x: 0, y: 48, width: innerWidth, height: innerHeight - 48 })));
+  await page.locator('.panel-controls[data-panel-id="' + robotId + '"] .panel-max').click();
+  assert.equal(await page.evaluate((id) => tabs.get(id).panel.api.isMaximized(), robotId), true);
+  assert.deepEqual(await page.evaluate((id) => {
+    const { x, y, width, height } = tabs.get(id).panel.group.element.getBoundingClientRect();
+    return { x, y, width, height };
+  }, robotId), await page.evaluate(() => ({ x: 0, y: 48, width: innerWidth, height: innerHeight - 48 })));
   await page.locator('#tools-button').click();
   await page.screenshot({ path: path.join(screenshots, 'desktop-system-menu.png') });
   await page.keyboard.press('Escape');
   await page.screenshot({ path: path.join(screenshots, 'desktop-maximized-top-dock.png') });
   await page.locator('#toggle-dock').click();
   assert.equal(await page.evaluate(() => dockCollapsed), true);
-  const maximized = await page.locator('#' + robotId).boundingBox();
+  const maximized = await page.evaluate((id) => {
+    const { x, y, width, height } = tabs.get(id).panel.group.element.getBoundingClientRect();
+    return { x, y, width, height };
+  }, robotId);
   assert.equal(maximized.x, 0); assert.equal(maximized.width, 1280);
   assert.equal(maximized.y, 28); assert.equal(maximized.height, 792);
   assert.equal(await page.locator('#dock .dock-label').nth(0).isVisible(), true);
@@ -232,32 +247,47 @@ async function run() {
   await page.keyboard.press('Escape');
   await page.screenshot({ path: path.join(screenshots, 'desktop-maximized-collapsed-dock.png') });
   await page.locator('#toggle-dock').click();
-  await page.locator('#' + robotId + ' .wb-max').click();
-  assert.equal(await page.evaluate((id) => tabs.get(id).window.max, robotId), false);
-
-  const header = page.locator('#' + robotId + ' .wb-title');
+  await page.locator('.panel-controls[data-panel-id="' + robotId + '"] .panel-max').click();
+  assert.equal(await page.evaluate((id) => tabs.get(id).panel.api.isMaximized(), robotId), false);
+  const guestId = await page.evaluate((id) => tabs.get(id).webview.getWebContentsId(), robotId);
+  const header = page.locator('[data-tab-panel-id="' + robotId + '"]');
   const box = await header.boundingBox();
-  const initial = await page.evaluate((id) => ({ x: tabs.get(id).window.x, y: tabs.get(id).window.y }), robotId);
-  await page.mouse.move(box.x + 80, box.y + 15);
+  await page.mouse.move(box.x + 35, box.y + box.height / 2);
   await page.mouse.down();
-  await page.mouse.move(box.x + 130, box.y + 35, { steps: 8 });
+  await page.mouse.move(1265, 450, { steps: 25 });
+  await page.screenshot({ path: path.join(screenshots, 'desktop-dockview-drag.png') });
   await page.mouse.up();
-  const moved = await page.evaluate((id) => ({ x: tabs.get(id).window.x, y: tabs.get(id).window.y }), robotId);
+  await page.waitForFunction(() => desktopLayout.groups.filter((group) => group.api.location.type === 'grid').length === 2);
+  assert.equal(await page.evaluate((id) => tabs.get(id).webview.getWebContentsId(), robotId), guestId);
+  assert.equal(await page.evaluate((id) => tabs.get(id).webview.executeJavaScript('window.testInstance'), robotId), 'preserved');
+  await waitForGuestLayout(page);
+  await page.screenshot({ path: path.join(screenshots, 'desktop-dockview-split.png') });
+  const sash = await page.locator('#dock-layout .dv-sash').first().boundingBox();
+  const originalWidth = await page.evaluate((id) => tabs.get(id).panel.api.width, robotId);
+  await page.mouse.move(sash.x + sash.width / 2, sash.y + sash.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(sash.x - 90, sash.y + sash.height / 2, { steps: 10 });
+  await page.mouse.up();
+  assert.notEqual(await page.evaluate((id) => tabs.get(id).panel.api.width, robotId), originalWidth);
+  await page.evaluate((id) => tabs.get(id).panel.api.moveTo({ group: tabs.get('tab-1').panel.group, position: 'bottom' }), robotId);
+  await page.screenshot({ path: path.join(screenshots, 'desktop-dockview-stacked.png') });
+  await page.locator('.panel-controls[data-panel-id="' + robotId + '"] .panel-float').click();
+  assert.equal(await page.evaluate((id) => tabs.get(id).panel.api.location.type, robotId), 'floating');
+  const floatHeader = await page.locator('.dv-floating-titlebar').boundingBox();
+  const initial = await page.locator('#' + robotId).boundingBox();
+  await page.mouse.move(floatHeader.x + 45, floatHeader.y + 8);
+  await page.mouse.down();
+  await page.mouse.move(floatHeader.x + 85, floatHeader.y + 28, { steps: 10 });
+  await page.mouse.up();
+  const moved = await page.locator('#' + robotId).boundingBox();
   assert.ok(moved.x !== initial.x || moved.y !== initial.y);
-  const resize = await page.locator('#' + robotId + ' .wb-se').boundingBox();
-  const originalWidth = await page.evaluate((id) => tabs.get(id).window.width, robotId);
-  await page.mouse.move(resize.x + resize.width / 2, resize.y + resize.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(resize.x - 80, resize.y - 60, { steps: 8 });
-  await page.mouse.up();
-  assert.ok(await page.evaluate((id) => tabs.get(id).window.width, robotId) < originalWidth);
-  await page.evaluate((id) => tabs.get(id).window.resize(640, 400), robotId);
-  assert.equal(await page.evaluate((id) => tabs.get(id).window.width, robotId), 640);
-  await page.locator('#tab-1 webview').click({ position: { x: 900, y: 300 } });
-  await page.waitForFunction(() => activeTabId === 'tab-1');
+  assert.equal(await page.evaluate((id) => tabs.get(id).webview.getWebContentsId(), robotId), guestId);
+  await page.screenshot({ path: path.join(screenshots, 'desktop-dockview-floating.png') });
+  await page.locator('.panel-controls[data-panel-id="' + robotId + '"] .panel-float').click();
+  assert.equal(await page.evaluate((id) => tabs.get(id).panel.api.location.type, robotId), 'grid');
   await page.locator('#dock button[data-app-url="' + robotUrl + '"]').click();
   await page.waitForFunction((id) => activeTabId === id, robotId);
-  console.log('PASS: top panel, System menu, per-window zoom/address controls, maximize, restore, drag and resize');
+  console.log('PASS: Dockview drag docking, split resize, stacking, floating and guest state preservation');
 
   await page.evaluate(() => getActiveTab().webview.executeJavaScript('document.getElementById("popup").click()'));
   await count(page, 3);
@@ -278,7 +308,8 @@ async function run() {
   assert.equal(await page.locator('#dock button[data-app-url="' + robotUrl + '"] .dock-label').textContent(), 'Robot Console');
   await page.screenshot({ path: path.join(screenshots, 'desktop-text-dock-multiple-windows.png') });
   await page.locator('#toggle-dock').click();
-  await page.evaluate(() => closeTab(activeTabId));
+  const duplicateId = await page.evaluate(() => activeTabId);
+  await page.locator('[data-tab-panel-id="' + duplicateId + '"] .dv-default-tab-action').click();
   await count(page, 4);
   console.log('PASS: multiple windows share one application Dock icon');
 
@@ -307,7 +338,8 @@ async function run() {
   await page.screenshot({ path: path.join(screenshots, 'desktop-850.png') });
   await application.evaluate(({ BrowserWindow }) => { const window = BrowserWindow.getAllWindows()[0]; window.setMinimumSize(0, 0); window.setContentSize(390, 844); });
   await page.waitForFunction(() => innerWidth === 390);
-  await page.waitForFunction(() => [...tabs.values()].every((tab) => tab.window.window.getBoundingClientRect().right <= innerWidth));
+  await waitForGuestLayout(page);
+  await page.waitForFunction(() => [...tabs.values()].every((tab) => tab.minimized || tab.body.getBoundingClientRect().right <= innerWidth + 1));
   await page.screenshot({ path: path.join(screenshots, 'desktop-390.png') });
   await page.locator('#tools-button').click();
   const systemMenu = await page.locator('#tools-menu').boundingBox();
@@ -329,9 +361,8 @@ async function run() {
   await page.locator('#toggle-dock').click();
   await application.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0].setContentSize(1280, 820); });
   await page.waitForFunction(() => innerWidth === 1280);
-  await page.evaluate((id) => { tabs.get(id).window.resize(640, 400).move(180, 90); }, robotId);
-  await page.evaluate(() => tabs.get('tab-1').window.maximize());
-  await page.locator('#' + robotId + ' .wb-min').click();
+  await page.evaluate((id) => { tabs.get(id).panel.api.moveTo({ group: tabs.get('tab-1').panel.group, position: 'center' }); }, robotId);
+  await page.locator('.panel-controls[data-panel-id="' + robotId + '"] .panel-min').click();
   await page.locator('#toggle-dock').click();
   await page.evaluate(() => writeShellState());
   await application.evaluate(({ BrowserWindow }) => {
@@ -343,9 +374,9 @@ async function run() {
   await application.close();
   application = null;
   const saved = JSON.parse(fs.readFileSync(path.join(temp, 'profile', 'shell-state.json')));
-  assert.equal(saved.version, 2);
+  assert.equal(saved.version, 3);
   assert.ok(saved.favorites.some((entry) => entry.url === robotUrl));
-  assert.deepEqual(saved.tabs.find((tab) => tab.id === robotId).bounds, { x: 180, y: 90, width: 640, height: 400 });
+  assert.ok(saved.layout.panels['tab-1']);
   assert.equal(saved.tabs.find((tab) => tab.id === robotId).minimized, true);
 
   page = await launch({ width: 1100, height: 720, maximized: true });
@@ -357,14 +388,13 @@ async function run() {
   assert.equal(await page.evaluate(() => dockCollapsed), true);
   assert.equal(await page.locator('#dock .dock-label').nth(0).isVisible(), true);
   await page.locator('#toggle-dock').click();
-  assert.equal(await page.evaluate(() => tabs.get('tab-1').window.max), true);
   assert.notEqual(await page.evaluate(() => defaultUrl), saved.serviceOrigins.os);
   assert.equal(await page.evaluate(() => new URL(tabs.get('tab-1').url).origin), await page.evaluate(() => new URL(defaultUrl).origin));
   assert.equal(await page.evaluate(() => tabs.get('tab-1').appUrl), await page.evaluate(() => defaultUrl));
   await page.locator('#dock button[data-app-url="' + robotUrl + '"]').click();
-  assert.deepEqual(await page.evaluate((id) => ({ x: tabs.get(id).window.x, y: tabs.get(id).window.y, width: tabs.get(id).window.width, height: tabs.get(id).window.height }), robotId), { x: 180, y: 90, width: 640, height: 400 });
+  assert.equal(await page.evaluate((id) => tabs.get(id).panel.group.id === tabs.get('tab-1').panel.group.id, robotId), true);
   console.log('PASS: restart restores pinned application, minimized state, geometry and remaps service ports');
-  await page.locator('#' + robotId + ' .wb-close').click();
+  await page.locator('.panel-controls[data-panel-id="' + robotId + '"] .panel-close').click();
   await count(page, 1);
   assert.equal(await page.locator('#dock button[data-app-url="' + robotUrl + '"]').count(), 1);
   await page.locator('#dock button[data-app-url="' + robotUrl + '"]').click({ button: 'right' });
@@ -379,16 +409,42 @@ async function run() {
   assert.equal(await page.evaluate(() => [...tabs.values()].every((tab) => tab.minimized)), true);
   await page.screenshot({ path: path.join(screenshots, 'desktop-empty.png') });
   console.log('PASS: close keeps pinned icon, unpin removes it, last close reaches desktop, shortcuts and show-desktop work');
+  const layoutIds = await page.evaluate((url) => {
+    const home = [...tabs.values()][0];
+    activateTab(home.id);
+    const robot = createTab(url);
+    robot.panel.api.moveTo({ group: home.panel.group, position: 'right' });
+    const child = createTab(url + 'layout-child');
+    child.panel.api.moveTo({ group: robot.panel.group, position: 'bottom' });
+    robot.panel.group.api.setSize({ height: 460 });
+    floatOrDockPanel(home);
+    return { home: home.id, robot: robot.id, child: child.id };
+  }, robotUrl);
+  await page.waitForFunction(() => [...tabs.values()].every((tab) => tab.ready));
+  const splitRatio = await page.evaluate(({ robot, child }) => tabs.get(robot).panel.api.height / (tabs.get(robot).panel.api.height + tabs.get(child).panel.api.height), layoutIds);
+  await page.evaluate(() => writeShellState());
+  await application.close();
+  application = null;
+  page = await launch();
+  await count(page, 3);
+  await page.waitForFunction(() => [...tabs.values()].every((tab) => tab.ready));
+  assert.equal(await page.evaluate(({ home }) => tabs.get(home).panel.api.location.type, layoutIds), 'floating');
+  assert.equal(await page.evaluate(() => desktopLayout.groups.filter((group) => group.api.location.type === 'grid').length), 2);
+  const restoredRatio = await page.evaluate(({ robot, child }) => tabs.get(robot).panel.api.height / (tabs.get(robot).panel.api.height + tabs.get(child).panel.api.height), layoutIds);
+  assert.ok(Math.abs(restoredRatio - splitRatio) < 0.03, 'Split proportions survive restart');
+  await page.screenshot({ path: path.join(screenshots, 'desktop-dockview-restored.png') });
+  console.log('PASS: nested split proportions and floating groups survive restart');
   await application.close();
   application = null;
   fs.writeFileSync(path.join(temp, 'profile', 'shell-state.json'), JSON.stringify({
-    tabs: [{ id: 'tab-9', url: robotUrl }], activeTabId: 'tab-9',
+    tabs: [{ id: 'tab-9', url: robotUrl, bounds: { x: 130, y: 90, width: 640, height: 400 } }], activeTabId: 'tab-9',
     favorites: [{ url: robotUrl, title: 'Legacy robot' }], chromeExpanded: true,
   }));
   page = await launch();
   await count(page, 1);
   assert.equal(await page.evaluate(() => favorites[0].title), 'Legacy robot');
   assert.equal(await page.evaluate(() => getActiveTab().appUrl), robotUrl);
+  assert.equal(await page.evaluate(() => getActiveTab().panel.api.location.type), 'floating');
   assert.equal(await page.locator('#browser-toolbar').isVisible(), true);
   console.log('PASS: legacy tabs and bookmarks migrate into desktop windows and Dock');
   await page.evaluate(() => { screenRecordMode = 'native'; showScreenRecordBar(); });
