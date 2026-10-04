@@ -295,13 +295,16 @@ function getSiteNameFromUrl(rawUrl) {
 
   try {
     const parsed = new URL(normalized);
+    if (parsed.origin === new URL(defaultUrl).origin && !/^\/[^/]+\/ui(?:\/|$)/.test(parsed.pathname)) {
+      return "Applications";
+    }
     const hostname = parsed.hostname.replace(/^www\./, "");
     if (hostname) {
       return hostname;
     }
   } catch (_error) {}
 
-  return "AivudaOS";
+  return "Applications";
 }
 
 function isGenericAivudaTitle(title) {

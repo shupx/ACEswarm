@@ -17,12 +17,23 @@ function applicationIcon(entry) {
   const builtin = key === desktopState.appKey(defaultUrl) ? "home" : key === desktopState.appKey(storeUrl) ? "store" : "";
   if (builtin) holder.classList.add(builtin);
   holder.append(desktopIcon(builtin === "home" ? "layout-grid" : builtin === "store" ? "package-plus" : "globe"));
-  if (entry.favicon) {
+  const icons = [];
+  try {
+    const url = new URL(entry.url);
+    const app = url.pathname.match(/^\/([^/]+)\/ui(?:\/|$)/);
+    if (app) icons.push(new URL('/aivuda_os/api/apps/' + encodeURIComponent(decodeURIComponent(app[1])) + '/icon', url).href);
+  } catch (_) {}
+  if (entry.favicon) icons.push(entry.favicon);
+  if (icons.length) {
     const image = document.createElement("img");
     image.alt = "";
     image.referrerPolicy = "no-referrer";
-    image.src = entry.favicon;
     image.onload = () => holder.replaceChildren(image);
+    image.onerror = () => {
+      if (icons.length) image.src = icons.shift();
+      else { holder.replaceChildren(desktopIcon(builtin === "home" ? "layout-grid" : builtin === "store" ? "package-plus" : "globe")); refreshDesktopIcons(); }
+    };
+    image.src = icons.shift();
   }
   return holder;
 }

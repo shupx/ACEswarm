@@ -149,6 +149,8 @@ async function run() {
   await count(page, 1);
   await page.waitForFunction(() => getActiveTab().webview.getURL().startsWith('http:'));
   console.log('PASS: real Electron desktop and local Applications page start');
+  await page.waitForFunction(() => getActiveTab().title === 'Applications');
+  assert.equal(await page.evaluate(() => resolveTabDisplayTitle('AivudaOS', defaultUrl)), 'Applications');
   const initialId = await page.evaluate(() => activeTabId);
   const initialLayout = await page.evaluate(() => desktopLayout.toJSON());
   const initialGuest = await page.evaluate(() => getActiveTab().webview.getWebContentsId());

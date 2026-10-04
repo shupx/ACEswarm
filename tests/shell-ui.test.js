@@ -2,12 +2,45 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
+const vm = require('node:vm');
 
 const root = path.resolve(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'electron/shell.html'), 'utf8');
 const renderer = fs.readFileSync(path.join(root, 'electron/shell.js'), 'utf8');
 const preload = fs.readFileSync(path.join(root, 'electron/preload.js'), 'utf8');
 const guest = fs.readFileSync(path.join(root, 'electron/guest-preload.js'), 'utf8');
+
+test('app UI Dock icons prefer the manifest icon and fall back to the page favicon', () => {
+  const nodes = [];
+  const context = vm.createContext({
+    URL, defaultUrl: 'http://localhost:28790/', storeUrl: 'http://localhost:28791/',
+    desktopState: { appKey: (url) => url }, lucide: { createIcons() {} },
+    document: {
+      querySelectorAll: () => [],
+      createElement(tag) {
+        const node = { tag, dataset: {}, classList: { add() {} }, children: [],
+          append(child) { this.children.push(child); },
+          replaceChildren(...children) { this.children = children; } };
+        nodes.push(node);
+        return node;
+      },
+    },
+  });
+  const desktop = fs.readFileSync(path.join(root, 'electron/desktop.js'), 'utf8');
+  vm.runInContext(desktop.split('function applicationEntries()')[0], context);
+  const holder = vm.runInContext('applicationIcon({url: "https://robot/navigation/ui/index.html", favicon: "https://robot/favicon.ico"})', context);
+  const image = nodes.find((node) => node.tag === 'img');
+  assert.equal(image.src, 'https://robot/aivuda_os/api/apps/navigation/icon');
+  image.onerror();
+  assert.equal(image.src, 'https://robot/favicon.ico');
+  image.onload();
+  assert.equal(holder.children[0], image);
+  image.onerror();
+  assert.equal(holder.children[0].dataset.lucide, 'globe');
+  nodes.length = 0;
+  vm.runInContext('applicationIcon({url: "https://example.org/page", favicon: "https://example.org/icon.png"})', context);
+  assert.equal(nodes.find((node) => node.tag === 'img').src, 'https://example.org/icon.png');
+});
 
 test('desktop shell exposes application windows, Dock, address bar and tools', () => {
   for (const id of ['shell', 'dock', 'desktop-shortcuts', 'show-desktop', 'open-page-dialog', 'address-input', 'add-favorite', 'tools-button', 'tools-menu', 'tools-fps', 'tools-record', 'webview-stack']) {
