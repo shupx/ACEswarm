@@ -62,6 +62,9 @@ async function openPage(page, url) {
 }
 
 async function checkRecording(page, mode) {
+  if (mode === 'native') await page.evaluate(() => {
+    navigator.mediaDevices.getUserMedia = () => { throw new Error('Desktop capture must not be used for Native recording'); };
+  });
   await page.evaluate(() => { screenRecordDetailsExpanded = true; renderScreenRecordBar(); });
   await page.locator('[data-screen-record-mode="' + mode + '"]').click();
   await page.locator('[data-start-screen-record]').click();
@@ -189,7 +192,7 @@ async function run() {
   await page.locator('#tools-button').click();
   await page.locator('#tools-record').click();
   assert.equal(await page.evaluate(() => screenRecordBarVisible), true);
-  for (const mode of ['ffmpeg', 'native', 'ffmpeg-x11']) await checkRecording(page, mode);
+  for (const mode of ['ffmpeg', 'native', 'native', 'native', 'ffmpeg-x11']) await checkRecording(page, mode);
   await page.evaluate(() => { screenRecordBarVisible = false; renderScreenRecordBar(); });
   await page.evaluate(() => {
     for (const tab of [...tabs.values()]) if (tab.id !== 'tab-2' && tab.id !== 'tab-1') closeTab(tab.id);

@@ -32,6 +32,7 @@ let screenRecordPausedAt = 0;
 let screenRecordTimer = 0;
 let screenRecorder = null;
 let screenRecorderStream = null;
+let screenRecorderFrameCapture = null;
 let screenRecorderChunks = [];
 let screenRecorderOutputPath = "";
 let screenRecorderOutputDir = "";
@@ -735,6 +736,11 @@ function startScreenRecordTimer() {
 }
 
 function cleanupScreenRecorderStream() {
+  if (screenRecorderFrameCapture) {
+    screenRecorderFrameCapture.stopped = true;
+    clearTimeout(screenRecorderFrameCapture.timer);
+    screenRecorderFrameCapture = null;
+  }
   if (screenRecorderStream) {
     for (const track of screenRecorderStream.getTracks()) {
       track.stop();
@@ -1124,6 +1130,10 @@ async function stopScreenRecording() {
   }
 
   try {
+    if (screenRecorderFrameCapture) {
+      screenRecorderFrameCapture.stopped = true;
+      clearTimeout(screenRecorderFrameCapture.timer);
+    }
     screenRecorder.stop();
   } catch (error) {
     isStoppingScreenRecorder = false;
@@ -1234,8 +1244,8 @@ async function finalizeScreenRecording() {
 
 function chooseScreenRecordingMimeType() {
   const candidates = [
-    "video/webm;codecs=vp9",
     "video/webm;codecs=vp8",
+    "video/webm;codecs=vp9",
     "video/webm",
   ];
 
@@ -1246,6 +1256,46 @@ function chooseScreenRecordingMimeType() {
   }
 
   return "";
+}
+
+async function createNativeWindowStream() {
+  // A CPU-backed canvas avoids Chromium's driver-dependent desktop capturer.
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
+  if (!context) throw new Error("Could not create recording canvas.");
+  const capture = { canvas, timer: null, stopped: false };
+  screenRecorderFrameCapture = capture;
+  async function drawFrame() {
+    const png = await window.aivudaShell.captureRecordingFrame();
+    const bitmap = await createImageBitmap(new Blob([png], { type: "image/png" }));
+    try {
+      if (capture.stopped) return;
+      if (!capture.track) { canvas.width = bitmap.width; canvas.height = bitmap.height; }
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      capture.track?.requestFrame();
+    } finally { bitmap.close(); }
+  }
+  await drawFrame();
+  const stream = canvas.captureStream(0);
+  capture.track = stream.getVideoTracks()[0];
+  screenRecorderStream = stream;
+  capture.track.requestFrame();
+  async function tick() {
+    if (capture.stopped) return;
+    try {
+      if (screenRecordStatus !== "paused") await drawFrame();
+    } catch (error) {
+      if (!capture.stopped) {
+        capture.stopped = true;
+        await stopScreenRecording().catch(() => {});
+        setScreenRecordState("error", `Window capture failed: ${error.message}`);
+      }
+      return;
+    }
+    if (!capture.stopped) capture.timer = setTimeout(tick, 50);
+  }
+  capture.timer = setTimeout(tick, 50);
+  return stream;
 }
 
 async function startScreenRecording() {
@@ -1290,14 +1340,11 @@ async function startScreenRecording() {
 
   try {
     const prepared = await window.aivudaShell.prepareWindowRecording();
-    if (!prepared?.ok || !prepared.sourceId || !prepared.outputPath) {
+    if (!prepared?.ok || !prepared.outputPath) {
       throw new Error(prepared?.error || "Could not prepare window capture.");
     }
 
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: { mandatory: { chromeMediaSource: "desktop", chromeMediaSourceId: prepared.sourceId } },
-    });
+    const stream = await createNativeWindowStream();
     screenRecorderStream = stream;
 
     const mimeType = chooseScreenRecordingMimeType();

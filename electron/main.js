@@ -1,6 +1,7 @@
 const path = require('node:path');
 const fs = require('node:fs');
-const { app, BrowserWindow, desktopCapturer, ipcMain, Menu, session, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, session, shell } = require('electron');
+if (process.platform === 'linux') app.commandLine.appendSwitch('disable-accelerated-video-encode');
 const { workspace } = require('./services/workspace');
 const { resolveRuntime } = require('./services/runtime');
 const { LocalServices } = require('./services/local-services');
@@ -226,15 +227,18 @@ app.whenReady().then(async () => {
     });
     ipcMain.handle('aivuda-shell:open-path', async (_, target) => { if (typeof target !== 'string') return { ok: false, error: 'Missing path' }; const error = await shell.openPath(target); return error ? { ok: false, error } : { ok: true }; });
     ipcMain.handle('aivuda-shell:show-item-in-folder', (_, target) => { if (typeof target !== 'string') return { ok: false, error: 'Missing path' }; shell.showItemInFolder(target); return { ok: true }; });
-    ipcMain.handle('aivuda-shell:prepare-window-recording', async () => {
+    ipcMain.handle('aivuda-shell:prepare-window-recording', async (event) => {
       if (!window || window.isDestroyed()) return { ok: false, error: 'Main window is not available.' };
-      const sources = await desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 0, height: 0 }, fetchWindowIcons: false });
-      const preferredSourceId = window.getMediaSourceId();
-      const source = sources.find((entry) => entry.id === preferredSourceId) || sources.find((entry) => entry.name === window.getTitle());
-      if (!source) return { ok: false, error: 'No capturable window source was found.' };
+      if (event.sender !== window.webContents) return { ok: false, error: 'Only the desktop can record.' };
       const dir = recording.getRecordingsDir();
       const outputPath = recording.createRecordingOutputPath();
-      return { ok: true, sourceId: source.id, outputPath, recordingsDir: dir };
+      return { ok: true, outputPath, recordingsDir: dir };
+    });
+    ipcMain.handle('aivuda-shell:capture-recording-frame', async (event) => {
+      if (!window || window.isDestroyed() || event.sender !== window.webContents) throw new Error('Only the desktop can record.');
+      const image = await window.webContents.capturePage();
+      if (image.isEmpty()) throw new Error('Window capture returned an empty frame.');
+      return image.toPNG();
     });
     ipcMain.handle('aivuda-shell:save-recording-file', (_, payload) => { try { if (!payload?.outputPath || !Array.isArray(payload.buffer)) throw new Error('Invalid recording payload'); fs.mkdirSync(path.dirname(payload.outputPath), { recursive: true }); fs.writeFileSync(payload.outputPath, Buffer.from(payload.buffer)); return { ok: true, outputPath: payload.outputPath }; } catch (error) { return { ok: false, error: error.message }; } });
     for (const [name, method] of Object.entries({

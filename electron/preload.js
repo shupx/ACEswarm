@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('aivudaShell', {
   clearBrowserData: () => ipcRenderer.invoke('aivuda-shell:clear-browser-data'), saveShellState: (state) => ipcRenderer.invoke('aivuda-shell:save-shell-state', state),
   openPath: (p) => ipcRenderer.invoke('aivuda-shell:open-path', p), showItemInFolder: (p) => ipcRenderer.invoke('aivuda-shell:show-item-in-folder', p),
   prepareWindowRecording: () => ipcRenderer.invoke('aivuda-shell:prepare-window-recording'), saveRecordingFile: (p) => ipcRenderer.invoke('aivuda-shell:save-recording-file', p),
+  captureRecordingFrame: () => ipcRenderer.invoke('aivuda-shell:capture-recording-frame'),
   startFfmpegWindowRecording: () => ipcRenderer.invoke('aivuda-shell:start-ffmpeg-window-recording'), startFfmpegX11Recording: () => ipcRenderer.invoke('aivuda-shell:start-ffmpeg-x11-recording'),
   pauseFfmpegWindowRecording: () => ipcRenderer.invoke('aivuda-shell:pause-ffmpeg-window-recording'), resumeFfmpegWindowRecording: () => ipcRenderer.invoke('aivuda-shell:resume-ffmpeg-window-recording'),
   stopFfmpegWindowRecording: () => ipcRenderer.invoke('aivuda-shell:stop-ffmpeg-window-recording'), registerWebview: (id) => ipcRenderer.send('aivuda-shell:register-webview', id),

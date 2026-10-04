@@ -40,11 +40,16 @@ to the current endpoints at startup. Address entry from the trusted desktop
 authorizes HTTP(S) origins; guest navigation remains subject to the existing
 origin checks. Allowed page popups open internal application windows.
 
-Recording uses the same three modes as aivuda-shell: Native captures the selected
-Electron window into WebM; FFmpeg encodes window frames into MP4; FFmpeg X11 records
+Recording exposes the same three modes as aivuda-shell: Native captures the
+Electron content area into WebM; FFmpeg encodes window frames into MP4; FFmpeg X11 records
 the native window's screen region on X11. The movable recording bar supports mode
 selection, pause/resume, stop/save, and opening saved files. FFmpeg is an optional
 system dependency. Window close finalizes recording before destroying its renderer.
+Native reads frames with `webContents.capturePage()`, draws them on a CPU-backed
+canvas, and feeds `canvas.captureStream()` to `MediaRecorder` (VP8 preferred).
+It avoids `desktopCapturer` and desktop `getUserMedia`, whose driver capture path
+can crash on NVIDIA/X11. Frames are captured sequentially at up to 20 FPS, with
+fixed output dimensions and explicit timer/track cleanup. Native needs no FFmpeg.
 
 ## ACEswarm layout
 

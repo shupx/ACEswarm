@@ -130,6 +130,9 @@ ACESWARM_TEST_WINDOW_MANAGER=/usr/bin/openbox xvfb-run -a npm run test:desktop
 ```
 
 Screenshots and sample recordings are written to `.smoke/desktop/`.
+Native is tested with desktop `getUserMedia` disabled, including three consecutive
+start/pause/resume/stop cycles. It records the application's content area as WebM
+through Electron frame capture and browser MediaRecorder, without OS title bars.
 
 Run `xvfb-run -a npm run test:cleanup` to verify real Electron window close,
 SIGTERM, and SIGKILL during FFmpeg recording. The test checks that subprocesses
