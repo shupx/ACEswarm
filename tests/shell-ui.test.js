@@ -9,8 +9,8 @@ const renderer = fs.readFileSync(path.join(root, 'electron/shell.js'), 'utf8');
 const preload = fs.readFileSync(path.join(root, 'electron/preload.js'), 'utf8');
 const guest = fs.readFileSync(path.join(root, 'electron/guest-preload.js'), 'utf8');
 
-test('Aivuda-style browser shell exposes Home, AppStore, favorites, tools and tabs', () => {
-  for (const id of ['shell', 'tabs', 'address-input', 'favorites-bar', 'home-button', 'store-button', 'add-favorite', 'tools-button', 'tools-menu', 'tools-fps', 'tools-record', 'webview-stack']) {
+test('desktop shell exposes application windows, Dock, address bar and tools', () => {
+  for (const id of ['shell', 'dock', 'desktop-shortcuts', 'show-desktop', 'open-page-dialog', 'address-input', 'add-favorite', 'tools-button', 'tools-menu', 'tools-fps', 'tools-record', 'webview-stack']) {
     assert.match(html, new RegExp(`id=["']${id}["']`), id);
   }
   assert.match(renderer, /persist:aivuda-shell/);
@@ -24,10 +24,10 @@ test('Aivuda-style browser shell exposes Home, AppStore, favorites, tools and ta
 test('browser chrome can be restored after collapse through the application menu', () => {
   const main = fs.readFileSync(path.join(root, 'electron/main.js'), 'utf8');
   assert.match(main, /Menu\.setApplicationMenu/);
-  assert.match(main, /Toggle Tab Bar/);
+  assert.match(main, /Toggle Address Bar/);
   assert.match(main, /CmdOrCtrl\+L/);
   assert.match(main, /aivuda-shell:show-browser-chrome/);
-  assert.match(main, /label: 'Tab Bar'/);
+  assert.match(main, /label: 'Address Bar'/);
 });
 
 test('browser shell preserves FPS overlay and recording controls', () => {

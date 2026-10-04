@@ -30,8 +30,8 @@ function createApplicationMenu() {
     {
       label: 'File',
       submenu: [
-        { label: 'New Tab', accelerator: 'CmdOrCtrl+T', click: () => sendToShell('aivuda-shell:new-tab', { url: endpoints?.os }) },
-        { label: 'Close Tab', accelerator: 'CmdOrCtrl+W', click: () => sendToShell('aivuda-shell:close-current-tab') },
+        { label: 'New Window', accelerator: 'CmdOrCtrl+T', click: () => sendToShell('aivuda-shell:new-tab', { url: endpoints?.os }) },
+        { label: 'Close Window', accelerator: 'CmdOrCtrl+W', click: () => sendToShell('aivuda-shell:close-current-tab') },
         { type: 'separator' },
         { role: 'quit' },
       ],
@@ -39,10 +39,10 @@ function createApplicationMenu() {
     {
       label: 'View',
       submenu: [
-        { label: 'Reload Tab', accelerator: 'CmdOrCtrl+R', click: () => sendToShell('aivuda-shell:reload-current-tab') },
-        { label: 'Toggle Tab Bar', accelerator: 'CmdOrCtrl+L', click: () => sendToShell('aivuda-shell:toggle-browser-chrome') },
-        { label: 'Show Tab Bar', click: () => sendToShell('aivuda-shell:show-browser-chrome') },
-        { label: 'Hide Tab Bar', accelerator: 'Escape', click: () => sendToShell('aivuda-shell:hide-browser-chrome') },
+        { label: 'Reload Window', accelerator: 'CmdOrCtrl+R', click: () => sendToShell('aivuda-shell:reload-current-tab') },
+        { label: 'Toggle Address Bar', accelerator: 'CmdOrCtrl+L', click: () => sendToShell('aivuda-shell:toggle-browser-chrome') },
+        { label: 'Show Address Bar', click: () => sendToShell('aivuda-shell:show-browser-chrome') },
+        { label: 'Hide Address Bar', accelerator: 'Escape', click: () => sendToShell('aivuda-shell:hide-browser-chrome') },
         { label: 'Toggle Developer Tools', accelerator: process.platform === 'darwin' ? 'Alt+Command+I' : 'Ctrl+Shift+I', click: () => sendToShell('aivuda-shell:toggle-devtools') },
         { type: 'separator' },
         { label: 'Actual Size', accelerator: 'CmdOrCtrl+0', click: () => sendToShell('aivuda-shell:reset-zoom') },
@@ -52,7 +52,7 @@ function createApplicationMenu() {
         { role: 'togglefullscreen' },
       ],
     },
-    { label: 'Tab Bar', click: () => sendToShell('aivuda-shell:toggle-browser-chrome') },
+    { label: 'Address Bar', click: () => sendToShell('aivuda-shell:toggle-browser-chrome') },
     {
       label: 'Tools',
       submenu: [
@@ -121,10 +121,16 @@ function createWindow() {
     contents.on('will-navigate', (event, url) => { if (!allowedUrl(url)) event.preventDefault(); });
     contents.session.setPermissionRequestHandler((_, __, callback) => callback(false));
     contents.setWindowOpenHandler(({ url }) => {
-      if (/^https?:\/\//.test(url)) shell.openExternal(url);
+      routePagePopup(url);
       return { action: 'deny' };
     });
   });
+}
+
+function routePagePopup(url) {
+  if (!/^https?:\/\//.test(url)) return;
+  if (allowedUrl(url)) sendToShell('aivuda-shell:open-url-in-new-tab', { url });
+  else shell.openExternal(url);
 }
 
 async function captureMainWindowForDisplayMedia(_request, callback) {
@@ -183,7 +189,19 @@ app.whenReady().then(async () => {
     ipcMain.handle('control:settings', () => ({ url: endpoints.os, kind: 'aivudaos-settings' }));
     ipcMain.handle('control:store', () => ({ url: endpoints.store, kind: 'aivudaappstore' }));
     ipcMain.handle('control:bootstrap', () => control.bootstrap);
-    ipcMain.handle('aivuda-shell:get-startup', () => ({ defaultUrl: endpoints.os, initialUrl: endpoints.os, storeUrl: endpoints.store, recordingsDir: path.join(app.getPath('videos'), 'ACEswarm'), savedState: shellState }));
+    ipcMain.handle('aivuda-shell:get-startup', () => ({ defaultUrl: endpoints.os, initialUrl: endpoints.os, storeUrl: endpoints.store, gatewayUrl: endpoints.gateway, recordingsDir: path.join(app.getPath('videos'), 'ACEswarm'), savedState: shellState }));
+    ipcMain.handle('aivuda-shell:authorize-url', (event, rawUrl) => {
+      if (event.sender !== window?.webContents) return { ok: false, error: 'Only the desktop can authorize pages.' };
+      try {
+        const url = new URL(rawUrl);
+        if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Use an HTTP or HTTPS address.');
+        remoteOrigins.add(url.origin);
+        return { ok: true };
+      } catch (error) { return { ok: false, error: error.message }; }
+    });
+    ipcMain.handle('aivuda-shell:route-page-popup', (event, url) => {
+      if (event.sender === window?.webContents && typeof url === 'string') routePagePopup(url);
+    });
     ipcMain.handle('aivuda-shell:get-gpu-status', () => app.getGPUFeatureStatus());
     ipcMain.handle('aivuda-shell:save-shell-state', (_, state) => { try { saveShellState(state); return { ok: true }; } catch (error) { return { ok: false, error: error.message }; } });
     ipcMain.handle('aivuda-shell:clear-browser-data', async () => {

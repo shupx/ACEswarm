@@ -115,6 +115,20 @@ npm run bundle:verify
 npm run smoke
 ```
 
+The desktop integration test launches the actual Electron main process and local
+services using a temporary browser profile and workspace. It checks page loading,
+Dock pin/unpin, window controls, page popups, restart persistence, and screenshots
+at 1280, 850 and 390 pixels wide. It requires the development Python environment
+and Caddy from setup; it does not change the normal user workspace.
+
+```bash
+npm run test:desktop
+# On a headless Linux host:
+xvfb-run -a npm run test:desktop
+```
+
+Screenshots are written to `.smoke/desktop/`.
+
 Test packaged resources without opening an Electron window:
 
 ```bash

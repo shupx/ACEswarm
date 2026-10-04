@@ -10,7 +10,8 @@
   "scripts": {
     "start": "electron .",
     "test": "node --test tests/*.test.js",
-    "check": "node --check electron/main.js && node --check electron/preload.js && node --check electron/backend/control-api.js && node --check electron/backend/server.js && node --check electron/renderer-adapter.js && node --check electron/services/control-server.js && node --check electron/services/mcp-server.js && node --check electron/shell.js && node --check scripts/smoke-services.js && node --test tests/*.test.js",
+    "test:desktop": "node scripts/test-desktop-ui.js",
+    "check": "node --check electron/main.js && node --check electron/preload.js && node --check electron/backend/control-api.js && node --check electron/backend/server.js && node --check electron/renderer-adapter.js && node --check electron/services/control-server.js && node --check electron/services/mcp-server.js && node --check electron/desktop-state.js && node --check electron/desktop.js && node --check electron/shell.js && node --check scripts/smoke-services.js && node --check scripts/test-desktop-ui.js && node --test tests/*.test.js",
     "backend": "node electron/backend/server.js",
     "mcp:stdio": "node electron/services/mcp-server.js",
     "smoke": "node scripts/smoke-services.js",
@@ -24,7 +25,8 @@
   },
   "devDependencies": {
     "electron": "40.10.2",
-    "electron-builder": "26.0.12"
+    "electron-builder": "26.0.12",
+    "playwright": "1.63.0"
   },
   "build": {
     "appId": "dev.aceswarm.workbench",
@@ -66,5 +68,9 @@
   },
   "allowScripts": {
     "electron@40.10.2": true
+  },
+  "dependencies": {
+    "lucide": "1.52.0",
+    "winbox": "0.2.82"
   }
 }

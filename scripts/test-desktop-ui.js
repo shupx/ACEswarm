@@ -1,0 +1,228 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const http = require('node:http');
+const net = require('node:net');
+const { _electron: electron } = require('playwright');
+
+const root = path.resolve(__dirname, '..');
+const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'aceswarm-desktop-ui-'));
+const screenshots = path.join(root, '.smoke', 'desktop');
+fs.mkdirSync(screenshots, { recursive: true });
+let application;
+let server;
+const errors = [];
+
+async function gatewayPort() {
+  // Keep gateway ports outside the debugger's ephemeral allocation range.
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const port = 18000 + Math.floor(Math.random() * 10000);
+    const probe = net.createServer();
+    try {
+      await new Promise((resolve, reject) => { probe.once('error', reject); probe.listen(port, '127.0.0.1', resolve); });
+      await new Promise((resolve) => probe.close(resolve));
+      return port;
+    } catch {}
+  }
+  throw new Error('Could not allocate test gateway port');
+}
+
+async function launch() {
+  application = await electron.launch({
+    args: [path.join(root, 'tests/fixtures/desktop-electron.cjs'), '--no-sandbox'],
+    env: {
+      ...process.env, ELECTRON_RUN_AS_NODE: '',
+      ACESWARM_UI_TEST_PROFILE: path.join(temp, 'profile'),
+      ACESWARM_WS_ROOT: path.join(temp, 'workspace'),
+      ACESWARM_GATEWAY_PORT: String(await gatewayPort()),
+      ACESWARM_STORE_GATEWAY_PORT: String(await gatewayPort()),
+      ACESWARM_PYTHON: path.join(root, '.venv/bin/python'),
+      ACESWARM_CADDY: path.join(root, 'resources/app-gateway/caddy'),
+    },
+    timeout: 90000,
+  });
+  const page = await application.firstWindow({ timeout: 90000 });
+  page.on('pageerror', (error) => { errors.push(error.message); console.error('Renderer error:', error); });
+  await page.waitForFunction(() => !isRestoringShellState && document.querySelector('#dock .dock-item[data-app-url]'), { timeout: 30000 });
+  return page;
+}
+
+async function count(page, expected) {
+  await page.waitForFunction((value) => tabs.size === value, expected);
+}
+
+async function openPage(page, url) {
+  await page.locator('#new-tab').click();
+  await page.locator('#open-page-url').fill(url);
+  await page.locator('#open-page-form button[type=submit]').click();
+}
+
+async function run() {
+  server = http.createServer((request, response) => {
+    response.writeHead(200, { 'content-type': 'text/html' });
+    response.end('<!doctype html><title>Robot Console</title><body style="font-family:system-ui;background:#fff;padding:24px"><h1>Robot Console</h1><p id="live">Connected</p><a id="popup" href="/child" target="_blank">Open telemetry</a><button id="script-popup" onclick="window.open(\'/script-child\')">Open map</button><script>window.tick=0;setInterval(()=>window.tick++,100)</script></body>');
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const robotUrl = 'http://127.0.0.1:' + server.address().port + '/robot';
+  let page = await launch();
+  await count(page, 1);
+  await page.waitForFunction(() => getActiveTab().webview.getURL().startsWith('http:'));
+  console.log('PASS: real Electron desktop and local Home page start');
+
+  await openPage(page, robotUrl);
+  await count(page, 2);
+  await page.waitForFunction(() => getActiveTab().title === 'Robot Console');
+  const robotId = await page.evaluate(() => activeTabId);
+  assert.equal(await page.evaluate(() => getActiveTab().webview.executeJavaScript('document.getElementById("live").textContent')), 'Connected');
+  await page.locator('#' + robotId + ' .wb-pin').click();
+  await page.waitForFunction((url) => favorites.some((entry) => entry.url === url), robotUrl);
+  assert.equal(await page.locator('#desktop-shortcuts .desktop-shortcut').count(), 3);
+  console.log('PASS: custom page loads, receives title, and pins to Dock and desktop');
+
+  await page.evaluate(() => getActiveTab().webview.executeJavaScript('window.testInstance = "preserved"'));
+  await page.locator('#' + robotId + ' .wb-min').click();
+  await page.waitForFunction((id) => tabs.get(id).minimized, robotId);
+  assert.equal(await page.locator('#' + robotId).isVisible(), false);
+  assert.equal(await page.evaluate((id) => tabs.get(id).webview.getURL(), robotId), robotUrl);
+  await page.locator('#dock button[data-app-url="' + robotUrl + '"]').click();
+  await page.waitForFunction((id) => activeTabId === id && !tabs.get(id).minimized, robotId);
+  await count(page, 2);
+  assert.equal(await page.evaluate(() => getActiveTab().webview.executeJavaScript('window.testInstance')), 'preserved');
+  console.log('PASS: minimize keeps WebView alive; Dock restores without duplicate windows');
+
+  await page.locator('#' + robotId + ' .wb-browser').click();
+  assert.equal(await page.locator('#browser-toolbar').isVisible(), true);
+  await page.locator('#collapse-chrome').click();
+  assert.equal(await page.locator('#browser-toolbar').isVisible(), false);
+  await page.locator('#' + robotId + ' .wb-max').click();
+  assert.equal(await page.evaluate((id) => tabs.get(id).window.max, robotId), true);
+  await page.locator('#' + robotId + ' .wb-max').click();
+  assert.equal(await page.evaluate((id) => tabs.get(id).window.max, robotId), false);
+
+  const header = page.locator('#' + robotId + ' .wb-title');
+  const box = await header.boundingBox();
+  const initial = await page.evaluate((id) => ({ x: tabs.get(id).window.x, y: tabs.get(id).window.y }), robotId);
+  await page.mouse.move(box.x + 80, box.y + 15);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 130, box.y + 35, { steps: 8 });
+  await page.mouse.up();
+  const moved = await page.evaluate((id) => ({ x: tabs.get(id).window.x, y: tabs.get(id).window.y }), robotId);
+  assert.ok(moved.x !== initial.x || moved.y !== initial.y);
+  const resize = await page.locator('#' + robotId + ' .wb-se').boundingBox();
+  const originalWidth = await page.evaluate((id) => tabs.get(id).window.width, robotId);
+  await page.mouse.move(resize.x + resize.width / 2, resize.y + resize.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(resize.x - 80, resize.y - 60, { steps: 8 });
+  await page.mouse.up();
+  assert.ok(await page.evaluate((id) => tabs.get(id).window.width, robotId) < originalWidth);
+  await page.evaluate((id) => tabs.get(id).window.resize(640, 400), robotId);
+  assert.equal(await page.evaluate((id) => tabs.get(id).window.width, robotId), 640);
+  await page.locator('#tab-1 webview').click({ position: { x: 900, y: 300 } });
+  await page.waitForFunction(() => activeTabId === 'tab-1');
+  await page.locator('#dock button[data-app-url="' + robotUrl + '"]').click();
+  await page.waitForFunction((id) => activeTabId === id, robotId);
+  console.log('PASS: address toolbar, maximize, restore, drag and resize');
+
+  await page.evaluate(() => getActiveTab().webview.executeJavaScript('document.getElementById("popup").click()'));
+  await count(page, 3);
+  await page.waitForFunction(() => getActiveTab().webview.getURL().endsWith('/child'));
+  await page.evaluate(() => getActiveTab().webview.executeJavaScript('document.getElementById("script-popup").click()'));
+  await count(page, 4);
+  await page.waitForFunction(() => getActiveTab().webview.getURL().endsWith('/script-child'));
+  console.log('PASS: target=_blank and page-world window.open create internal windows');
+
+  await page.locator('#dock button[data-app-url="' + robotUrl + '"]').click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'New window', exact: true }).click();
+  await count(page, 5);
+  await page.waitForFunction(() => getActiveTab().title === 'Robot Console');
+  assert.equal(await page.locator('#dock button[data-app-url="' + robotUrl + '"] .window-badge').textContent(), '2');
+  assert.equal(await page.locator('#dock button[data-app-url="' + robotUrl + '"]').count(), 1);
+  await page.evaluate(() => closeTab(activeTabId));
+  await count(page, 4);
+  console.log('PASS: multiple windows share one application Dock icon');
+
+  await page.locator('#tools-button').click();
+  await page.locator('#tools-record').click();
+  assert.equal(await page.evaluate(() => screenRecordBarVisible), true);
+  await page.evaluate(() => { screenRecordBarVisible = false; renderScreenRecordBar(); });
+  await page.evaluate(() => {
+    for (const tab of [...tabs.values()]) if (tab.id !== 'tab-2' && tab.id !== 'tab-1') closeTab(tab.id);
+    activateTab('tab-2');
+  });
+  await count(page, 2);
+  await page.screenshot({ path: path.join(screenshots, 'desktop-1280.png') });
+  await application.evaluate(({ BrowserWindow }) => { const window = BrowserWindow.getAllWindows()[0]; window.setSize(850, 550); });
+  await page.waitForFunction(() => innerWidth === 850);
+  await page.screenshot({ path: path.join(screenshots, 'desktop-850.png') });
+  await application.evaluate(({ BrowserWindow }) => { const window = BrowserWindow.getAllWindows()[0]; window.setMinimumSize(0, 0); window.setSize(390, 844); });
+  await page.waitForFunction(() => innerWidth === 390);
+  await page.screenshot({ path: path.join(screenshots, 'desktop-390.png') });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  await application.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0].setSize(1280, 820); });
+  await page.waitForFunction(() => innerWidth === 1280);
+  await page.evaluate((id) => { tabs.get(id).window.resize(640, 400).move(180, 90); }, robotId);
+  await page.evaluate(() => tabs.get('tab-1').window.maximize());
+  await page.locator('#' + robotId + ' .wb-min').click();
+  await page.evaluate(() => writeShellState());
+  await application.close();
+  application = null;
+  const saved = JSON.parse(fs.readFileSync(path.join(temp, 'profile', 'shell-state.json')));
+  assert.equal(saved.version, 2);
+  assert.ok(saved.favorites.some((entry) => entry.url === robotUrl));
+  assert.deepEqual(saved.tabs.find((tab) => tab.id === robotId).bounds, { x: 180, y: 90, width: 640, height: 400 });
+  assert.equal(saved.tabs.find((tab) => tab.id === robotId).minimized, true);
+
+  page = await launch();
+  await count(page, 2);
+  assert.equal(await page.evaluate((id) => tabs.get(id).minimized, robotId), true);
+  assert.equal(await page.evaluate(() => favorites.length), 1);
+  assert.equal(await page.evaluate(() => tabs.get('tab-1').window.max), true);
+  assert.notEqual(await page.evaluate(() => defaultUrl), saved.serviceOrigins.os);
+  assert.equal(await page.evaluate(() => new URL(tabs.get('tab-1').url).origin), await page.evaluate(() => new URL(defaultUrl).origin));
+  assert.equal(await page.evaluate(() => tabs.get('tab-1').appUrl), await page.evaluate(() => defaultUrl));
+  await page.locator('#dock button[data-app-url="' + robotUrl + '"]').click();
+  assert.deepEqual(await page.evaluate((id) => ({ x: tabs.get(id).window.x, y: tabs.get(id).window.y, width: tabs.get(id).window.width, height: tabs.get(id).window.height }), robotId), { x: 180, y: 90, width: 640, height: 400 });
+  console.log('PASS: restart restores pinned application, minimized state, geometry and remaps service ports');
+  await page.locator('#' + robotId + ' .wb-close').click();
+  await count(page, 1);
+  assert.equal(await page.locator('#dock button[data-app-url="' + robotUrl + '"]').count(), 1);
+  await page.locator('#dock button[data-app-url="' + robotUrl + '"]').click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Unpin from Dock' }).click();
+  assert.equal(await page.locator('#dock button[data-app-url="' + robotUrl + '"]').count(), 0);
+  await page.evaluate(() => closeTab(activeTabId));
+  await count(page, 0);
+  assert.equal(await page.evaluate(() => activeTabId), null);
+  await page.locator('#desktop-shortcuts .desktop-shortcut').first().click();
+  await count(page, 1);
+  await page.locator('#show-desktop').click();
+  assert.equal(await page.evaluate(() => [...tabs.values()].every((tab) => tab.minimized)), true);
+  await page.screenshot({ path: path.join(screenshots, 'desktop-empty.png') });
+  console.log('PASS: close keeps pinned icon, unpin removes it, last close reaches desktop, shortcuts and show-desktop work');
+  await application.close();
+  application = null;
+  fs.writeFileSync(path.join(temp, 'profile', 'shell-state.json'), JSON.stringify({
+    tabs: [{ id: 'tab-9', url: robotUrl }], activeTabId: 'tab-9',
+    favorites: [{ url: robotUrl, title: 'Legacy robot' }], chromeExpanded: true,
+  }));
+  page = await launch();
+  await count(page, 1);
+  assert.equal(await page.evaluate(() => favorites[0].title), 'Legacy robot');
+  assert.equal(await page.evaluate(() => getActiveTab().appUrl), robotUrl);
+  assert.equal(await page.locator('#browser-toolbar').isVisible(), true);
+  console.log('PASS: legacy tabs and bookmarks migrate into desktop windows and Dock');
+  assert.deepEqual(errors, []);
+  console.log('Desktop UI tests completed. Screenshots:', screenshots);
+}
+
+run().catch(async (error) => {
+  console.error(error); process.exitCode = 1;
+  if (application) {
+    const page = application.windows()[0];
+    if (page) await page.screenshot({ path: path.join(screenshots, 'failure.png') }).catch(() => {});
+  }
+}).finally(async () => {
+  if (application) await application.close().catch(() => {});
+  if (server) await new Promise((resolve) => server.close(resolve));
+  fs.rmSync(temp, { recursive: true, force: true });
+});

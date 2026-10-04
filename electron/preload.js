@@ -13,6 +13,8 @@ contextBridge.exposeInMainWorld('aceswarm', {
   settingsTarget: () => ipcRenderer.invoke('control:settings'), storeTarget: () => ipcRenderer.invoke('control:store'), bootstrap: () => ipcRenderer.invoke('control:bootstrap'),
 });
 contextBridge.exposeInMainWorld('aivudaShell', {
+  authorizeUrl: (url) => ipcRenderer.invoke('aivuda-shell:authorize-url', url),
+  routePagePopup: (url) => ipcRenderer.invoke('aivuda-shell:route-page-popup', url),
   getStartup: () => ipcRenderer.invoke('aivuda-shell:get-startup'), getGpuStatus: () => ipcRenderer.invoke('aivuda-shell:get-gpu-status'),
   clearBrowserData: () => ipcRenderer.invoke('aivuda-shell:clear-browser-data'), saveShellState: (state) => ipcRenderer.invoke('aivuda-shell:save-shell-state', state),
   openPath: (p) => ipcRenderer.invoke('aivuda-shell:open-path', p), showItemInFolder: (p) => ipcRenderer.invoke('aivuda-shell:show-item-in-folder', p),

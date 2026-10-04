@@ -1,5 +1,12 @@
 const { ipcRenderer } = require("electron");
 
+// Guest input does not bubble through the host window's DOM.
+function notifyWindowFocus() {
+  ipcRenderer.sendToHost("aivuda-shell:activate-window");
+}
+window.addEventListener("pointerdown", notifyWindowFocus, true);
+window.addEventListener("focus", notifyWindowFocus);
+
 function normalizeUrl(url) {
   if (!url || typeof url !== "string") {
     return null;

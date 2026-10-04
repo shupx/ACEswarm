@@ -1,5 +1,4 @@
 const shellEl = document.getElementById("shell");
-const tabsEl = document.getElementById("tabs");
 const stackEl = document.getElementById("webview-stack");
 const addressInput = document.getElementById("address-input");
 const statusText = document.getElementById("status-text");
@@ -13,6 +12,7 @@ const toolsMenu = document.getElementById("tools-menu");
 
 let defaultUrl = "http://127.0.0.1:80";
 let storeUrl = "";
+let serviceOrigins = {};
 let favorites = [];
 let activeTabId = null;
 let nextTabId = 1;
@@ -167,6 +167,8 @@ function normalizeSavedShellState(rawState) {
 
 function buildShellStatePayload() {
   return {
+    version: 2,
+    serviceOrigins,
     activeTabId,
     chromeExpanded: shellEl.classList.contains("expanded"),
     performanceOverlayVisible,
@@ -178,6 +180,12 @@ function buildShellStatePayload() {
       id: tab.id,
       title: tab.title,
       url: getTabUrl(tab),
+      appUrl: tab.appUrl,
+      favicon: tab.favicon,
+      chromeExpanded: tab.chromeExpanded,
+      minimized: tab.minimized,
+      maximized: tab.window?.max === true,
+      bounds: tab.window ? { x: tab.window.x, y: tab.window.y, width: tab.window.width, height: tab.window.height } : undefined,
     })),
   };
 }
@@ -185,27 +193,14 @@ function buildShellStatePayload() {
 window.__aivudaBuildShellState = buildShellStatePayload;
 
 function renderFavorites() {
-  const bar = document.getElementById("favorites-bar");
-  if (!bar) return;
-  for (const node of [...bar.querySelectorAll("button[data-favorite-url]")]) node.remove();
-  for (const favorite of favorites) {
-    const button = document.createElement("button");
-    button.dataset.favoriteUrl = favorite.url;
-    button.textContent = favorite.title || getSiteNameFromUrl(favorite.url);
-    button.title = favorite.url;
-    button.onclick = () => navigateActiveTab(favorite.url);
-    button.oncontextmenu = (event) => { event.preventDefault(); favorites = favorites.filter((entry) => entry.url !== favorite.url); renderFavorites(); writeShellState(); };
-    bar.insertBefore(button, document.getElementById("add-favorite"));
-  }
+  renderDesktop();
 }
 
 function addCurrentFavorite() {
   const tab = getActiveTab();
-  const url = tab && getTabUrl(tab);
+  const url = tab?.appUrl;
   if (!url || url.startsWith("file:")) return;
-  if (!favorites.some((entry) => entry.url === url)) favorites.push({ url, title: tab.title || getSiteNameFromUrl(url) });
-  renderFavorites();
-  writeShellState();
+  pinApplication({ url, title: tab.title || getSiteNameFromUrl(url), favicon: tab.favicon });
 }
 
 function writeShellState() {
@@ -224,7 +219,10 @@ function finishShellStateRestore() {
 }
 
 function setChromeExpanded(isExpanded) {
+  const tab = getActiveTab();
+  if (tab) tab.chromeExpanded = isExpanded;
   shellEl.classList.toggle("expanded", isExpanded);
+  syncWindowToolbar();
   writeShellState();
 }
 
@@ -270,7 +268,8 @@ function getTabUrl(tab) {
   }
 
   try {
-    return tab.webview.getURL() || tab.url;
+    const currentUrl = tab.webview.getURL();
+    return currentUrl && !currentUrl.startsWith(offlineUrl) ? currentUrl : tab.url;
   } catch (_error) {
     return tab.url;
   }
@@ -307,115 +306,18 @@ function resolveTabDisplayTitle(title, rawUrl) {
   return String(title || "").trim() || getSiteNameFromUrl(rawUrl);
 }
 
-function createDefaultTabIconSvg() {
-  const svgNs = "http://www.w3.org/2000/svg";
-  const svg = document.createElementNS(svgNs, "svg");
-  svg.setAttribute("viewBox", "0 0 16 16");
-  svg.setAttribute("fill", "none");
-  svg.setAttribute("aria-hidden", "true");
-
-  const rect = document.createElementNS(svgNs, "rect");
-  rect.setAttribute("x", "2");
-  rect.setAttribute("y", "2.75");
-  rect.setAttribute("width", "12");
-  rect.setAttribute("height", "10.5");
-  rect.setAttribute("rx", "2.25");
-  rect.setAttribute("stroke", "currentColor");
-  rect.setAttribute("stroke-width", "1.35");
-
-  const line = document.createElementNS(svgNs, "path");
-  line.setAttribute("d", "M2.75 5.25h10.5");
-  line.setAttribute("stroke", "currentColor");
-  line.setAttribute("stroke-width", "1.35");
-  line.setAttribute("stroke-linecap", "round");
-
-  svg.append(rect, line);
-  return svg;
-}
-
-function createTabButton(tab) {
-  const button = document.createElement("button");
-  button.className = "tab";
-  button.type = "button";
-  button.dataset.tabId = tab.id;
-  button.setAttribute("role", "tab");
-
-  const main = document.createElement("span");
-  main.className = "tab-main";
-
-  const icon = document.createElement("span");
-  icon.className = "tab-icon";
-
-  const iconImg = document.createElement("img");
-  iconImg.alt = "";
-  iconImg.decoding = "async";
-  iconImg.referrerPolicy = "no-referrer";
-  iconImg.classList.add("hidden");
-
-  const fallbackIcon = createDefaultTabIconSvg();
-
-  const title = document.createElement("span");
-  title.className = "tab-title";
-  title.textContent = tab.title;
-
-  const close = document.createElement("span");
-  close.className = "tab-close";
-  close.textContent = "×";
-  close.title = "Close tab";
-
-  close.addEventListener("click", (event) => {
-    event.stopPropagation();
-    closeTab(tab.id);
-  });
-
-  button.addEventListener("click", () => {
-    activateTab(tab.id);
-  });
-
-  icon.append(iconImg, fallbackIcon);
-  main.append(icon, title);
-  button.append(main, close);
-  tabsEl.appendChild(button);
-  tab.titleEl = title;
-  tab.iconImgEl = iconImg;
-  tab.iconFallbackEl = fallbackIcon;
-  return button;
-}
-
 function updateTabTitle(tab, title) {
   const nextTitle = resolveTabDisplayTitle(title, getTabUrl(tab));
   tab.title = nextTitle;
-  if (tab.titleEl) {
-    tab.titleEl.textContent = nextTitle;
-  }
-  if (tab.button) {
-    tab.button.title = nextTitle;
-  }
+  tab.window?.setTitle(nextTitle);
+  renderDesktop();
   writeShellState();
 }
 
 function updateTabIcon(tab, faviconUrl) {
-  if (!tab?.iconImgEl || !tab.iconFallbackEl) {
-    return;
-  }
-
-  const nextUrl = typeof faviconUrl === "string" ? faviconUrl.trim() : "";
-  if (!nextUrl) {
-    tab.iconImgEl.removeAttribute("src");
-    tab.iconImgEl.classList.add("hidden");
-    tab.iconFallbackEl.classList.remove("hidden");
-    return;
-  }
-
-  tab.iconImgEl.onload = () => {
-    tab.iconImgEl.classList.remove("hidden");
-    tab.iconFallbackEl.classList.add("hidden");
-  };
-  tab.iconImgEl.onerror = () => {
-    tab.iconImgEl.classList.add("hidden");
-    tab.iconFallbackEl.classList.remove("hidden");
-  };
-  tab.iconImgEl.src = nextUrl;
+  tab.favicon = typeof faviconUrl === "string" ? faviconUrl : "";
+  renderDesktop();
+  writeShellState();
 }
 
 function updateAddressFromActiveTab() {
@@ -487,12 +389,8 @@ function updateNavigationState() {
 }
 
 function updateActiveClasses() {
-  for (const tab of tabs.values()) {
-    const isActive = tab.id === activeTabId;
-    tab.button.classList.toggle("active", isActive);
-    tab.button.setAttribute("aria-selected", String(isActive));
-    tab.webview.classList.toggle("hidden", !isActive);
-  }
+  syncWindowToolbar();
+  renderDesktop();
 }
 
 function setPerformanceOverlayVisible(isVisible) {
@@ -514,11 +412,12 @@ function syncPerformanceOverlayForActiveTab() {
 }
 
 async function injectPerformanceOverlay(tab, action) {
-  if (!tab || !tab.webview || tab.webview.getURL().startsWith("file://")) {
+  if (!tab?.ready || getTabUrl(tab).startsWith("file://")) {
     return;
   }
 
   const gpuStatus = await window.aivudaShell.getGpuStatus().catch(() => ({}));
+  if (!tab.ready || !tab.webview.isConnected || tabs.get(tab.id) !== tab) return;
 
   tab.webview.executeJavaScript(
     `
@@ -1445,6 +1344,7 @@ function showScreenRecordBar() {
 }
 
 async function finalizeActiveRecordingBeforeClose() {
+  await writeShellState();
   if (screenRecordStatus !== "recording" && screenRecordStatus !== "paused" && screenRecordStatus !== "stopping") {
     return { ok: true };
   }
@@ -1482,24 +1382,25 @@ function createTab(rawUrl, options = {}) {
   webview.src = url;
   webview.setAttribute("partition", "persist:aivuda-shell");
   webview.setAttribute("preload", guestPreloadUrl);
+  // The main process denies native popups and routes allowed URLs to our desktop.
+  webview.setAttribute("allowpopups", "");
 
   const tab = {
     id,
-    title: getSiteNameFromUrl(url),
+    title: options.title || getSiteNameFromUrl(url),
     url,
+    appUrl: options.appUrl || url,
+    favicon: options.favicon || "",
+    ready: false,
     webview,
-    button: null,
-    titleEl: null,
-    iconImgEl: null,
-    iconFallbackEl: null,
   };
 
-  tab.button = createTabButton(tab);
   tabs.set(id, tab);
-  stackEl.appendChild(webview);
+  mountApplicationWindow(tab, options);
   writeShellState();
 
   webview.addEventListener("dom-ready", () => {
+    tab.ready = true;
     if (typeof webview.getWebContentsId === "function") {
       window.aivudaShell.registerWebview(webview.getWebContentsId());
     }
@@ -1509,10 +1410,14 @@ function createTab(rawUrl, options = {}) {
   });
 
   webview.addEventListener("ipc-message", (event) => {
+    if (event.channel === "aivuda-shell:activate-window") {
+      if (activeTabId !== tab.id && !tab.minimized) activateTab(tab.id);
+      return;
+    }
     if (event.channel === "aivuda-shell:open-url-in-new-tab") {
       const [nextUrl] = event.args;
       if (typeof nextUrl === "string" && nextUrl.trim()) {
-        createTab(nextUrl);
+        window.aivudaShell.routePagePopup(nextUrl);
       }
       return;
     }
@@ -1585,6 +1490,8 @@ function createTab(rawUrl, options = {}) {
     webview.src = `${offlineUrl}?${params.toString()}`;
   });
   activateTab(id);
+  if (options.minimized) minimizeApplicationWindow(tab);
+  return tab;
 }
 
 function activateTab(id) {
@@ -1593,6 +1500,10 @@ function activateTab(id) {
   }
 
   activeTabId = id;
+  const tab = tabs.get(id);
+  tab.minimized = false;
+  tab.window.show();
+  tab.window.focus();
   updateActiveClasses();
   updateAddressFromActiveTab();
   updateNavigationState();
@@ -1606,20 +1517,7 @@ function closeTab(id) {
     return;
   }
 
-  tab.button.remove();
-  tab.webview.remove();
-  tabs.delete(id);
-  writeShellState();
-
-  if (activeTabId === id) {
-    const next = tabs.keys().next().value;
-    activeTabId = next || null;
-    if (next) {
-      activateTab(next);
-    } else {
-      createTab(defaultUrl);
-    }
-  }
+  tab.window.close();
 }
 
 function reloadActiveTab() {
@@ -1629,15 +1527,21 @@ function reloadActiveTab() {
   }
 }
 
-function navigateActiveTab(rawUrl) {
+async function navigateActiveTab(rawUrl) {
   const tab = getActiveTab();
   if (!tab) {
+    showOpenPageDialog();
     return;
   }
 
   const nextUrl = canonicalizeNavigationUrl(rawUrl);
+  const authorized = await window.aivudaShell.authorizeUrl(nextUrl);
+  if (!authorized.ok) { setStatus(authorized.error || "Navigation denied"); return; }
   tab.url = nextUrl;
+  tab.appUrl = nextUrl;
+  tab.favicon = "";
   tab.webview.src = nextUrl;
+  renderDesktop();
   updateAddressFromActiveTab();
   writeShellState();
 }
@@ -1653,8 +1557,7 @@ collapseChromeButton.addEventListener("click", () => {
 });
 
 newTabButton.addEventListener("click", () => {
-  setChromeExpanded(true);
-  createTab(defaultUrl);
+  showOpenPageDialog();
 });
 
 reloadButton.addEventListener("click", reloadActiveTab);
@@ -1736,6 +1639,7 @@ window.aivudaShell.onCloseCurrentTab(() => {
 window.aivudaShell.onReloadCurrentTab(reloadActiveTab);
 window.aivudaShell.onResetZoom(resetActiveTabZoom);
 window.aivudaShell.onShowBrowserChrome(() => {
+  if (!getActiveTab()) { showOpenPageDialog(); return; }
   setChromeExpanded(true);
   addressInput.focus();
   addressInput.select();
@@ -1744,6 +1648,7 @@ window.aivudaShell.onHideBrowserChrome(() => {
   setChromeExpanded(false);
 });
 window.aivudaShell.onToggleBrowserChrome(() => {
+  if (!getActiveTab()) { showOpenPageDialog(); return; }
   const isExpanded = shellEl.classList.contains("expanded");
   setChromeExpanded(!isExpanded);
   if (!isExpanded) {
@@ -1798,6 +1703,19 @@ window.setInterval(() => {
 window.aivudaShell.getStartup().then((startup) => {
   defaultUrl = startup.defaultUrl || defaultUrl;
   storeUrl = startup.storeUrl || "";
+  serviceOrigins = { os: defaultUrl, store: storeUrl, gateway: startup.gatewayUrl || "" };
+  const remap = (url) => desktopState.remapUrl(url, startup.savedState?.serviceOrigins, serviceOrigins);
+  if (startup.savedState) {
+    for (const tab of startup.savedState.tabs || []) {
+      tab.url = remap(tab.url);
+      tab.appUrl = remap(tab.appUrl || tab.url);
+      if (tab.favicon) tab.favicon = remap(tab.favicon);
+    }
+    for (const favorite of startup.savedState.favorites || []) {
+      favorite.url = remap(favorite.url);
+      if (favorite.favicon) favorite.favicon = remap(favorite.favicon);
+    }
+  }
   defaultScreenRecordingsDir = typeof startup.recordingsDir === "string" ? startup.recordingsDir : "";
   const savedState = normalizeSavedShellState(startup.savedState);
   if (savedState) {
@@ -1807,21 +1725,22 @@ window.aivudaShell.getStartup().then((startup) => {
     screenRecordBarVisible = savedState.screenRecordBarVisible;
     screenRecordMode = "native";
     screenRecordBarPosition = savedState.screenRecordBarPosition;
-    setChromeExpanded(savedState.chromeExpanded);
-    const restoredTabs = savedState.tabs.length > 0 ? savedState.tabs : [{ url: startup.initialUrl || defaultUrl }];
+    const restoredTabs = savedState.tabs;
     for (const tabState of restoredTabs) {
-      createTab(tabState.url, { id: tabState.id });
+      createTab(tabState.url, { ...tabState, chromeExpanded: tabState.chromeExpanded ?? savedState.chromeExpanded });
     }
-    if (savedState.activeTabId && tabs.has(savedState.activeTabId)) {
+    if (savedState.activeTabId && tabs.has(savedState.activeTabId) && !tabs.get(savedState.activeTabId).minimized) {
       activateTab(savedState.activeTabId);
     }
     renderScreenRecordBar();
+    renderDesktop();
     finishShellStateRestore();
     return;
   }
 
   createTab(startup.initialUrl || defaultUrl);
-  setChromeExpanded(true);
+  setChromeExpanded(false);
+  renderDesktop();
   renderScreenRecordBar();
   finishShellStateRestore();
 });
