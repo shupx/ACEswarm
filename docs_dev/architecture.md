@@ -23,10 +23,14 @@ application windows, and Lucide for controls. Each window owns an independent
 WebView using the existing persistent browser session. Minimizing hides the
 window without recreating its page; closing releases the WebView.
 
-The collapsible top panel combines System, Home/AppStore, pinned page entries,
+The collapsible top panel combines System, Applications/Store Admin, pinned page entries,
 running applications, desktop actions and the clock. Its expanded/collapsed height
 (48/28 pixels) is reserved by the window manager. Maximized windows fill the
 viewport below it; their restore geometry is retained when the panel is toggled.
+Expanded Dock entries show icons; collapsed entries show application names,
+running state and window counts in a horizontally scrollable row. Applications
+hosts AivudaOS, including its Online Store for downloads. Store Admin hosts the
+AivudaAppStore upload/publication management backend. Internal IDs remain unchanged.
 The native application menu is removed. System contains global recording,
 performance, fullscreen, browser data and quit commands, plus current-page actions.
 Each window's upper-right controls expose the address bar, pinning and a menu for

@@ -50,7 +50,14 @@ button:focus-visible, input:focus-visible, .wb-control span:focus-visible { outl
 .dock-toggle { width: 24px; height: 24px; flex: 0 0 24px; border: 0; background: transparent; border-radius: 4px; color: #4d6b65; display: grid; place-items: center; }
 .dock-toggle:hover { background: #e1ece8; }
 .dock-toggle svg { width: 16px; height: 16px; }
-.dock-collapsed .dock-items, .dock-collapsed #window-count, .dock-collapsed .desktop-actions > button { display: none; }
+.dock-collapsed #window-count, .dock-collapsed .desktop-actions > button { display: none; }
+.dock-collapsed .dock-items { scrollbar-width: none; }
+.dock-label { display: none; }
+.dock-collapsed .dock-item { width: auto; max-width: 180px; height: 24px; flex: 0 0 auto; padding: 0 8px; gap: 5px; color: #354746; }
+.dock-collapsed .dock-item .app-icon { display: none; }
+.dock-collapsed .dock-label { display: block; min-width: 0; max-width: 140px; font-size: 12px; line-height: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dock-collapsed .running-dot { position: static; flex: 0 0 4px; order: -1; }
+.dock-collapsed .window-badge { position: static; flex-shrink: 0; }
 .dock-collapsed .system-button { height: 24px; }
 .dock-collapsed .system-button img { width: 18px; height: 18px; }
 .dock-item { width: 42px; height: 42px; flex: 0 0 42px; border: 0; background: transparent; border-radius: 5px; display: flex; align-items: center; justify-content: center; position: relative; padding: 3px 5px 7px; }

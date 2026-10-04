@@ -16,7 +16,7 @@ function applicationIcon(entry) {
   const key = desktopState.appKey(entry.url);
   const builtin = key === desktopState.appKey(defaultUrl) ? "home" : key === desktopState.appKey(storeUrl) ? "store" : "";
   if (builtin) holder.classList.add(builtin);
-  holder.append(desktopIcon(builtin === "home" ? "house" : builtin === "store" ? "shopping-bag" : "globe"));
+  holder.append(desktopIcon(builtin === "home" ? "layout-grid" : builtin === "store" ? "package-plus" : "globe"));
   if (entry.favicon) {
     const image = document.createElement("img");
     image.alt = "";
@@ -29,7 +29,7 @@ function applicationIcon(entry) {
 
 function applicationEntries() {
   const entries = new Map();
-  for (const entry of [{ url: defaultUrl, title: "Home", builtin: true }, { url: storeUrl, title: "AppStore", builtin: true }, ...favorites]) {
+  for (const entry of [{ url: defaultUrl, title: "Applications", builtin: true }, { url: storeUrl, title: "Store Admin", builtin: true }, ...favorites]) {
     if (!entry.url) continue;
     const key = desktopState.appKey(entry.url);
     if (!entries.has(key)) entries.set(key, { ...entry, title: entry.title || getSiteNameFromUrl(entry.url), key, pinned: true, windows: [] });
@@ -136,6 +136,7 @@ function renderDesktop() {
   shellEl.classList.toggle("dock-collapsed", dockCollapsed);
   shellEl.classList.toggle("window-maximized", [...tabs.values()].some((tab) => tab.window?.max && !tab.minimized));
   const dock = document.getElementById("dock");
+  const scrollLeft = dock.querySelector(".dock-items")?.scrollLeft || 0;
   const shortcuts = document.getElementById("desktop-shortcuts");
   dock.replaceChildren();
   shortcuts.replaceChildren();
@@ -158,6 +159,10 @@ function renderDesktop() {
     button.classList.toggle("active", entry.windows.some((tab) => tab.id === activeTabId));
     button.classList.toggle("minimized", entry.windows.length > 0 && entry.windows.every((tab) => tab.minimized));
     button.append(applicationIcon(entry));
+    const text = document.createElement("span");
+    text.className = "dock-label";
+    text.textContent = entry.title;
+    button.append(text);
     if (entry.windows.length) {
       const dot = document.createElement("span"); dot.className = "running-dot"; button.append(dot);
       if (entry.windows.length > 1) {
@@ -178,6 +183,13 @@ function renderDesktop() {
       shortcuts.append(shortcut);
     }
   }
+  items.scrollLeft = scrollLeft;
+  items.addEventListener("wheel", (event) => {
+    if (items.scrollWidth > items.clientWidth && Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
+      items.scrollLeft += event.deltaY;
+      event.preventDefault();
+    }
+  }, { passive: false });
   document.getElementById("window-count").textContent = tabs.size ? tabs.size + (tabs.size === 1 ? " window" : " windows") : "Desktop";
   refreshDesktopIcons();
 }

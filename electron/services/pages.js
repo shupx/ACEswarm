@@ -1,11 +1,11 @@
 const fixed = Object.freeze([
-  { id: 'home', label: 'Home', kind: 'internal' },
+  { id: 'home', label: 'Applications', kind: 'internal' },
   { id: 'projects', label: 'Projects', kind: 'internal' },
   { id: 'simulation', label: 'Simulation', kind: 'internal' },
   { id: 'experiments', label: 'Experiments', kind: 'internal' },
   { id: 'fleet', label: 'Fleet', kind: 'internal' },
   { id: 'settings', label: 'Settings', kind: 'os' },
-  { id: 'store', label: 'App Store', kind: 'store' },
+  { id: 'store', label: 'Store Admin', kind: 'store' },
 ]);
 
 function resolvePage(id, endpoints, context = {}) {
