@@ -140,6 +140,7 @@
 
       .tab-close:hover,
       .new-tab:hover,
+      .tools-button:hover,
       .collapse-chrome:hover,
       .nav-button:hover {
         background: rgba(16, 42, 67, 0.1);
@@ -151,6 +152,57 @@
         align-items: center;
         gap: 4px;
         padding: 0 6px;
+      }
+
+      .tools-menu-wrap {
+        position: relative;
+      }
+
+      .tools-button {
+        height: 24px;
+        padding: 0 9px;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: #52606d;
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      .tools-menu {
+        position: absolute;
+        z-index: 20;
+        top: 29px;
+        right: 0;
+        display: grid;
+        min-width: 178px;
+        padding: 5px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 10px 24px rgba(16, 42, 67, 0.18);
+      }
+
+      .tools-menu[hidden] {
+        display: none;
+      }
+
+      .tools-menu button {
+        padding: 8px 10px;
+        border: 0;
+        border-radius: 5px;
+        background: transparent;
+        color: #334e68;
+        text-align: left;
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      .tools-menu button:hover {
+        background: #e7eef6;
+        color: #102a43;
       }
 
       .address-row {
@@ -258,6 +310,14 @@
                 <path d="M8 3.25v9.5M3.25 8h9.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
               </svg>
             </button>
+            <div class="tools-menu-wrap">
+              <button id="tools-button" class="tools-button" type="button" title="Tools" aria-label="Tools" aria-haspopup="true" aria-expanded="false">Tools</button>
+              <div id="tools-menu" class="tools-menu" role="menu" hidden>
+                <button id="tools-fps" type="button" role="menuitem">FPS / GPU Overlay</button>
+                <button id="tools-record" type="button" role="menuitem">Screen Record</button>
+                <button id="tools-clear-data" type="button" role="menuitem">Clear Browser Data</button>
+              </div>
+            </div>
             <button id="collapse-chrome" class="collapse-chrome" type="button" title="Hide tabs and address bar" aria-label="Hide tabs and address bar">
               <svg class="chrome-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                 <path d="m4.25 10.25 3.75-3.75 3.75 3.75" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />

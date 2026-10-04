@@ -1,6 +1,6 @@
 const path = require('node:path');
 const fs = require('node:fs');
-const { app, BrowserWindow, desktopCapturer, ipcMain, session, shell } = require('electron');
+const { app, BrowserWindow, desktopCapturer, ipcMain, Menu, session, shell } = require('electron');
 const { workspace } = require('./services/workspace');
 const { resolveRuntime } = require('./services/runtime');
 const { LocalServices } = require('./services/local-services');
@@ -19,6 +19,52 @@ let control;
 
 let shellStatePath;
 let shellState;
+
+function sendToShell(channel, payload) {
+  if (!window || window.isDestroyed()) return;
+  window.webContents.send(channel, payload);
+}
+
+function createApplicationMenu() {
+  const template = [
+    {
+      label: 'File',
+      submenu: [
+        { label: 'New Tab', accelerator: 'CmdOrCtrl+T', click: () => sendToShell('aivuda-shell:new-tab', { url: endpoints?.os }) },
+        { label: 'Close Tab', accelerator: 'CmdOrCtrl+W', click: () => sendToShell('aivuda-shell:close-current-tab') },
+        { type: 'separator' },
+        { role: 'quit' },
+      ],
+    },
+    {
+      label: 'View',
+      submenu: [
+        { label: 'Reload Tab', accelerator: 'CmdOrCtrl+R', click: () => sendToShell('aivuda-shell:reload-current-tab') },
+        { label: 'Toggle Tab Bar', accelerator: 'CmdOrCtrl+L', click: () => sendToShell('aivuda-shell:toggle-browser-chrome') },
+        { label: 'Show Tab Bar', click: () => sendToShell('aivuda-shell:show-browser-chrome') },
+        { label: 'Hide Tab Bar', accelerator: 'Escape', click: () => sendToShell('aivuda-shell:hide-browser-chrome') },
+        { label: 'Toggle Developer Tools', accelerator: process.platform === 'darwin' ? 'Alt+Command+I' : 'Ctrl+Shift+I', click: () => sendToShell('aivuda-shell:toggle-devtools') },
+        { type: 'separator' },
+        { label: 'Actual Size', accelerator: 'CmdOrCtrl+0', click: () => sendToShell('aivuda-shell:reset-zoom') },
+        { label: 'Zoom In', accelerator: 'CmdOrCtrl+Plus', click: () => sendToShell('aivuda-shell:zoom-in') },
+        { label: 'Zoom Out', accelerator: 'CmdOrCtrl+-', click: () => sendToShell('aivuda-shell:zoom-out') },
+        { type: 'separator' },
+        { role: 'togglefullscreen' },
+      ],
+    },
+    { label: 'Tab Bar', click: () => sendToShell('aivuda-shell:toggle-browser-chrome') },
+    {
+      label: 'Tools',
+      submenu: [
+        { label: 'Show FPS/GPU Overlay', accelerator: 'CmdOrCtrl+Shift+P', click: () => sendToShell('aivuda-shell:show-performance-overlay') },
+        { label: 'Toggle Screen Record Bar', accelerator: 'CmdOrCtrl+Shift+R', click: () => sendToShell('aivuda-shell:toggle-screen-record-bar') },
+        { type: 'separator' },
+        { label: 'Clear Browser Data', accelerator: 'CmdOrCtrl+Shift+Backspace', click: () => sendToShell('aivuda-shell:clear-browser-data') },
+      ],
+    },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
 
 function readShellState() {
   try { shellState = JSON.parse(fs.readFileSync(shellStatePath, 'utf8')); } catch (_) { shellState = null; }
@@ -81,6 +127,21 @@ function createWindow() {
   });
 }
 
+async function captureMainWindowForDisplayMedia(_request, callback) {
+  try {
+    const sources = await desktopCapturer.getSources({
+      types: ['window'],
+      thumbnailSize: { width: 0, height: 0 },
+      fetchWindowIcons: false,
+    });
+    const source = sources.find((entry) => entry.name === window?.getTitle()) || sources[0];
+    callback(source ? { video: source, audio: 'none' } : { video: null, audio: null });
+  } catch (error) {
+    console.error('Display capture source preparation failed:', error);
+    callback({ video: null, audio: null });
+  }
+}
+
 function handleTerminationSignal() {
   if (quitting) return;
   quitting = true;
@@ -108,6 +169,8 @@ app.whenReady().then(async () => {
     console.log(`ACEswarm MCP HTTP: ${endpoints.control}/mcp`);
     services.startMcp(endpoints.control);
     services.startPackageMcps();
+    createApplicationMenu();
+    session.defaultSession.setDisplayMediaRequestHandler(captureMainWindowForDisplayMedia);
     ipcMain.handle('control:pages', () => fixed);
     ipcMain.handle('control:resolve', (_, id, context) => {
       const page = resolvePage(id, endpoints, context);

@@ -8,6 +8,8 @@ const newTabButton = document.getElementById("new-tab");
 const backButton = document.getElementById("back-button");
 const forwardButton = document.getElementById("forward-button");
 const reloadButton = document.getElementById("reload-button");
+const toolsButton = document.getElementById("tools-button");
+const toolsMenu = document.getElementById("tools-menu");
 
 let defaultUrl = "http://127.0.0.1:80";
 let storeUrl = "";
@@ -144,12 +146,7 @@ function normalizeSavedShellState(rawState) {
   const chromeExpanded = rawState.chromeExpanded === true;
   const performanceOverlayVisible = rawState.performanceOverlayVisible === true;
   const screenRecordBarVisible = rawState.screenRecordBarVisible === true;
-  const screenRecordMode =
-    rawState.screenRecordMode === "native"
-      ? "native"
-      : rawState.screenRecordMode === "ffmpeg-x11"
-        ? "ffmpeg-x11"
-        : "ffmpeg";
+  const screenRecordMode = "native";
   const screenRecordBarPosition =
     normalizeRelativeOverlayPosition(rawState.screenRecordBarPosition);
   const favorites = Array.isArray(rawState.favorites)
@@ -246,6 +243,21 @@ function normalizeUrlInput(value) {
       return defaultUrl;
     }
   }
+}
+
+function canonicalizeNavigationUrl(value) {
+  const normalized = normalizeUrlInput(value);
+  if (!storeUrl) return normalized;
+  try {
+    const target = new URL(normalized);
+    if (target.origin === new URL(storeUrl).origin && (target.pathname === "/store" || target.pathname === "/store/")) {
+      target.pathname = "/";
+      target.search = "";
+      target.hash = "";
+      return target.toString();
+    }
+  } catch (_) {}
+  return normalized;
 }
 
 function getActiveTab() {
@@ -989,9 +1001,7 @@ function renderScreenRecordBar() {
       ? [
           '<div style="margin-top:2px;padding:4px 6px 2px;border-top:1px solid rgba(148,163,184,0.35);border-radius:8px;background:rgba(255,255,255,0.2);max-width:300px;overflow-wrap:anywhere;">',
           '<div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;font-size:10px;">',
-          `<button type="button" data-screen-record-mode="native" style="border:0;border-radius:999px;padding:1px 6px;background:${screenRecordMode === "native" ? "rgba(148,163,184,0.24)" : "transparent"};color:#334e68;font:inherit;cursor:${screenRecordStatus === "idle" || screenRecordStatus === "saved" || screenRecordStatus === "error" ? "pointer" : "not-allowed"};">Native</button>`,
-          `<button type="button" data-screen-record-mode="ffmpeg" style="border:0;border-radius:999px;padding:1px 6px;background:${screenRecordMode === "ffmpeg" ? "rgba(148,163,184,0.24)" : "transparent"};color:#334e68;font:inherit;cursor:${screenRecordStatus === "idle" || screenRecordStatus === "saved" || screenRecordStatus === "error" ? "pointer" : "not-allowed"};">FFmpeg</button>`,
-          `<button type="button" data-screen-record-mode="ffmpeg-x11" style="border:0;border-radius:999px;padding:1px 6px;background:${screenRecordMode === "ffmpeg-x11" ? "rgba(148,163,184,0.24)" : "transparent"};color:#334e68;font:inherit;cursor:${screenRecordStatus === "idle" || screenRecordStatus === "saved" || screenRecordStatus === "error" ? "pointer" : "not-allowed"};">FFmpeg X11</button>`,
+          '<span style="border-radius:999px;padding:1px 6px;background:rgba(148,163,184,0.24);color:#334e68;">Native WebM</span>',
           "</div>",
           `<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:${statusTone};">${screenRecordStatus}</div>`,
           `<div style="margin-top:2px;font-size:11px;color:#334e68;">${screenRecordStatusText || "No details"}</div>`,
@@ -1027,13 +1037,6 @@ function renderScreenRecordBar() {
   const expandButton = screenRecordBarEl.querySelector("[data-expand-screen-record]");
   const openRecordingFileButton = screenRecordBarEl.querySelector("[data-open-recording-file]");
   const openRecordingFolderButton = screenRecordBarEl.querySelector("[data-open-recording-folder]");
-  const modeButtons = screenRecordBarEl.querySelectorAll("[data-screen-record-mode]");
-  const modeButtonTitles = {
-    native: "Native\nDoes not require installing FFmpeg\nRecorded files are usually larger\nOutput format: WebM",
-    ffmpeg: "FFmpeg\nSmaller output files\nSomewhat higher CPU usage\nCaptures only this window",
-    "ffmpeg-x11":
-      "FFmpeg X11\nCaptures a fixed screen region matching this window's initial size\nDoes not follow window moves\nCan record content outside the window",
-  };
 
   if (closeButton) {
     closeButton.addEventListener("click", () => {
@@ -1111,23 +1114,6 @@ function renderScreenRecordBar() {
     });
   }
 
-  for (const modeButton of modeButtons) {
-    modeButton.title = modeButtonTitles[modeButton.dataset.screenRecordMode] || "";
-    modeButton.addEventListener("click", () => {
-      if (!(screenRecordStatus === "idle" || screenRecordStatus === "saved" || screenRecordStatus === "error")) {
-        return;
-      }
-      if (modeButton.dataset.screenRecordMode === "native") {
-        screenRecordMode = "native";
-      } else if (modeButton.dataset.screenRecordMode === "ffmpeg-x11") {
-        screenRecordMode = "ffmpeg-x11";
-      } else {
-        screenRecordMode = "ffmpeg";
-      }
-      writeShellState();
-      renderScreenRecordBar();
-    });
-  }
 }
 
 function resetScreenRecordingSessionState() {
@@ -1393,19 +1379,14 @@ async function startScreenRecording() {
 
   try {
     const prepared = await window.aivudaShell.prepareWindowRecording();
-    if (!prepared?.ok || !prepared.sourceId || !prepared.outputPath) {
+    if (!prepared?.ok || !prepared.outputPath) {
       throw new Error(prepared?.error || "Could not prepare window capture.");
     }
 
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: {
-        mandatory: {
-          chromeMediaSource: "desktop",
-          chromeMediaSourceId: prepared.sourceId,
-        },
-      },
-    });
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      throw new Error("Display capture is unavailable in this Electron session.");
+    }
+    const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
 
     const mimeType = chooseScreenRecordingMimeType();
     const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
@@ -1496,7 +1477,7 @@ function createTab(rawUrl, options = {}) {
     nextTabId += 1;
   }
 
-  const url = normalizeUrlInput(rawUrl);
+  const url = canonicalizeNavigationUrl(rawUrl);
   const webview = document.createElement("webview");
   webview.src = url;
   webview.setAttribute("partition", "persist:aivuda-shell");
@@ -1590,6 +1571,9 @@ function createTab(rawUrl, options = {}) {
   });
 
   webview.addEventListener("did-fail-load", (event) => {
+    // Chromium reports a superseded navigation as ERR_ABORTED; the newer
+    // navigation is still valid and must not be replaced by the offline page.
+    if (event.errorCode === -3) return;
     if (!event.isMainFrame || event.validatedURL.startsWith("file://")) {
       return;
     }
@@ -1651,11 +1635,17 @@ function navigateActiveTab(rawUrl) {
     return;
   }
 
-  const nextUrl = normalizeUrlInput(rawUrl);
+  const nextUrl = canonicalizeNavigationUrl(rawUrl);
   tab.url = nextUrl;
   tab.webview.src = nextUrl;
   updateAddressFromActiveTab();
   writeShellState();
+}
+
+function setToolsMenuOpen(isOpen) {
+  if (!toolsButton || !toolsMenu) return;
+  toolsMenu.hidden = !isOpen;
+  toolsButton.setAttribute("aria-expanded", String(isOpen));
 }
 
 collapseChromeButton.addEventListener("click", () => {
@@ -1671,6 +1661,25 @@ reloadButton.addEventListener("click", reloadActiveTab);
 document.getElementById("add-favorite")?.addEventListener("click", addCurrentFavorite);
 document.getElementById("home-button")?.addEventListener("click", () => navigateActiveTab(defaultUrl));
 document.getElementById("store-button")?.addEventListener("click", () => navigateActiveTab(storeUrl || defaultUrl));
+toolsButton?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  setToolsMenuOpen(toolsMenu?.hidden !== false);
+});
+document.getElementById("tools-fps")?.addEventListener("click", () => {
+  setToolsMenuOpen(false);
+  setPerformanceOverlayVisible(true);
+  syncPerformanceOverlayForActiveTab();
+});
+document.getElementById("tools-record")?.addEventListener("click", () => {
+  setToolsMenuOpen(false);
+  showScreenRecordBar();
+});
+document.getElementById("tools-clear-data")?.addEventListener("click", async () => {
+  setToolsMenuOpen(false);
+  await window.aivudaShell.clearBrowserData();
+  window.location.reload();
+});
+document.addEventListener("click", () => setToolsMenuOpen(false));
 
 backButton.addEventListener("click", () => {
   const tab = getActiveTab();
@@ -1796,7 +1805,7 @@ window.aivudaShell.getStartup().then((startup) => {
     favorites = savedState.favorites || [];
     renderFavorites();
     screenRecordBarVisible = savedState.screenRecordBarVisible;
-    screenRecordMode = savedState.screenRecordMode;
+    screenRecordMode = "native";
     screenRecordBarPosition = savedState.screenRecordBarPosition;
     setChromeExpanded(savedState.chromeExpanded);
     const restoredTabs = savedState.tabs.length > 0 ? savedState.tabs : [{ url: startup.initialUrl || defaultUrl }];
