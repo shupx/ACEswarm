@@ -11,6 +11,25 @@ function schedulePanelLayout() {
 // detach Electron webviews and recreate their guest processes.
 function syncPanelBodies() {
   if (!desktopLayout) return;
+  let iconsAdded = false;
+  for (const group of desktopLayout.groups) {
+    const compact = group.panels.length === 1 && group.api.location.type === 'grid';
+    if (group.element.classList.contains('single-panel') !== compact) {
+      group.element.classList.toggle('single-panel', compact);
+      group.relayout();
+    }
+    for (const panel of group.panels) {
+      const header = group.element.querySelector(`[data-tab-panel-id="${panel.id}"]`);
+      if (header && !header.querySelector('.panel-drag-icon')) {
+        const icon = desktopIcon('grip-vertical');
+        icon.classList.add('panel-drag-icon');
+        header.append(icon);
+        iconsAdded = true;
+      }
+      if (header) header.title = compact ? `Drag ${panel.title}` : panel.title;
+    }
+  }
+  if (iconsAdded) refreshDesktopIcons();
   const hostRect = stackEl.getBoundingClientRect();
   for (const tab of tabs.values()) {
     const panel = desktopLayout.getPanel(tab.id);
@@ -33,27 +52,7 @@ function panelActions(group) {
   element.className = 'panel-controls';
   const disposables = [];
   const commands = [
-    ['panel-browser', 'globe', 'Address bar', toggleActiveAddressBar],
-    ['panel-pin', 'pin', 'Pin to Dock', addCurrentFavorite],
     ['panel-menu', 'ellipsis', 'Window controls', () => openWindowMenu(getActiveTab())],
-    ['panel-float', 'panels-top-left', 'Float or dock panel', () => floatOrDockPanel(getActiveTab())],
-    ['panel-min', 'minus', 'Minimize', () => minimizeApplicationWindow(getActiveTab())],
-    ['panel-max', 'maximize-2', 'Maximize or restore', () => {
-      const api = getActiveTab()?.panel?.api;
-      if (!api) return;
-      if (api.location.type === 'floating') api.group.api.moveTo({ position: 'right' });
-      if (api.isMaximized()) {
-        api.exitMaximized();
-        workspaceRegion = workspaceMaximizeRestore;
-      } else {
-        workspaceMaximizeRestore = workspaceRegion;
-        workspaceRegion = 'full';
-        layoutApplicationWindows();
-        api.maximize();
-      }
-      layoutApplicationWindows(); renderDesktop(); writeShellState();
-    }],
-    ['panel-close', 'x', 'Close', () => closeTab(activeTabId)],
   ];
   for (const [className, icon, title, action] of commands) {
     const button = document.createElement('button');
@@ -80,6 +79,22 @@ function panelActions(group) {
     init() { disposables.push(group.api.onDidActivePanelChange(sync)); sync(); refreshDesktopIcons(); },
     dispose() { disposables.forEach((item) => item.dispose()); },
   };
+}
+
+function togglePanelMaximized() {
+  const api = getActiveTab()?.panel?.api;
+  if (!api) return;
+  if (api.location.type === 'floating') api.group.api.moveTo({ position: 'right' });
+  if (api.isMaximized()) {
+    api.exitMaximized();
+    workspaceRegion = workspaceMaximizeRestore;
+  } else {
+    workspaceMaximizeRestore = workspaceRegion;
+    workspaceRegion = 'full';
+    layoutApplicationWindows();
+    api.maximize();
+  }
+  layoutApplicationWindows(); renderDesktop(); writeShellState();
 }
 
 function initializeDesktopLayout() {

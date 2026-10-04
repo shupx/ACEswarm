@@ -119,6 +119,8 @@ services using a temporary browser profile and workspace. It checks page loading
 top-panel Dock pin/unpin, collapsed text entries and horizontal scrolling,
 System menus, panel zoom/address controls, drag docking, nested splits,
 splitter resizing, floating panels and preserved guest instances,
+single-panel compact grips and menus with no reserved header height,
+28-pixel headers for stacked tabs and floating groups,
 shortcuts with guest focus, page popups, restart persistence, and screenshots
 at 1280, 850 and 390 pixels wide. It also records videos in all three modes and
 uses ffprobe/ffmpeg to verify decodable, nonblank output. It requires the development

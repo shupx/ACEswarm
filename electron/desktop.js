@@ -341,7 +341,9 @@ document.getElementById("window-zoom-reset").onclick = () => { resetActiveTabZoo
 for (const region of ['left', 'right', 'top', 'bottom', 'full']) {
   document.getElementById('workspace-' + region).onclick = () => { setWindowMenuOpen(false); setWorkspaceRegion(region); };
 }
-for (const [id, action] of [["window-reload", () => reloadActiveTab()], ["window-address", toggleActiveAddressBar], ["window-devtools", toggleActiveDevtools]]) {
+for (const [id, action] of [["window-reload", () => reloadActiveTab()], ["window-address", toggleActiveAddressBar], ["window-devtools", toggleActiveDevtools],
+  ["window-pin", () => addCurrentFavorite()], ["window-float", () => floatOrDockPanel(getActiveTab())],
+  ["window-max", togglePanelMaximized], ["window-min", () => minimizeApplicationWindow(getActiveTab())], ["window-close", () => closeTab(activeTabId)]]) {
   document.getElementById(id).onclick = () => { setWindowMenuOpen(false); action(); };
 }
 document.addEventListener("click", (event) => { if (!event.target.closest(".panel-menu")) setWindowMenuOpen(false); });

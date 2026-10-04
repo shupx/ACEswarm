@@ -34,10 +34,27 @@ button:focus-visible, input:focus-visible { outline: 2px solid #157d71; outline-
 .application-body { position: absolute; display: flex; flex-direction: column; overflow: hidden; background: #fff; pointer-events: auto; container-type: inline-size; }
 .application-body webview { display: flex; width: 100%; flex: 1 1 0; min-width: 0; min-height: 0; }
 .panel-controls { display: flex; align-items: center; flex-shrink: 0; }
-.panel-controls .icon-button { width: 27px; height: 30px; }
+.panel-controls .icon-button { width: 28px; height: 28px; }
+#dock-layout { --dv-tabs-and-actions-container-height: 28px; }
+#dock-layout .dv-tabs-and-actions-container { height: 28px; min-height: 28px; }
+.panel-drag-icon { display: none; }
+/* Keep the native draggable tab as a grip without reserving page height. */
+#dock-layout .single-panel > .dv-tabs-and-actions-container { height: 0; min-height: 0; padding: 0; border: 0; overflow: visible; z-index: 5; background: transparent; }
+#dock-layout .single-panel > .dv-tabs-and-actions-container > .dv-scrollable { position: absolute; right: 36px; top: 4px; width: 28px; height: 28px; flex: none; }
+#dock-layout .single-panel .dv-tabs-container { width: 28px; height: 28px; overflow: hidden; flex: none; }
+#dock-layout .single-panel .dv-scrollbar { display: none; }
+#dock-layout .single-panel .dv-right-actions-container { position: absolute; right: 4px; top: 4px; height: 28px; }
+#dock-layout .single-panel .dv-tab { width: 28px !important; min-width: 28px !important; max-width: 28px !important; height: 28px; padding: 5px; border: 0; cursor: grab; background: #f8fafb; border-radius: 4px; }
+#dock-layout .single-panel .dv-tab:active { cursor: grabbing; }
+#dock-layout .single-panel .dv-tab > :not(.panel-drag-icon) { display: none; }
+#dock-layout .single-panel .panel-drag-icon { display: block; width: 18px; height: 18px; color: #48575c; pointer-events: none; }
+#dock-layout .single-panel .panel-menu { background: #f8fafb; border: 1px solid #ccd5d7; }
+#dock-layout .single-panel .dv-tab, #dock-layout .single-panel .panel-menu { opacity: .4; }
+#dock-layout .single-panel.dv-active-group .dv-tab, #dock-layout .single-panel.dv-active-group .panel-menu,
+#dock-layout .single-panel .dv-tab:hover, #dock-layout .single-panel .panel-menu:hover,
+#dock-layout .single-panel .dv-tab:focus-within, #dock-layout .single-panel .panel-menu:focus-visible,
+#dock-layout .single-panel .panel-menu[aria-expanded="true"] { opacity: 1; }
 #dock-layout .dv-groupview { container-type: inline-size; }
-@container (max-width: 360px) { .panel-controls .panel-browser, .panel-controls .panel-pin, .panel-controls .panel-min { display: none; } }
-.panel-close:hover { background: #c94145; color: white; }
 #dock-layout .dv-tab { font-size: 12px; }
 #dock-layout.empty-grid { pointer-events: none; background: transparent; }
 #dock-layout.empty-grid .dv-watermark { display: none; }

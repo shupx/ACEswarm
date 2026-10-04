@@ -21,7 +21,10 @@ AivudaOS and AivudaAppStore remain independent distributions. ACEswarm launches 
 The Electron renderer uses plain JavaScript, Dockview Core for tab groups,
 nested splits and floating panels, and Lucide for controls. Tabs can be dragged
 to group edges to split or onto tab bars to merge; splitters resize both sides.
-Group controls provide floating/docking, minimizing and maximizing.
+Single docked panels use a floating drag grip and menu at the top right, reserving
+no height for a tab bar. Groups with multiple panels and floating groups retain
+a compact 28-pixel tab bar. The window menu provides pinning, floating/docking,
+minimizing, maximizing, closing, page zoom and browser actions.
 Each application owns an independent WebView using the persistent browser session.
 WebViews stay mounted in permanent shell containers; Dockview content anchors
 drive their position, size, visibility and floating z-order. Moving a panel or

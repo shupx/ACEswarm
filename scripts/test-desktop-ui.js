@@ -92,6 +92,24 @@ async function openPage(page, url) {
   await page.locator('#open-page-form button[type=submit]').click();
 }
 
+async function windowCommand(page, id, command) {
+  await page.locator('.panel-controls[data-panel-id="' + id + '"] .panel-menu').click();
+  await page.locator('#window-' + command).click();
+}
+
+async function checkGroupHeader(page, id, compact) {
+  await page.waitForFunction(({ id, compact }) => {
+    const group = tabs.get(id)?.panel?.group;
+    if (!group || group.element.classList.contains('single-panel') !== compact) return false;
+    const header = group.element.querySelector('.dv-tabs-and-actions-container');
+    const rect = header.getBoundingClientRect();
+    const anchor = tabs.get(id).anchor.getBoundingClientRect();
+    const bounds = group.element.getBoundingClientRect();
+    return compact ? rect.height === 0 && Math.abs(anchor.top - bounds.top) < 1 : rect.height === 28;
+  }, { id, compact });
+  assert.equal(await page.locator('.panel-controls[data-panel-id="' + id + '"] button').count(), 1);
+}
+
 async function checkRecording(page, mode) {
   if (mode === 'native') await page.evaluate(() => {
     navigator.mediaDevices.getUserMedia = () => { throw new Error('Desktop capture must not be used for Native recording'); };
@@ -154,6 +172,8 @@ async function run() {
   const initialId = await page.evaluate(() => activeTabId);
   const initialLayout = await page.evaluate(() => desktopLayout.toJSON());
   const initialGuest = await page.evaluate(() => getActiveTab().webview.getWebContentsId());
+  await checkGroupHeader(page, initialId, true);
+  await page.waitForFunction(async () => getActiveTab()?.ready && await getActiveTab().webview.executeJavaScript('document.body.innerText.trim().length > 0'));
   await page.locator('#show-desktop').click();
   assert.equal(await page.evaluate(() => desktopVisible), true);
   assert.equal(await page.locator('#dock-layout').isVisible(), false);
@@ -174,20 +194,21 @@ async function run() {
   assert.equal(await page.evaluate(() => getActiveTab().webview.getWebContentsId()), initialGuest);
   assert.deepEqual(await page.evaluate(() => desktopLayout.toJSON()), initialLayout);
   const singleTab = await page.locator('[data-tab-panel-id="' + initialId + '"]').boundingBox();
-  await page.mouse.move(singleTab.x + 35, singleTab.y + singleTab.height / 2);
+  await page.mouse.move(singleTab.x + singleTab.width / 2, singleTab.y + singleTab.height / 2);
   await page.mouse.down();
   await page.mouse.move(8, 450, { steps: 20 });
   assert.equal(await page.locator('#workspace-snap-preview').isVisible(), true);
   await page.mouse.up();
   await page.waitForFunction(() => workspaceRegion === 'left');
   assert.equal((await page.locator('#webview-stack').boundingBox()).width, 640);
+  await waitForGuestLayout(page);
   await page.screenshot({ path: path.join(screenshots, 'desktop-single-left.png') });
   await page.locator('.panel-controls[data-panel-id="' + initialId + '"] .panel-menu').click();
   await page.locator('#workspace-right').click();
   assert.equal((await page.locator('#webview-stack').boundingBox()).x, 640);
-  await page.locator('.panel-controls[data-panel-id="' + initialId + '"] .panel-max').click();
+  await windowCommand(page, initialId, 'max');
   assert.equal((await page.locator('#webview-stack').boundingBox()).width, 1280);
-  await page.locator('.panel-controls[data-panel-id="' + initialId + '"] .panel-max').click();
+  await windowCommand(page, initialId, 'max');
   assert.equal((await page.locator('#webview-stack').boundingBox()).x, 640);
   await page.locator('#show-desktop').click();
   await page.locator('#show-desktop').click();
@@ -248,14 +269,15 @@ async function run() {
   await count(page, 2);
   await page.waitForFunction(() => getActiveTab().title === 'Robot Console');
   const robotId = await page.evaluate(() => activeTabId);
+  await checkGroupHeader(page, robotId, false);
   assert.equal(await page.evaluate(() => getActiveTab().webview.executeJavaScript('document.getElementById("live").textContent')), 'Connected');
-  await page.locator('.panel-controls[data-panel-id="' + robotId + '"] .panel-pin').click();
+  await windowCommand(page, robotId, 'pin');
   await page.waitForFunction((url) => favorites.some((entry) => entry.url === url), robotUrl);
   assert.equal(await page.locator('#desktop-shortcuts .desktop-shortcut').count(), 3);
   console.log('PASS: custom page loads, receives title, and pins to Dock and desktop');
 
   await page.evaluate(() => getActiveTab().webview.executeJavaScript('window.testInstance = "preserved"'));
-  await page.locator('.panel-controls[data-panel-id="' + robotId + '"] .panel-min').click();
+  await windowCommand(page, robotId, 'min');
   await page.waitForFunction((id) => tabs.get(id).minimized, robotId);
   assert.equal(await page.locator('#' + robotId).isVisible(), false);
   assert.equal(await page.evaluate((id) => tabs.get(id).webview.getURL(), robotId), robotUrl);
@@ -265,7 +287,7 @@ async function run() {
   assert.equal(await page.evaluate(() => getActiveTab().webview.executeJavaScript('window.testInstance')), 'preserved');
   console.log('PASS: minimize keeps WebView alive; Dock restores without duplicate windows');
 
-  await page.locator('.panel-controls[data-panel-id="' + robotId + '"] .panel-browser').click();
+  await windowCommand(page, robotId, 'address');
   assert.equal(await page.locator('#browser-toolbar').isVisible(), true);
   await page.locator('#collapse-chrome').click();
   await page.locator('#' + robotId + ' webview').click({ position: { x: 450, y: 200 } });
@@ -299,7 +321,7 @@ async function run() {
   await page.locator('#system-address').click();
   assert.equal(await page.locator('#browser-toolbar').isVisible(), true);
   await page.locator('#collapse-chrome').click();
-  await page.locator('.panel-controls[data-panel-id="' + robotId + '"] .panel-max').click();
+  await windowCommand(page, robotId, 'max');
   assert.equal(await page.evaluate((id) => tabs.get(id).panel.api.isMaximized(), robotId), true);
   assert.deepEqual(await page.evaluate((id) => {
     const { x, y, width, height } = tabs.get(id).panel.group.element.getBoundingClientRect();
@@ -332,17 +354,19 @@ async function run() {
   await page.keyboard.press('Escape');
   await page.screenshot({ path: path.join(screenshots, 'desktop-maximized-collapsed-dock.png') });
   await page.locator('#toggle-dock').click();
-  await page.locator('.panel-controls[data-panel-id="' + robotId + '"] .panel-max').click();
+  await windowCommand(page, robotId, 'max');
   assert.equal(await page.evaluate((id) => tabs.get(id).panel.api.isMaximized(), robotId), false);
   const guestId = await page.evaluate((id) => tabs.get(id).webview.getWebContentsId(), robotId);
   const header = page.locator('[data-tab-panel-id="' + robotId + '"]');
   const box = await header.boundingBox();
-  await page.mouse.move(box.x + 35, box.y + box.height / 2);
+  await page.mouse.move(box.x + Math.min(35, box.width / 2), box.y + box.height / 2);
   await page.mouse.down();
   await page.mouse.move(1265, 450, { steps: 25 });
   await page.screenshot({ path: path.join(screenshots, 'desktop-dockview-drag.png') });
   await page.mouse.up();
   await page.waitForFunction(() => desktopLayout.groups.filter((group) => group.api.location.type === 'grid').length === 2);
+  await checkGroupHeader(page, robotId, true);
+  await checkGroupHeader(page, 'tab-1', true);
   assert.equal(await page.evaluate((id) => tabs.get(id).webview.getWebContentsId(), robotId), guestId);
   assert.equal(await page.evaluate((id) => tabs.get(id).webview.executeJavaScript('window.testInstance'), robotId), 'preserved');
   await waitForGuestLayout(page);
@@ -356,8 +380,9 @@ async function run() {
   assert.notEqual(await page.evaluate((id) => tabs.get(id).panel.api.width, robotId), originalWidth);
   await page.evaluate((id) => tabs.get(id).panel.api.moveTo({ group: tabs.get('tab-1').panel.group, position: 'bottom' }), robotId);
   await page.screenshot({ path: path.join(screenshots, 'desktop-dockview-stacked.png') });
-  await page.locator('.panel-controls[data-panel-id="' + robotId + '"] .panel-float').click();
+  await windowCommand(page, robotId, 'float');
   assert.equal(await page.evaluate((id) => tabs.get(id).panel.api.location.type, robotId), 'floating');
+  await checkGroupHeader(page, robotId, false);
   const floatHeader = await page.locator('.dv-floating-titlebar').boundingBox();
   const initial = await page.locator('#' + robotId).boundingBox();
   await page.mouse.move(floatHeader.x + 45, floatHeader.y + 8);
@@ -368,11 +393,12 @@ async function run() {
   assert.ok(moved.x !== initial.x || moved.y !== initial.y);
   assert.equal(await page.evaluate((id) => tabs.get(id).webview.getWebContentsId(), robotId), guestId);
   await page.screenshot({ path: path.join(screenshots, 'desktop-dockview-floating.png') });
-  await page.locator('.panel-controls[data-panel-id="' + robotId + '"] .panel-float').click();
+  await windowCommand(page, robotId, 'float');
   assert.equal(await page.evaluate((id) => tabs.get(id).panel.api.location.type, robotId), 'grid');
   await page.locator('#dock button[data-app-url="' + robotUrl + '"]').click();
   await page.waitForFunction((id) => activeTabId === id, robotId);
   console.log('PASS: Dockview drag docking, split resize, stacking, floating and guest state preservation');
+  console.log('PASS: single-panel headers reclaim page height; compact grips, menus and floating headers work');
 
   await page.evaluate(() => getActiveTab().webview.executeJavaScript('document.getElementById("popup").click()'));
   await count(page, 3);
@@ -447,7 +473,7 @@ async function run() {
   await application.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0].setContentSize(1280, 820); });
   await page.waitForFunction(() => innerWidth === 1280);
   await page.evaluate((id) => { tabs.get(id).panel.api.moveTo({ group: tabs.get('tab-1').panel.group, position: 'center' }); }, robotId);
-  await page.locator('.panel-controls[data-panel-id="' + robotId + '"] .panel-min').click();
+  await windowCommand(page, robotId, 'min');
   await page.locator('#toggle-dock').click();
   await page.evaluate(() => writeShellState());
   await application.evaluate(({ BrowserWindow }) => {
@@ -479,7 +505,7 @@ async function run() {
   await page.locator('#dock button[data-app-url="' + robotUrl + '"]').click();
   assert.equal(await page.evaluate((id) => tabs.get(id).panel.group.id === tabs.get('tab-1').panel.group.id, robotId), true);
   console.log('PASS: restart restores pinned application, minimized state, geometry and remaps service ports');
-  await page.locator('.panel-controls[data-panel-id="' + robotId + '"] .panel-close').click();
+  await windowCommand(page, robotId, 'close');
   await count(page, 1);
   assert.equal(await page.locator('#dock button[data-app-url="' + robotUrl + '"]').count(), 1);
   await page.locator('#dock button[data-app-url="' + robotUrl + '"]').click({ button: 'right' });
