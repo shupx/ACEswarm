@@ -206,6 +206,17 @@ app.whenReady().then(async () => {
     readShellState();
     services.startPackageMcps();
     createApplicationMenu();
+    ipcMain.on('aivuda-shell:get-default-appstore-url', (event) => {
+      let storeUrl = null;
+      try {
+        const url = new URL(event.senderFrame.url);
+        if (event.sender.hostWebContents === window?.webContents && event.senderFrame === event.sender.mainFrame &&
+          url.origin === new URL(endpoints.os).origin && !/^\/[^/]+\/ui(?:\/|$)/.test(url.pathname)) {
+          storeUrl = endpoints.store.replace(/\/+$/, '');
+        }
+      } catch (_) {}
+      event.returnValue = storeUrl;
+    });
     ipcMain.handle('aivuda-shell:desktop-command', (event, command) => {
       if (event.sender !== window?.webContents) return { ok: false, error: 'Only the desktop can run system commands.' };
       if (command === 'quit') app.quit();

@@ -51,6 +51,12 @@ Expanded Dock entries show icons; collapsed entries show application names,
 running state and window counts in a horizontally scrollable row. Applications
 hosts AivudaOS, including its Online Store for downloads. Store Admin hosts the
 AivudaAppStore upload/publication management backend. Internal IDs remain unchanged.
+
+Guest preload initializes the internal AivudaOS Online Store URL to the actual
+local AppStore gateway before page scripts run. A stored marker allows managed
+defaults to follow port changes while preserving manually saved URLs. Remote
+pages and installed app UI pages do not receive this default.
+
 The native application menu is removed. System contains global recording,
 performance, fullscreen, browser data and quit commands, plus current-page actions.
 The performance and recording entries toggle visibility and show a dot when

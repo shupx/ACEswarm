@@ -188,6 +188,16 @@ async function run() {
   const initialGuest = await page.evaluate(() => getActiveTab().webview.getWebContentsId());
   await checkGroupHeader(page, initialId, true);
   await page.waitForFunction(async () => getActiveTab()?.ready && await getActiveTab().webview.executeJavaScript('document.body.innerText.trim().length > 0'));
+  const defaultStore = await page.evaluate(() => storeUrl.replace(/\/+$/, ''));
+  assert.equal(await page.evaluate(() => getActiveTab().webview.executeJavaScript('localStorage.getItem("aivuda_ui_appstore_base_url")')), defaultStore);
+  await page.evaluate(() => getActiveTab().webview.executeJavaScript('localStorage.setItem("aivuda_ui_appstore_base_url", "http://127.0.0.1:18001"); localStorage.setItem("aceswarm_default_appstore_base_url", "http://127.0.0.1:18001"); location.reload()'));
+  await page.waitForFunction(async (url) => await getActiveTab().webview.executeJavaScript('localStorage.getItem("aivuda_ui_appstore_base_url")') === url, defaultStore);
+  await page.evaluate(() => getActiveTab().webview.executeJavaScript('localStorage.setItem("aivuda_ui_appstore_base_url", "https://custom-store.example"); location.reload()'));
+  await page.waitForFunction(async () => await getActiveTab().webview.executeJavaScript('document.readyState') === 'complete');
+  assert.equal(await page.evaluate(() => getActiveTab().webview.executeJavaScript('localStorage.getItem("aivuda_ui_appstore_base_url")')), 'https://custom-store.example');
+  await page.evaluate(() => getActiveTab().webview.executeJavaScript('localStorage.removeItem("aivuda_ui_appstore_base_url"); location.reload()'));
+  await page.waitForFunction(async (url) => await getActiveTab().webview.executeJavaScript('localStorage.getItem("aivuda_ui_appstore_base_url")') === url, defaultStore);
+  console.log('PASS: internal AivudaOS receives the actual store URL before startup, refreshes managed defaults and preserves user URLs');
   await page.locator('#show-desktop').click();
   assert.equal(await page.evaluate(() => desktopVisible), true);
   assert.equal(await page.locator('#dock-layout').isVisible(), false);
@@ -284,6 +294,7 @@ async function run() {
   await count(page, 2);
   await page.waitForFunction(() => getActiveTab().title === 'Robot Console');
   const robotId = await page.evaluate(() => activeTabId);
+  assert.equal(await page.evaluate(() => getActiveTab().webview.executeJavaScript('localStorage.getItem("aivuda_ui_appstore_base_url")')), null, 'external pages receive no store URL');
   await checkGroupHeader(page, robotId, false);
   assert.equal(await page.evaluate(() => getActiveTab().webview.executeJavaScript('document.getElementById("live").textContent')), 'Connected');
   await windowCommand(page, robotId, 'pin');

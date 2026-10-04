@@ -1,5 +1,22 @@
 const { ipcRenderer } = require("electron");
 
+// Synchronous startup keeps the default available before the page's scripts run.
+try {
+  const storeUrl = ipcRenderer.sendSync('aivuda-shell:get-default-appstore-url');
+  if (storeUrl) {
+    const key = 'aivuda_ui_appstore_base_url';
+    const marker = 'aceswarm_default_appstore_base_url';
+    const current = (localStorage.getItem(key) || '').trim().replace(/\/+$/, '');
+    const previous = localStorage.getItem(marker);
+    if (!current || current === previous) {
+      localStorage.setItem(key, storeUrl);
+      localStorage.setItem(marker, storeUrl);
+    }
+  }
+} catch (error) {
+  console.warn('ACEswarm AppStore default:', error.message);
+}
+
 // Guest input does not bubble through the host window's DOM.
 function notifyWindowFocus() {
   ipcRenderer.sendToHost("aivuda-shell:activate-window");

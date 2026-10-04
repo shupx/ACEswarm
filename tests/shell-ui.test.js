@@ -10,6 +10,27 @@ const renderer = fs.readFileSync(path.join(root, 'electron/shell.js'), 'utf8');
 const preload = fs.readFileSync(path.join(root, 'electron/preload.js'), 'utf8');
 const guest = fs.readFileSync(path.join(root, 'electron/guest-preload.js'), 'utf8');
 
+test('guest startup initializes and refreshes the managed store URL while preserving user settings', () => {
+  const key = 'aivuda_ui_appstore_base_url';
+  const marker = 'aceswarm_default_appstore_base_url';
+  function load(entries, defaultUrl = 'http://127.0.0.1:28791') {
+    const storage = new Map(entries);
+    vm.runInNewContext(guest, {
+      require: () => ({ ipcRenderer: { sendSync: () => defaultUrl, sendToHost() {} } }),
+      window: { addEventListener() {}, open() {} }, console,
+      localStorage: { getItem: (name) => storage.get(name) ?? null, setItem: (name, value) => storage.set(name, value) },
+    });
+    return storage;
+  }
+  assert.equal(load([]).get(key), 'http://127.0.0.1:28791');
+  const refreshed = load([[key, 'http://127.0.0.1:18001/'], [marker, 'http://127.0.0.1:18001']]);
+  assert.equal(refreshed.get(key), 'http://127.0.0.1:28791');
+  assert.equal(refreshed.get(marker), 'http://127.0.0.1:28791');
+  assert.equal(load([[key, 'https://my-store.example'], [marker, 'http://127.0.0.1:18001']]).get(key), 'https://my-store.example');
+  assert.equal(load([[key, 'https://my-store.example']]).get(key), 'https://my-store.example');
+  assert.equal(load([], null).size, 0, 'other guest origins receive no defaults');
+});
+
 test('app UI Dock icons prefer the manifest icon and fall back to the page favicon', () => {
   const nodes = [];
   const context = vm.createContext({
