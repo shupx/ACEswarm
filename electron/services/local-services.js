@@ -125,15 +125,6 @@ class LocalServices {
     return this.endpoints;
   }
 
-  startMcp(controlUrl) {
-    const child = this.launch('aceswarm-mcp', process.execPath, [path.join(__dirname, 'mcp-server.js')], {
-      ACESWARM_CONTROL_URL: controlUrl,
-      ELECTRON_RUN_AS_NODE: '1',
-    }, true);
-    this.mcp = child;
-    return child;
-  }
-
   trackRecording(child) {
     if (!child.pid || !this.guardian) return;
     // Negative identifiers track a single PID instead of a detached process group.

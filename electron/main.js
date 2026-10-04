@@ -5,10 +5,7 @@ if (process.platform === 'linux') app.commandLine.appendSwitch('disable-accelera
 const { workspace } = require('./services/workspace');
 const { resolveRuntime } = require('./services/runtime');
 const { LocalServices } = require('./services/local-services');
-const { fixed, resolvePage } = require('./services/pages');
 const { provision } = require('./services/seed');
-const { listItems, createItem } = require('./services/workspace-items');
-const { ControlServer } = require('./services/control-server');
 const recording = require('./services/recording')(() => window, (failure) => sendToShell('aivuda-shell:recording-error', failure), (child) => services?.trackRecording(child));
 
 let services;
@@ -17,7 +14,6 @@ let endpoints;
 const remoteOrigins = new Set();
 let paths;
 let quitting = false;
-let control;
 
 let shellStatePath;
 let shellState;
@@ -155,7 +151,7 @@ async function shutdown() {
     finally { clearTimeout(timer); await recording.stop(); }
   };
   const recordingResult = await Promise.allSettled([finalizeRecording()]);
-  const results = [...recordingResult, ...await Promise.allSettled([control?.stop(), services?.stop()])];
+  const results = [...recordingResult, ...await Promise.allSettled([services?.stop()])];
   for (const result of results) if (result.status === 'rejected') console.error('ACEswarm shutdown:', result.reason);
 }
 process.on('SIGTERM', handleTerminationSignal);
@@ -170,11 +166,6 @@ app.whenReady().then(async () => {
     endpoints = await services.start();
     shellStatePath = path.join(app.getPath('userData'), 'shell-state.json');
     readShellState();
-    control = new ControlServer({ paths, endpoints });
-    endpoints.control = await control.start();
-    console.log(`ACEswarm Control API: ${endpoints.control}`);
-    console.log(`ACEswarm MCP HTTP: ${endpoints.control}/mcp`);
-    services.startMcp(endpoints.control);
     services.startPackageMcps();
     createApplicationMenu();
     ipcMain.handle('aivuda-shell:desktop-command', (event, command) => {
@@ -184,18 +175,6 @@ app.whenReady().then(async () => {
       else return { ok: false, error: 'Unknown system command.' };
       return { ok: true };
     });
-    ipcMain.handle('control:pages', () => fixed);
-    ipcMain.handle('control:resolve', (_, id, context) => {
-      const page = resolvePage(id, endpoints, context);
-      if (page.kind === 'robot') remoteOrigins.add(new URL(page.url).origin);
-      return page;
-    });
-    ipcMain.handle('control:status', () => ({ ...services.endpoints, control: endpoints.control, failures: services.failures, bootstrap: control.bootstrap }));
-    ipcMain.handle('control:items', (_, kind) => ({ kind, items: listItems(paths, kind) }));
-    ipcMain.handle('control:create', (_, kind, name) => createItem(paths, kind, name));
-    ipcMain.handle('control:settings', () => ({ url: endpoints.os, kind: 'aivudaos-settings' }));
-    ipcMain.handle('control:store', () => ({ url: endpoints.store, kind: 'aivudaappstore' }));
-    ipcMain.handle('control:bootstrap', () => control.bootstrap);
     ipcMain.handle('aivuda-shell:get-startup', () => ({ defaultUrl: endpoints.os, initialUrl: endpoints.os, storeUrl: endpoints.store, gatewayUrl: endpoints.gateway, recordingsDir: path.join(app.getPath('videos'), 'ACEswarm'), savedState: shellState }));
     ipcMain.handle('aivuda-shell:authorize-url', (event, rawUrl) => {
       if (event.sender !== window?.webContents) return { ok: false, error: 'Only the desktop can authorize pages.' };
@@ -242,12 +221,10 @@ app.whenReady().then(async () => {
       try { return await recording[method](); } catch (error) { return { ok: false, error: error.message }; }
     });
     createWindow();
-    control.setBootstrap('running');
     provision({ osUrl: endpoints.osApi, storeUrl: endpoints.store, storeApiUrl: endpoints.storeApi, configPath: path.join(app.isPackaged ? process.resourcesPath : path.resolve(__dirname, '..', 'resources'), 'seed-apps', 'aceswarm-config-export.json') })
-      .then((result) => control.setBootstrap('completed', { result }))
-      .catch((error) => { control.setBootstrap('failed', { error: error.message }); services.failures.push(`Seed provisioning: ${error.message}`); console.error(error); });
+      .then(() => console.log('ACEswarm seed provisioning completed'))
+      .catch((error) => { services.failures.push(`Seed provisioning: ${error.message}`); console.error(error); });
   } catch (error) {
-    await control?.stop();
     await services?.stop();
     console.error('ACEswarm startup failed:', error);
     require('electron').dialog.showErrorBox('ACEswarm startup failed', `${error.message}\n\nLogs: ${paths?.logs || 'not initialized'}`);

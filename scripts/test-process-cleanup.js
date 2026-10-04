@@ -47,9 +47,10 @@ async function run() {
         }
         children = descendants(owner.pid);
         if (mode === 'SIGKILL') assert.ok(children.some((child) => /(?:^|\/)ffmpeg\s/.test(child.command)), 'FFmpeg is running during forced exit');
-        const mcp = children.find((child) => child.command.endsWith('/electron/services/mcp-server.js'));
-        assert.ok(mcp, 'MCP is running');
-        assert.equal(children.filter((child) => child.parent === mcp.pid).length, 0, 'MCP has no Chromium subprocesses');
+        const mcps = children.filter((child) => / -m (aivudaos|aivudaappstore)\.mcp_server$/.test(child.command));
+        assert.equal(mcps.length, 2, 'Both package MCP servers are running');
+        assert.equal(children.some((child) => /electron\/(backend\/server|services\/mcp-server)\.js/.test(child.command)), false, 'No ACEswarm control or MCP process is running');
+        for (const mcp of mcps) assert.equal(children.filter((child) => child.parent === mcp.pid).length, 0, 'Python MCP has no subprocesses');
         if (mode === 'close') await application.close();
         else {
           const exited = new Promise((resolve) => owner.once('exit', resolve));

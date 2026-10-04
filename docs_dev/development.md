@@ -96,15 +96,14 @@ AivudaAppStore FastAPI/Uvicorn
 ACEswarm Caddy App Gateway
 ```
 
-All services bind to dynamically allocated loopback ports. ACEswarm also starts its Control API and local MCP transport on a dynamic loopback port. The streamable HTTP endpoint is available at the reported control URL; a local MCP client such as Codex must be configured with that URL for the session. The stdio compatibility transport is available with `ACESWARM_CONTROL_URL=http://127.0.0.1:<port> npm run mcp:stdio`. AivudaOS and AivudaAppStore MCP servers are started as separate local processes. ACEswarm does not call standalone installation scripts, systemd, Avahi, or ports 80/443.
-
-When ACEswarm is running, its console prints the MCP endpoint. For a local Codex smoke test, configure that endpoint for the session and ask Codex to list the pages:
-
-```bash
-codex exec --ephemeral --skip-git-repo-check --sandbox read-only \
-  -c 'mcp_servers.aceswarm.url="http://127.0.0.1:<control-port>/mcp"' \
-  'Use the ACEswarm MCP server. List the pages and report their ids.'
-```
+All listeners bind to loopback. The two browser-facing Gateway ports are fixed
+and configurable; internal backend and Caddy admin ports are dynamically allocated.
+AivudaOS and AivudaAppStore MCP servers are started as separate stdio processes
+using the private Python runtime. Their logs are `aivudaos-mcp.log` and
+`aivudaappstore-mcp.log` in the workspace logs directory. These processes are not
+exposed through an HTTP endpoint or external client bridge. ACEswarm has no
+Control API or MCP server of its own; desktop agent integration is deferred.
+ACEswarm does not call standalone installation scripts, systemd, Avahi, or ports 80/443.
 
 ## Tests
 
@@ -138,7 +137,8 @@ through Electron frame capture and browser MediaRecorder, without OS title bars.
 
 Run `xvfb-run -a npm run test:cleanup` to verify real Electron window close,
 System-menu quit, SIGTERM, and SIGKILL during FFmpeg recording. The test checks that subprocesses
-exit, gateway ports are released, and the stdio MCP has no Chromium subprocesses.
+exit, gateway ports are released, both package MCP servers are running before exit,
+and no ACEswarm control backend or MCP process is launched.
 Services run in separate process groups. An independent Node guardian monitors
 Electron's pipe and stops those groups and active FFmpeg recordings if Electron
 crashes. Normal shutdown sends SIGTERM, escalates to SIGKILL after five seconds,
