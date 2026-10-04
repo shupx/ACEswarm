@@ -12,6 +12,7 @@ Use these documents when setting up, running, testing, or packaging ACEswarm:
 
 Use these documents to understand the system and its runtime behavior:
 
+- [Design philosophy](philosophy.md)
 - [Architecture and project layout](architecture.md)
 - [Runtime and workspace](runtime.md)
 - [Ports and local listeners](ports.md)
