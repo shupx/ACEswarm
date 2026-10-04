@@ -1,7 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-function gatewayConfig({ port, osPort, adminPort = port + 1, uiRoot, storeGatewayPort, storePort, storeFilesRoot }) {
+function gatewayConfig({ port, osPort, adminPort = port + 1, uiRoot, storeGatewayPort, storePort, storeFilesRoot, storeUiRoot }) {
   const ui = JSON.stringify(uiRoot);
   const storeSite = storeGatewayPort && storePort && storeFilesRoot ? `
 http://127.0.0.1:${storeGatewayPort} {
@@ -10,8 +10,15 @@ http://127.0.0.1:${storeGatewayPort} {
     root * ${JSON.stringify(storeFilesRoot)}
     file_server
   }
-  handle {
+  @storeApi path /aivuda_app_store/* /openapi.json /docs /docs/* /redoc
+  handle @storeApi {
     reverse_proxy 127.0.0.1:${storePort}
+  }
+  handle {
+    encode zstd gzip
+    root * ${JSON.stringify(storeUiRoot)}
+    try_files {path} /index.html
+    file_server
   }
 }
 ` : '';
@@ -54,6 +61,9 @@ function prepareGateway(paths, runtime, port, osPort, adminPort, storeGatewayPor
   }
   const uiRoot = path.join(runtime.osRoot, 'aivudaos', 'resources', 'ui', 'dist');
   if (!fs.existsSync(path.join(uiRoot, 'index.html'))) throw new Error(`AivudaOS UI not built: ${uiRoot}`);
+  const storeUiRoot = storeGatewayPort && storePort
+    ? path.join(runtime.storeRoot, 'aivudaappstore', 'resources', 'ui', 'dist') : undefined;
+  if (storeUiRoot && !fs.existsSync(path.join(storeUiRoot, 'index.html'))) throw new Error(`AppStore UI not built: ${storeUiRoot}`);
   const previous = fs.existsSync(config) ? fs.readFileSync(config, 'utf8') : '';
   const match = previous.match(/^    # BEGIN AIVUDA APP IMPORTS\n([\s\S]*?)^    # END AIVUDA APP IMPORTS$/m);
   if (previous && !match) throw new Error(`Gateway import markers missing: ${config}`);
@@ -61,7 +71,7 @@ function prepareGateway(paths, runtime, port, osPort, adminPort, storeGatewayPor
   if (imports.split('\n').some((line) => line.trim() && !/^\s*import "[^"\n]+"\s*$/.test(line))) {
     throw new Error(`Unexpected gateway imports: ${config}`);
   }
-  const generated = gatewayConfig({ port, osPort, adminPort, uiRoot, storeGatewayPort, storePort, storeFilesRoot: path.join(paths.store, 'data', 'files') }).replace(
+  const generated = gatewayConfig({ port, osPort, adminPort, uiRoot, storeGatewayPort, storePort, storeUiRoot, storeFilesRoot: path.join(paths.store, 'data', 'files') }).replace(
     '    # BEGIN AIVUDA APP IMPORTS\n', `    # BEGIN AIVUDA APP IMPORTS\n${imports}`,
   );
   fs.writeFileSync(config, generated);

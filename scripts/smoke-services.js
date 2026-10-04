@@ -28,6 +28,22 @@ async function run() {
         assert.equal(response.status, 200, url);
         assert.match(await response.text(), /<html/i, url);
       }
+      const storeHtml = await (await fetch(endpoints.store)).text();
+      for (const route of ['store', 'login', 'apps/example', 'me/new', 'me/account']) {
+        const response = await fetch(new URL(route, endpoints.store));
+        assert.equal(response.status, 200, route);
+        assert.match(response.headers.get('content-type'), /text\/html/, route);
+        assert.equal(await response.text(), storeHtml, route);
+      }
+      const assetPath = storeHtml.match(/(?:src|href)="([^" ]+\/assets\/[^" ]+|\/assets\/[^" ]+)"/)?.[1];
+      assert.ok(assetPath, 'Store HTML references built assets');
+      const asset = await fetch(new URL(assetPath, endpoints.store));
+      assert.equal(asset.status, 200);
+      assert.doesNotMatch(asset.headers.get('content-type'), /text\/html/);
+      const missingApi = await fetch(new URL('aivuda_app_store/api/smoke-missing', endpoints.store));
+      assert.equal(missingApi.status, 404);
+      assert.match(missingApi.headers.get('content-type'), /application\/json/);
+      assert.ok((await (await fetch(new URL('openapi.json', endpoints.store))).json()).paths);
       const gatewayApi = await fetch(`${endpoints.gateway}/aivuda_os/api/auth/me`);
       assert.notEqual(gatewayApi.status, 502);
       const openapi = await (await fetch(new URL('openapi.json', endpoints.osApi))).json();
