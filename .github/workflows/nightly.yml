@@ -1,0 +1,107 @@
+name: Nightly AppImage
+
+on:
+  push:
+    branches: [master, main]
+  schedule:
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aceswarm-nightly
+  cancel-in-progress: false
+
+jobs:
+  appimage:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    env:
+      ELECTRON_MIRROR: https://github.com/electron/electron/releases/download/
+      ELECTRON_BUILDER_BINARIES_MIRROR: https://github.com/electron-userland/electron-builder-binaries/releases/download/
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - name: Check out source and pinned submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential curl rsync tar libfuse2
+          npm ci --include=dev
+
+      - name: Check source
+        run: npm run check
+
+      - name: Build AppImage
+        run: npm run build:release -- --publish never
+
+      - name: Prepare nightly assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./package.json').version")"
+          mkdir -p dist/nightly
+          cp "dist/ACEswarm-${version}-x86_64.AppImage" dist/nightly/ACEswarm-nightly-x86_64.AppImage
+          cd dist/nightly
+          sha256sum ACEswarm-nightly-x86_64.AppImage > SHA256SUMS
+
+      - name: Retain build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ACEswarm-nightly-linux-x86_64
+          path: dist/nightly/*
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Update nightly tag
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const ref = 'tags/nightly';
+            try {
+              await github.rest.git.getRef({ owner, repo, ref });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              await github.rest.git.createRef({ owner, repo, ref: `refs/${ref}`, sha: context.sha });
+              return;
+            }
+            await github.rest.git.updateRef({ owner, repo, ref, sha: context.sha, force: true });
+
+      - name: Publish nightly release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nightly
+          target_commitish: ${{ github.sha }}
+          name: Nightly
+          prerelease: true
+          make_latest: 'false'
+          overwrite_files: true
+          fail_on_unmatched_files: true
+          body: |
+            Automated Linux x86_64 development build.
+
+            Source: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+            Build: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            Download `ACEswarm-nightly-x86_64.AppImage` and run `chmod +x ACEswarm-nightly-x86_64.AppImage` before launching it.
+            `SHA256SUMS` contains the AppImage checksum. These assets are replaced by each successful nightly build.
+          files: |
+            dist/nightly/ACEswarm-nightly-x86_64.AppImage
+            dist/nightly/SHA256SUMS

@@ -12,6 +12,6 @@ npm run bundle:runtime
 
 printf '%s\n' '[3/3] Verifying and packaging ACEswarm'
 npm run bundle:verify
-npm run dist
+npm run dist -- "$@"
 
 printf '\nRelease artifact:\n%s\n' "$ROOT/dist/ACEswarm-$(node -p "require('./package.json').version")-x86_64.AppImage"

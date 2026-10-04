@@ -86,7 +86,25 @@ The resulting artifact is written to:
 dist/ACEswarm-<version>-x86_64.AppImage
 ```
 
-## Local services
+## GitHub Nightly Builds
+
+[Nightly AppImage](../.github/workflows/nightly.yml) builds on pushes to the default
+branch (`master` or `main`), daily at 18:00 UTC (02:00 Asia/Shanghai), and through
+the Actions page's **Run workflow** button on the default branch.
+It checks out the pinned submodules, runs source checks, and uses the existing
+release build to package Linux x86_64. Only a successful build moves the `nightly`
+tag and updates the **Nightly** prerelease with these assets:
+
+- `ACEswarm-nightly-x86_64.AppImage`
+- `SHA256SUMS`
+
+The same files are retained as an Actions artifact for 14 days. Release asset
+names stay constant so each build replaces the previous downloads. The workflow
+uses the repository's `GITHUB_TOKEN` with `contents: write`; no release token
+secret is required. Repository rules must allow this workflow to update the
+`nightly` tag. A workflow dispatch from another branch does not publish.
+
+## Local backends
 
 Development mode starts:
 
@@ -95,6 +113,8 @@ AivudaOS FastAPI/Uvicorn
 AivudaAppStore FastAPI/Uvicorn
 ACEswarm Caddy App Gateway
 ```
+
+See [ports.md](ports.md) for the default and configurable ports.
 
 All listeners bind to loopback. The two browser-facing Gateway ports are fixed
 and configurable; internal backend and Caddy admin ports are dynamically allocated.
