@@ -79,6 +79,7 @@ function createWindow() {
   window = new BrowserWindow({
     width: 1280, height: 820, minWidth: 850, minHeight: 550,
     title: 'ACEswarm', backgroundColor: '#101828',
+    icon: path.join(__dirname, 'assets', 'aivuda_icon.png'),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), webviewTag: true, contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
   window.loadFile(path.join(__dirname, 'shell.html'));
