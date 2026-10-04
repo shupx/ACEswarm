@@ -130,10 +130,21 @@ function openDockMenu(event, entry) {
 }
 
 function renderDesktop() {
+  shellEl.classList.toggle("dock-collapsed", dockCollapsed);
+  shellEl.classList.toggle("window-maximized", [...tabs.values()].some((tab) => tab.window?.max && !tab.minimized));
   const dock = document.getElementById("dock");
   const shortcuts = document.getElementById("desktop-shortcuts");
   dock.replaceChildren();
   shortcuts.replaceChildren();
+  const toggle = document.createElement("button");
+  toggle.id = "toggle-dock";
+  toggle.className = "dock-toggle";
+  toggle.title = dockCollapsed ? "Expand Dock" : "Collapse Dock";
+  toggle.setAttribute("aria-label", toggle.title);
+  toggle.setAttribute("aria-expanded", String(!dockCollapsed));
+  toggle.append(desktopIcon(dockCollapsed ? "chevron-right" : "chevron-left"));
+  toggle.onclick = () => { dockCollapsed = !dockCollapsed; layoutApplicationWindows(); renderDesktop(); writeShellState(); };
+  dock.append(toggle);
   const desktop = document.createElement("button");
   desktop.className = "dock-item";
   desktop.title = "Show desktop";
@@ -177,15 +188,26 @@ function renderDesktop() {
       shortcuts.append(shortcut);
     }
   }
+  const utilities = document.createElement("div");
+  utilities.className = "dock-utilities";
+  for (const [icon, title, action] of [["plus", "Open page", showOpenPageDialog], ["video", "Screen Record", showScreenRecordBar]]) {
+    const button = document.createElement("button");
+    button.className = "dock-item";
+    button.title = title; button.setAttribute("aria-label", title);
+    button.append(desktopIcon(icon)); button.onclick = action; utilities.append(button);
+  }
+  dock.append(utilities);
   document.getElementById("window-count").textContent = tabs.size ? tabs.size + (tabs.size === 1 ? " window" : " windows") : "Desktop";
   refreshDesktopIcons();
 }
 
 function mountApplicationWindow(tab, options) {
-  const bounds = desktopState.windowBounds(options.bounds, { width: innerWidth, height: innerHeight }, tabs.size - 1);
+  const viewport = { width: innerWidth, height: innerHeight };
+  const bounds = desktopState.windowBounds(options.bounds, viewport, tabs.size - 1, dockCollapsed);
+  const area = desktopState.workArea(viewport, dockCollapsed);
   const win = new WinBox({
     id: tab.id, title: tab.title, root: stackEl, ...bounds,
-    top: 48, bottom: 88, left: 8, right: 8, minwidth: Math.min(340, innerWidth - 16), minheight: 220,
+    top: 48, bottom: 8, left: area.x, right: 8, minwidth: Math.min(240, area.width), minheight: 220,
     header: 36, class: ["no-full", "no-animation"],
   });
   tab.window = win;
@@ -203,7 +225,7 @@ function mountApplicationWindow(tab, options) {
   };
   win.onclose = () => { removeApplicationWindow(tab); return false; };
   win.onmove = win.onresize = () => writeShellState();
-  win.onmaximize = win.onrestore = () => writeShellState();
+  win.onmaximize = win.onrestore = () => { layoutApplicationWindows(); renderDesktop(); writeShellState(); };
   win.addControl({ class: "wb-browser", click: () => { activateTab(tab.id); setChromeExpanded(!tab.chromeExpanded); } });
   win.addControl({ class: "wb-pin", click: () => pinApplication({ url: tab.appUrl, title: tab.title, favicon: tab.favicon }) });
   // Replace WinBox's taskbar minimizer: our Dock hides the full window intact.
@@ -293,14 +315,19 @@ function updateDesktopClock() {
 updateDesktopClock();
 setInterval(updateDesktopClock, 30000);
 
-window.addEventListener("resize", () => requestAnimationFrame(() => {
+function layoutApplicationWindows() {
+  const viewport = { width: innerWidth, height: innerHeight };
   for (const tab of tabs.values()) {
     const win = tab.window;
-    const maximized = win.max;
-    if (maximized) win.restore();
-    const bounds = desktopState.windowBounds(win, { width: innerWidth, height: innerHeight });
-    win.minwidth = Math.min(340, innerWidth - 16);
-    win.resize(bounds.width, bounds.height).move(bounds.x, bounds.y);
-    if (maximized) win.maximize();
+    const area = desktopState.workArea(viewport, dockCollapsed, win.max);
+    win.top = area.y; win.left = area.x;
+    win.right = win.max ? 0 : 8; win.bottom = win.max ? 0 : 8;
+    if (win.max) {
+      win.resize(area.width, area.height, true).move(area.x, area.y, true);
+    } else {
+      const bounds = desktopState.windowBounds(win, viewport, 0, dockCollapsed);
+      win.resize(bounds.width, bounds.height).move(bounds.x, bounds.y);
+    }
   }
-}));
+}
+window.addEventListener("resize", () => requestAnimationFrame(layoutApplicationWindows));

@@ -5,8 +5,11 @@ button, input { font: inherit; }
 button { cursor: pointer; }
 button:focus-visible, input:focus-visible, .wb-control span:focus-visible { outline: 2px solid #157d71; outline-offset: 2px; }
 [hidden] { display: none !important; }
-.shell { height: 100vh; background: linear-gradient(120deg, #d5e5e2, #e8edef 55%, #d5dce3); }
-.desktop-bar { height: 48px; display: flex; align-items: center; padding: 0 18px; gap: 20px; background: #f9fbfc; border-bottom: 1px solid #c5cdd1; position: relative; z-index: 100000; }
+.shell { --dock-width: 64px; height: 100vh; background: linear-gradient(120deg, #d5e5e2, #e8edef 55%, #d5dce3); }
+.shell.dock-collapsed { --dock-width: 24px; }
+.shell.window-maximized .desktop-bar { display: none; }
+.window-layer .winbox.max { border: 0; border-radius: 0; box-shadow: none; }
+.desktop-bar { height: 48px; display: flex; align-items: center; padding: 0 18px 0 calc(var(--dock-width) + 18px); gap: 20px; background: #f9fbfc; border-bottom: 1px solid #c5cdd1; position: relative; z-index: 100000; }
 .brand { display: flex; align-items: center; gap: 9px; white-space: nowrap; }
 .brand img { width: 25px; height: 25px; object-fit: contain; }
 .brand strong { font-size: 17px; }
@@ -18,7 +21,7 @@ button:focus-visible, input:focus-visible, .wb-control span:focus-visible { outl
 .icon-button:disabled { opacity: .35; cursor: default; }
 .icon-button svg { width: 17px; height: 17px; }
 #desktop-clock { font-size: 12px; color: #536168; margin-left: 12px; min-width: 45px; text-align: right; }
-.desktop-shortcuts { position: absolute; top: 72px; left: 20px; bottom: 98px; width: 95px; overflow-y: auto; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.desktop-shortcuts { position: absolute; top: 72px; left: calc(var(--dock-width) + 16px); bottom: 16px; width: 95px; overflow-y: auto; display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .desktop-shortcut { border: 1px solid transparent; background: transparent; border-radius: 6px; width: 90px; min-height: 92px; padding: 10px 4px; color: #34494a; display: flex; flex-direction: column; align-items: center; gap: 7px; }
 .desktop-shortcut:hover { background: #ffffff70; border-color: #b6c9c7; }
 .desktop-shortcut .app-icon { width: 40px; height: 40px; }
@@ -34,15 +37,23 @@ button:focus-visible, input:focus-visible, .wb-control span:focus-visible { outl
 .winbox .wb-control svg { width: 16px; height: 16px; pointer-events: none; }
 .winbox .wb-control span:hover { background: #dce8e5; }
 .winbox .wb-control .wb-close:hover { background: #c94145; color: white; }
-.winbox .wb-body { background: #fff; display: flex; flex-direction: column; margin: 0; overflow: hidden; }
+.winbox .wb-body { background: #fff; display: flex; flex-direction: column; margin: 0; overflow: hidden; container-type: inline-size; }
 .winbox .wb-body webview { display: flex; width: 100%; flex: 1 1 0; min-height: 0; }
 .winbox.dock-minimized { display: none !important; }
 .window-layer.interacting webview { pointer-events: none; }
 .browser-toolbar { background: #f8fafb; border-bottom: 1px solid #d4dede; display: flex; align-items: center; padding: 5px 7px; gap: 3px; flex: 0 0 42px; }
 #address-input { min-width: 50px; flex: 1; height: 29px; border: 1px solid #ccd5d7; border-radius: 5px; padding: 0 8px; background: #fff; font-size: 12px; color: #3a4b4e; }
 #status-text { font-size: 11px; color: #758185; padding: 0 5px; }
-.dock { position: absolute; z-index: 100000; bottom: 14px; left: 50%; transform: translateX(-50%); padding: 7px 9px; display: flex; align-items: center; gap: 4px; max-width: calc(100% - 32px); min-height: 64px; background: #f9fbfcf2; border: 1px solid #bacac9; border-radius: 8px; box-shadow: 0 4px 18px #344b4920; }
-.dock-items { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: thin; padding: 0 2px; }
+@container (max-width: 320px) { #status-text { display: none; } }
+.dock { position: absolute; z-index: 100001; top: 0; bottom: 0; left: 0; width: var(--dock-width); padding: 9px 7px; display: flex; flex-direction: column; align-items: center; gap: 5px; background: #f9fbfc; border-right: 1px solid #bacac9; }
+.dock-items { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; width: 49px; min-height: 0; flex: 1; }
+.dock-utilities { display: flex; flex-direction: column; gap: 5px; }
+.dock-toggle { width: 46px; height: 28px; flex: 0 0 28px; border: 0; background: transparent; border-radius: 4px; color: #4d6b65; display: grid; place-items: center; }
+.dock-toggle:hover { background: #e1ece8; }
+.dock-toggle svg { width: 16px; height: 16px; }
+.dock-collapsed .dock { padding: 9px 0; }
+.dock-collapsed .dock-toggle { width: 23px; }
+.dock-collapsed .dock > :not(.dock-toggle) { display: none; }
 .dock-item { width: 48px; height: 49px; flex: 0 0 48px; border: 0; background: transparent; border-radius: 6px; display: flex; align-items: center; justify-content: center; position: relative; padding: 5px 6px 10px; }
 .dock-item:hover, .dock-item.active { background: #dfece8; }
 .dock-item.minimized { opacity: .65; }
@@ -53,7 +64,7 @@ button:focus-visible, input:focus-visible, .wb-control span:focus-visible { outl
 .app-icon img { width: 100%; height: 100%; object-fit: contain; }
 .running-dot { position: absolute; bottom: 3px; height: 4px; width: 4px; border-radius: 50%; background: #378678; }
 .window-badge { position: absolute; top: 1px; right: 1px; font-size: 10px; padding: 1px 3px; background: #367b6a; color: #fff; border-radius: 3px; }
-.dock-divider { width: 1px; height: 31px; background: #ccd7d5; margin: 0 4px; flex-shrink: 0; }
+.dock-divider { width: 32px; height: 1px; background: #ccd7d5; margin: 3px 0; flex-shrink: 0; }
 .tools-menu-wrap { position: relative; }
 .tools-menu, .dock-menu { padding: 5px; border: 1px solid #c4cfce; border-radius: 6px; background: #fff; box-shadow: 0 6px 20px #223e3925; min-width: 190px; }
 .tools-menu { position: absolute; right: 0; top: 36px; }
@@ -71,4 +82,4 @@ dialog input { width: 100%; padding: 10px; border: 1px solid #b9c8c4; border-rad
 .dialog-actions button { border: 1px solid #c9d5d1; border-radius: 5px; padding: 8px 14px; background: white; color: #435c55; font-size: 12px; }
 .dialog-actions .primary { margin-left: auto; background: #267761; border-color: #267761; color: white; }
 #open-page-error { color: #b43e43; font-size: 12px; }
-@media (max-width: 640px) { .brand span, #window-count, #status-text { display: none; } .desktop-bar { padding: 0 10px; gap: 6px; } #desktop-clock { margin-left: 4px; } .desktop-shortcuts { left: 8px; } }
+@media (max-width: 640px) { .brand span, #window-count, #status-text, #desktop-clock { display: none; } .desktop-bar { padding: 0 8px 0 calc(var(--dock-width) + 8px); gap: 6px; } }

@@ -23,7 +23,10 @@ application windows, and Lucide for controls. Each window owns an independent
 WebView using the existing persistent browser session. Minimizing hides the
 window without recreating its page; closing releases the WebView.
 
-The Dock combines Home/AppStore, pinned page entries, and running applications.
+The collapsible left Dock combines Home/AppStore, pinned page entries, and running applications.
+Its expanded/collapsed width is reserved by the window manager. Maximized windows
+fill the remaining viewport, including the space normally used by the desktop
+header; their restore geometry is retained when the Dock is toggled.
 Applications are identified by their launch URL (ignoring the fragment), separately
 from a window's current navigation URL. Multiple windows share a Dock entry;
 ordinary clicks activate an existing window, while the context menu can open
@@ -36,6 +39,12 @@ Legacy tab/bookmark state is accepted. Saved local service origins are remapped
 to the current endpoints at startup. Address entry from the trusted desktop
 authorizes HTTP(S) origins; guest navigation remains subject to the existing
 origin checks. Allowed page popups open internal application windows.
+
+Recording uses the same three modes as aivuda-shell: Native captures the selected
+Electron window into WebM; FFmpeg encodes window frames into MP4; FFmpeg X11 records
+the native window's screen region on X11. The movable recording bar supports mode
+selection, pause/resume, stop/save, and opening saved files. FFmpeg is an optional
+system dependency. Window close finalizes recording before destroying its renderer.
 
 ## ACEswarm layout
 

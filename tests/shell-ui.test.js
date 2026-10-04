@@ -41,15 +41,17 @@ test('browser shell preserves FPS overlay and recording controls', () => {
   assert.match(preload, /prepareWindowRecording/);
   assert.match(preload, /startFfmpegWindowRecording/);
   assert.match(preload, /saveRecordingFile/);
-  assert.match(renderer, /getDisplayMedia\(\{ video: true, audio: false \}\)/);
-  assert.doesNotMatch(renderer, /data-screen-record-mode="ffmpeg/);
+  assert.match(renderer, /getUserMedia/);
+  assert.match(renderer, /chromeMediaSourceId: prepared.sourceId/);
+  assert.match(renderer, /data-screen-record-mode/);
+  assert.match(renderer, /ffmpeg-x11/);
 });
 
-test('native recording is selected by the main process display capture handler', () => {
+test('native recording selects the Electron window media source', () => {
   const main = fs.readFileSync(path.join(root, 'electron/main.js'), 'utf8');
-  assert.match(main, /setDisplayMediaRequestHandler/);
+  assert.match(main, /getMediaSourceId/);
   assert.match(main, /desktopCapturer\.getSources/);
-  assert.match(main, /audio: 'none'/);
+  assert.match(renderer, /chromeMediaSourceId: prepared.sourceId/);
 });
 
 test('guest pages use persistent session and shell preload bridge', () => {

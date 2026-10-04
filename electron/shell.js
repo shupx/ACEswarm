@@ -13,6 +13,7 @@ const toolsMenu = document.getElementById("tools-menu");
 let defaultUrl = "http://127.0.0.1:80";
 let storeUrl = "";
 let serviceOrigins = {};
+let dockCollapsed = false;
 let favorites = [];
 let activeTabId = null;
 let nextTabId = 1;
@@ -21,7 +22,7 @@ let screenRecordBarVisible = false;
 let screenRecordBarPosition = null;
 let screenRecordBarEl = null;
 let screenRecordDetailsExpanded = false;
-let screenRecordMode = "native";
+let screenRecordMode = "ffmpeg";
 let screenRecordStatus = "idle";
 let screenRecordStatusText = "Ready to record";
 let screenRecordElapsedMs = 0;
@@ -146,7 +147,7 @@ function normalizeSavedShellState(rawState) {
   const chromeExpanded = rawState.chromeExpanded === true;
   const performanceOverlayVisible = rawState.performanceOverlayVisible === true;
   const screenRecordBarVisible = rawState.screenRecordBarVisible === true;
-  const screenRecordMode = "native";
+  const screenRecordMode = ["native", "ffmpeg", "ffmpeg-x11"].includes(rawState.screenRecordMode) ? rawState.screenRecordMode : "ffmpeg";
   const screenRecordBarPosition =
     normalizeRelativeOverlayPosition(rawState.screenRecordBarPosition);
   const favorites = Array.isArray(rawState.favorites)
@@ -169,6 +170,7 @@ function buildShellStatePayload() {
   return {
     version: 2,
     serviceOrigins,
+    dockCollapsed,
     activeTabId,
     chromeExpanded: shellEl.classList.contains("expanded"),
     performanceOverlayVisible,
@@ -742,7 +744,7 @@ function cleanupScreenRecorderStream() {
 }
 
 function canCloseScreenRecordBar() {
-  return screenRecordStatus !== "recording" && screenRecordStatus !== "paused" && screenRecordStatus !== "stopping";
+  return !["starting", "recording", "paused", "stopping"].includes(screenRecordStatus);
 }
 
 function updateScreenRecordBarLayout() {
@@ -853,7 +855,7 @@ function renderScreenRecordBar() {
 
   const isRecording = screenRecordStatus === "recording";
   const isPaused = screenRecordStatus === "paused";
-  const isBusy = screenRecordStatus === "stopping";
+  const isBusy = screenRecordStatus === "stopping" || screenRecordStatus === "starting";
   const elapsedText = formatElapsedTime(screenRecordElapsedMs);
   const recordingFolderPath = screenRecorderOutputDir || defaultScreenRecordingsDir;
   const escapedRecordingFolderPath = recordingFolderPath ? escapeHtml(recordingFolderPath) : "";
@@ -900,7 +902,8 @@ function renderScreenRecordBar() {
       ? [
           '<div style="margin-top:2px;padding:4px 6px 2px;border-top:1px solid rgba(148,163,184,0.35);border-radius:8px;background:rgba(255,255,255,0.2);max-width:300px;overflow-wrap:anywhere;">',
           '<div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;font-size:10px;">',
-          '<span style="border-radius:999px;padding:1px 6px;background:rgba(148,163,184,0.24);color:#334e68;">Native WebM</span>',
+          ...[["native", "Native"], ["ffmpeg", "FFmpeg"], ["ffmpeg-x11", "FFmpeg X11"]].map(([mode, label]) =>
+            `<button type="button" data-screen-record-mode="${mode}" ${canCloseScreenRecordBar() ? "" : "disabled"} style="border:0;border-radius:5px;padding:2px 6px;background:${screenRecordMode === mode ? "rgba(148,163,184,0.3)" : "transparent"};color:#334e68;font:inherit;cursor:pointer;">${label}</button>`),
           "</div>",
           `<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:${statusTone};">${screenRecordStatus}</div>`,
           `<div style="margin-top:2px;font-size:11px;color:#334e68;">${screenRecordStatusText || "No details"}</div>`,
@@ -936,6 +939,14 @@ function renderScreenRecordBar() {
   const expandButton = screenRecordBarEl.querySelector("[data-expand-screen-record]");
   const openRecordingFileButton = screenRecordBarEl.querySelector("[data-open-recording-file]");
   const openRecordingFolderButton = screenRecordBarEl.querySelector("[data-open-recording-folder]");
+  for (const button of screenRecordBarEl.querySelectorAll("[data-screen-record-mode]")) {
+    button.title = button.dataset.screenRecordMode === "native" ? "Native window capture (WebM)" : button.dataset.screenRecordMode === "ffmpeg" ? "Window frames encoded by FFmpeg (MP4)" : "X11 window region encoded by FFmpeg (MP4)";
+    button.onclick = () => {
+      if (!canCloseScreenRecordBar()) return;
+      screenRecordMode = button.dataset.screenRecordMode;
+      writeShellState(); renderScreenRecordBar();
+    };
+  }
 
   if (closeButton) {
     closeButton.addEventListener("click", () => {
@@ -1238,7 +1249,7 @@ function chooseScreenRecordingMimeType() {
 }
 
 async function startScreenRecording() {
-  if (screenRecordStatus === "recording" || screenRecordStatus === "paused" || screenRecordStatus === "stopping") {
+  if (!canCloseScreenRecordBar()) {
     return;
   }
 
@@ -1246,7 +1257,7 @@ async function startScreenRecording() {
   screenRecordDetailsExpanded = false;
   screenRecorderLastSavedPath = "";
   renderScreenRecordBar();
-  setScreenRecordState("idle", "Preparing window capture...");
+  setScreenRecordState("starting", "Preparing window capture...");
 
   if (screenRecordMode === "ffmpeg" || screenRecordMode === "ffmpeg-x11") {
     try {
@@ -1257,6 +1268,7 @@ async function startScreenRecording() {
       if (!prepared?.ok || !prepared.outputPath) {
         throw new Error(prepared?.error || "Could not start FFmpeg window capture.");
       }
+      if (screenRecordStatus === "error") throw new Error(screenRecordStatusText);
 
       screenRecordBackend = "ffmpeg";
       screenRecorderOutputPath = prepared.outputPath;
@@ -1278,14 +1290,15 @@ async function startScreenRecording() {
 
   try {
     const prepared = await window.aivudaShell.prepareWindowRecording();
-    if (!prepared?.ok || !prepared.outputPath) {
+    if (!prepared?.ok || !prepared.sourceId || !prepared.outputPath) {
       throw new Error(prepared?.error || "Could not prepare window capture.");
     }
 
-    if (!navigator.mediaDevices?.getDisplayMedia) {
-      throw new Error("Display capture is unavailable in this Electron session.");
-    }
-    const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: { mandatory: { chromeMediaSource: "desktop", chromeMediaSourceId: prepared.sourceId } },
+    });
+    screenRecorderStream = stream;
 
     const mimeType = chooseScreenRecordingMimeType();
     const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
@@ -1628,6 +1641,11 @@ window.addEventListener(
 );
 
 window.aivudaShell.onNewTab((payload) => createTab(payload?.url || defaultUrl));
+window.aivudaShell.onRecordingError((failure) => {
+  resetScreenRecordingSessionState();
+  screenRecordDetailsExpanded = true;
+  setScreenRecordState("error", failure?.error || "Recording encoder stopped.");
+});
 window.aivudaShell.onOpenUrlInNewTab((payload) => {
   createTab(payload?.url || defaultUrl);
 });
@@ -1718,12 +1736,13 @@ window.aivudaShell.getStartup().then((startup) => {
   }
   defaultScreenRecordingsDir = typeof startup.recordingsDir === "string" ? startup.recordingsDir : "";
   const savedState = normalizeSavedShellState(startup.savedState);
+  dockCollapsed = startup.savedState?.dockCollapsed === true;
   if (savedState) {
     performanceOverlayVisible = savedState.performanceOverlayVisible;
     favorites = savedState.favorites || [];
     renderFavorites();
     screenRecordBarVisible = savedState.screenRecordBarVisible;
-    screenRecordMode = "native";
+    screenRecordMode = savedState.screenRecordMode;
     screenRecordBarPosition = savedState.screenRecordBarPosition;
     const restoredTabs = savedState.tabs;
     for (const tabState of restoredTabs) {

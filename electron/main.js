@@ -8,6 +8,7 @@ const { fixed, resolvePage } = require('./services/pages');
 const { provision } = require('./services/seed');
 const { listItems, createItem } = require('./services/workspace-items');
 const { ControlServer } = require('./services/control-server');
+const recording = require('./services/recording')(() => window, (failure) => sendToShell('aivuda-shell:recording-error', failure));
 
 let services;
 let window;
@@ -101,6 +102,22 @@ function createWindow() {
     webPreferences: { preload: path.join(__dirname, 'preload.js'), webviewTag: true, contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
   window.loadFile(path.join(__dirname, 'shell.html'));
+  let finalizingClose = false;
+  window.on('close', (event) => {
+    if (quitting) return;
+    event.preventDefault();
+    if (finalizingClose) return;
+    finalizingClose = true;
+    window.webContents.executeJavaScript('window.__aivudaFinalizeActiveRecordingBeforeClose?.()')
+      .then((result) => {
+        if (result?.ok === false) throw new Error(result.error || 'Could not save recording.');
+        app.quit();
+      })
+      .catch((error) => {
+        finalizingClose = false;
+        require('electron').dialog.showErrorBox('Recording save failed', error.message);
+      });
+  });
   window.webContents.once('did-finish-load', () => {
     console.log('ACEswarm workbench ready');
     const smokeExit = Number(process.env.ACESWARM_SMOKE_EXIT_MS);
@@ -133,26 +150,12 @@ function routePagePopup(url) {
   else shell.openExternal(url);
 }
 
-async function captureMainWindowForDisplayMedia(_request, callback) {
-  try {
-    const sources = await desktopCapturer.getSources({
-      types: ['window'],
-      thumbnailSize: { width: 0, height: 0 },
-      fetchWindowIcons: false,
-    });
-    const source = sources.find((entry) => entry.name === window?.getTitle()) || sources[0];
-    callback(source ? { video: source, audio: 'none' } : { video: null, audio: null });
-  } catch (error) {
-    console.error('Display capture source preparation failed:', error);
-    callback({ video: null, audio: null });
-  }
-}
-
 function handleTerminationSignal() {
   if (quitting) return;
   quitting = true;
   Promise.resolve(window?.webContents.executeJavaScript('window.__aivudaFinalizeActiveRecordingBeforeClose?.()'))
     .catch(() => {})
+    .finally(() => recording.stop())
     .finally(() => control?.stop())
     .finally(() => services?.stop())
     .finally(() => app.quit());
@@ -176,7 +179,6 @@ app.whenReady().then(async () => {
     services.startMcp(endpoints.control);
     services.startPackageMcps();
     createApplicationMenu();
-    session.defaultSession.setDisplayMediaRequestHandler(captureMainWindowForDisplayMedia);
     ipcMain.handle('control:pages', () => fixed);
     ipcMain.handle('control:resolve', (_, id, context) => {
       const page = resolvePage(id, endpoints, context);
@@ -216,16 +218,21 @@ app.whenReady().then(async () => {
     ipcMain.handle('aivuda-shell:prepare-window-recording', async () => {
       if (!window || window.isDestroyed()) return { ok: false, error: 'Main window is not available.' };
       const sources = await desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 0, height: 0 }, fetchWindowIcons: false });
-      const source = sources.find((entry) => entry.name === window.getTitle()) || sources[0];
+      const preferredSourceId = window.getMediaSourceId();
+      const source = sources.find((entry) => entry.id === preferredSourceId) || sources.find((entry) => entry.name === window.getTitle());
       if (!source) return { ok: false, error: 'No capturable window source was found.' };
-      const dir = path.join(app.getPath('videos'), 'ACEswarm');
-      fs.mkdirSync(dir, { recursive: true });
-      const outputPath = path.join(dir, `aceswarm-${new Date().toISOString().replaceAll(':', '-')}.webm`);
+      const dir = recording.getRecordingsDir();
+      const outputPath = recording.createRecordingOutputPath();
       return { ok: true, sourceId: source.id, outputPath, recordingsDir: dir };
     });
     ipcMain.handle('aivuda-shell:save-recording-file', (_, payload) => { try { if (!payload?.outputPath || !Array.isArray(payload.buffer)) throw new Error('Invalid recording payload'); fs.mkdirSync(path.dirname(payload.outputPath), { recursive: true }); fs.writeFileSync(payload.outputPath, Buffer.from(payload.buffer)); return { ok: true, outputPath: payload.outputPath }; } catch (error) { return { ok: false, error: error.message }; } });
-    for (const name of ['start-ffmpeg-window-recording', 'start-ffmpeg-x11-recording']) ipcMain.handle(`aivuda-shell:${name}`, () => ({ ok: false, error: 'FFmpeg recording is not available in ACEswarm yet.' }));
-    for (const name of ['pause-ffmpeg-window-recording', 'resume-ffmpeg-window-recording', 'stop-ffmpeg-window-recording']) ipcMain.handle(`aivuda-shell:${name}`, () => ({ ok: false, error: 'No active FFmpeg recording.' }));
+    for (const [name, method] of Object.entries({
+      'start-ffmpeg-window-recording': 'startWindow', 'start-ffmpeg-x11-recording': 'startX11',
+      'pause-ffmpeg-window-recording': 'pause', 'resume-ffmpeg-window-recording': 'resume', 'stop-ffmpeg-window-recording': 'stop',
+    })) ipcMain.handle(`aivuda-shell:${name}`, async (event) => {
+      if (event.sender !== window?.webContents) return { ok: false, error: 'Only the desktop can record.' };
+      try { return await recording[method](); } catch (error) { return { ok: false, error: error.message }; }
+    });
     createWindow();
     control.setBootstrap('running');
     provision({ osUrl: endpoints.osApi, storeUrl: endpoints.store, storeApiUrl: endpoints.storeApi, configPath: path.join(app.isPackaged ? process.resourcesPath : path.resolve(__dirname, '..', 'resources'), 'seed-apps', 'aceswarm-config-export.json') })
@@ -245,6 +252,7 @@ app.on('before-quit', (event) => {
   quitting = true;
   Promise.resolve(window?.webContents.executeJavaScript('window.__aivudaFinalizeActiveRecordingBeforeClose?.()'))
     .catch(() => {})
+    .finally(() => recording.stop())
     .finally(() => control?.stop())
     .finally(() => services.stop())
     .finally(() => app.quit());

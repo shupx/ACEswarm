@@ -4,6 +4,7 @@ const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
 const net = require('node:net');
+const { execFileSync, spawn } = require('node:child_process');
 const { _electron: electron } = require('playwright');
 
 const root = path.resolve(__dirname, '..');
@@ -12,6 +13,7 @@ const screenshots = path.join(root, '.smoke', 'desktop');
 fs.mkdirSync(screenshots, { recursive: true });
 let application;
 let server;
+let windowManager;
 const errors = [];
 
 async function gatewayPort() {
@@ -43,8 +45,9 @@ async function launch() {
     timeout: 90000,
   });
   const page = await application.firstWindow({ timeout: 90000 });
+  await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1280, 820));
   page.on('pageerror', (error) => { errors.push(error.message); console.error('Renderer error:', error); });
-  await page.waitForFunction(() => !isRestoringShellState && document.querySelector('#dock .dock-item[data-app-url]'), { timeout: 30000 });
+  await page.waitForFunction(() => typeof isRestoringShellState !== 'undefined' && !isRestoringShellState && document.querySelector('#dock .dock-item[data-app-url]'), { timeout: 30000 });
   return page;
 }
 
@@ -56,6 +59,38 @@ async function openPage(page, url) {
   await page.locator('#new-tab').click();
   await page.locator('#open-page-url').fill(url);
   await page.locator('#open-page-form button[type=submit]').click();
+}
+
+async function checkRecording(page, mode) {
+  await page.evaluate(() => { screenRecordDetailsExpanded = true; renderScreenRecordBar(); });
+  await page.locator('[data-screen-record-mode="' + mode + '"]').click();
+  await page.locator('[data-start-screen-record]').click();
+  await page.waitForFunction(() => screenRecordStatus === 'recording' || screenRecordStatus === 'error', { timeout: 15000 });
+  assert.equal(await page.evaluate(() => screenRecordStatus), 'recording', await page.evaluate(() => screenRecordStatusText));
+  await page.waitForFunction(() => screenRecordElapsedMs >= 700);
+  await page.locator('[data-pause-screen-record]').click();
+  await page.waitForFunction(() => screenRecordStatus === 'paused' || screenRecordStatus === 'error');
+  assert.equal(await page.evaluate(() => screenRecordStatus), 'paused', await page.evaluate(() => screenRecordStatusText));
+  await page.locator('[data-expand-screen-record]').click();
+  assert.equal(await page.locator('[data-screen-record-mode="native"]').isDisabled(), true);
+  await page.locator('[data-pause-screen-record]').click();
+  await page.waitForFunction(() => screenRecordStatus === 'recording');
+  await page.waitForFunction(() => screenRecordElapsedMs >= 1400);
+  await page.locator('[data-stop-screen-record]').click();
+  await page.waitForFunction(() => screenRecordStatus === 'saved' || screenRecordStatus === 'error', { timeout: 15000 });
+  assert.equal(await page.evaluate(() => screenRecordStatus), 'saved', await page.evaluate(() => screenRecordStatusText));
+  const file = await page.evaluate(() => screenRecorderLastSavedPath);
+  assert.ok(fs.statSync(file).size > 1000);
+  const metadata = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-count_frames', '-show_streams', '-of', 'json', file], { encoding: 'utf8' }));
+  const video = metadata.streams.find((stream) => stream.codec_type === 'video');
+  assert.ok(video.width > 600 && video.height > 300 && Number(video.nb_read_frames) > 5);
+  const frame = execFileSync('ffmpeg', ['-v', 'error', '-i', file, '-frames:v', '1', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'], { maxBuffer: 20 * 1024 * 1024 });
+  const shades = new Set();
+  for (let i = 0; i < frame.length; i += 101) shades.add(frame[i]);
+  assert.ok(shades.size > 50, 'recorded frame must contain rendered UI, not a blank image');
+  fs.copyFileSync(file, path.join(screenshots, 'recording-' + mode + path.extname(file)));
+  if (mode === 'ffmpeg') execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', file, '-frames:v', '1', path.join(screenshots, 'recording-preview.png')]);
+  console.log('PASS: ' + mode + ' start, pause, resume, stop and decodable nonblank video (' + video.width + 'x' + video.height + ')');
 }
 
 async function run() {
@@ -97,6 +132,15 @@ async function run() {
   assert.equal(await page.locator('#browser-toolbar').isVisible(), false);
   await page.locator('#' + robotId + ' .wb-max').click();
   assert.equal(await page.evaluate((id) => tabs.get(id).window.max, robotId), true);
+  assert.deepEqual(await page.locator('#' + robotId).boundingBox(), await page.evaluate(() => ({ x: 64, y: 0, width: innerWidth - 64, height: innerHeight })));
+  await page.screenshot({ path: path.join(screenshots, 'desktop-maximized-left-dock.png') });
+  await page.locator('#toggle-dock').click();
+  assert.equal(await page.evaluate(() => dockCollapsed), true);
+  const maximized = await page.locator('#' + robotId).boundingBox();
+  assert.equal(maximized.x, 24); assert.equal(maximized.width, 1256);
+  assert.equal(maximized.y, 0);
+  await page.screenshot({ path: path.join(screenshots, 'desktop-maximized-collapsed-dock.png') });
+  await page.locator('#toggle-dock').click();
   await page.locator('#' + robotId + ' .wb-max').click();
   assert.equal(await page.evaluate((id) => tabs.get(id).window.max, robotId), false);
 
@@ -145,6 +189,7 @@ async function run() {
   await page.locator('#tools-button').click();
   await page.locator('#tools-record').click();
   assert.equal(await page.evaluate(() => screenRecordBarVisible), true);
+  for (const mode of ['ffmpeg', 'native', 'ffmpeg-x11']) await checkRecording(page, mode);
   await page.evaluate(() => { screenRecordBarVisible = false; renderScreenRecordBar(); });
   await page.evaluate(() => {
     for (const tab of [...tabs.values()]) if (tab.id !== 'tab-2' && tab.id !== 'tab-1') closeTab(tab.id);
@@ -152,18 +197,20 @@ async function run() {
   });
   await count(page, 2);
   await page.screenshot({ path: path.join(screenshots, 'desktop-1280.png') });
-  await application.evaluate(({ BrowserWindow }) => { const window = BrowserWindow.getAllWindows()[0]; window.setSize(850, 550); });
+  await application.evaluate(({ BrowserWindow }) => { const window = BrowserWindow.getAllWindows()[0]; window.setContentSize(850, 550); });
   await page.waitForFunction(() => innerWidth === 850);
   await page.screenshot({ path: path.join(screenshots, 'desktop-850.png') });
-  await application.evaluate(({ BrowserWindow }) => { const window = BrowserWindow.getAllWindows()[0]; window.setMinimumSize(0, 0); window.setSize(390, 844); });
+  await application.evaluate(({ BrowserWindow }) => { const window = BrowserWindow.getAllWindows()[0]; window.setMinimumSize(0, 0); window.setContentSize(390, 844); });
   await page.waitForFunction(() => innerWidth === 390);
+  await page.waitForFunction(() => [...tabs.values()].every((tab) => tab.window.window.getBoundingClientRect().right <= innerWidth));
   await page.screenshot({ path: path.join(screenshots, 'desktop-390.png') });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
-  await application.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0].setSize(1280, 820); });
+  await application.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0].setContentSize(1280, 820); });
   await page.waitForFunction(() => innerWidth === 1280);
   await page.evaluate((id) => { tabs.get(id).window.resize(640, 400).move(180, 90); }, robotId);
   await page.evaluate(() => tabs.get('tab-1').window.maximize());
   await page.locator('#' + robotId + ' .wb-min').click();
+  await page.locator('#toggle-dock').click();
   await page.evaluate(() => writeShellState());
   await application.close();
   application = null;
@@ -177,6 +224,9 @@ async function run() {
   await count(page, 2);
   assert.equal(await page.evaluate((id) => tabs.get(id).minimized, robotId), true);
   assert.equal(await page.evaluate(() => favorites.length), 1);
+  assert.equal(await page.evaluate(() => screenRecordMode), 'ffmpeg-x11');
+  assert.equal(await page.evaluate(() => dockCollapsed), true);
+  await page.locator('#toggle-dock').click();
   assert.equal(await page.evaluate(() => tabs.get('tab-1').window.max), true);
   assert.notEqual(await page.evaluate(() => defaultUrl), saved.serviceOrigins.os);
   assert.equal(await page.evaluate(() => new URL(tabs.get('tab-1').url).origin), await page.evaluate(() => new URL(defaultUrl).origin));
@@ -211,11 +261,36 @@ async function run() {
   assert.equal(await page.evaluate(() => getActiveTab().appUrl), robotUrl);
   assert.equal(await page.locator('#browser-toolbar').isVisible(), true);
   console.log('PASS: legacy tabs and bookmarks migrate into desktop windows and Dock');
+  await page.evaluate(() => { screenRecordMode = 'native'; showScreenRecordBar(); });
+  await page.locator('[data-start-screen-record]').click();
+  await page.waitForFunction(() => screenRecordStatus === 'recording' || screenRecordStatus === 'error');
+  assert.equal(await page.evaluate(() => screenRecordStatus), 'recording');
+  await page.waitForFunction(() => screenRecordElapsedMs > 700);
+  const closingFile = await page.evaluate(() => screenRecorderOutputPath);
+  const exited = new Promise((resolve) => application.process().once('exit', resolve));
+  await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].close());
+  await exited;
+  application = null;
+  const closedVideo = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-count_frames', '-show_streams', '-of', 'json', closingFile], { encoding: 'utf8' }));
+  // A static native window may emit only a few frames in this sub-second clip.
+  assert.ok(Number(closedVideo.streams[0].nb_read_frames) > 0);
+  console.log('PASS: native window close flushes recording before destroying the renderer');
   assert.deepEqual(errors, []);
   console.log('Desktop UI tests completed. Screenshots:', screenshots);
 }
 
-run().catch(async (error) => {
+async function startTests() {
+  if (process.env.ACESWARM_TEST_WINDOW_MANAGER) {
+    windowManager = spawn(process.env.ACESWARM_TEST_WINDOW_MANAGER, ['--sm-disable'], { stdio: 'ignore' });
+    await new Promise((resolve, reject) => {
+      windowManager.once('error', reject);
+      setTimeout(resolve, 500);
+    });
+  }
+  await run();
+}
+
+startTests().catch(async (error) => {
   console.error(error); process.exitCode = 1;
   if (application) {
     const page = application.windows()[0];
@@ -224,5 +299,6 @@ run().catch(async (error) => {
 }).finally(async () => {
   if (application) await application.close().catch(() => {});
   if (server) await new Promise((resolve) => server.close(resolve));
+  if (windowManager) windowManager.kill('SIGTERM');
   fs.rmSync(temp, { recursive: true, force: true });
 });

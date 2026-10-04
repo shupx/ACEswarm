@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { appKey, windowBounds, remapUrl } = require('../electron/desktop-state');
+const { appKey, windowBounds, workArea, remapUrl } = require('../electron/desktop-state');
 
 test('application identity keeps paths and query but ignores in-page anchors', () => {
   assert.equal(appKey('https://robot.local/app#status'), appKey('https://robot.local/app#settings'));
@@ -11,10 +11,15 @@ test('application identity keeps paths and query but ignores in-page anchors', (
 test('restored windows remain between desktop bar and Dock after viewport shrinks', () => {
   for (const viewport of [{ width: 1280, height: 820 }, { width: 850, height: 550 }, { width: 390, height: 844 }]) {
     const bounds = windowBounds({ x: 4000, y: -100, width: 3000, height: 2000 }, viewport);
-    assert.ok(bounds.x >= 8 && bounds.y >= 48);
+    assert.ok(bounds.x >= 72 && bounds.y >= 48);
     assert.ok(bounds.x + bounds.width <= viewport.width - 8);
-    assert.ok(bounds.y + bounds.height <= viewport.height - 88);
+    assert.ok(bounds.y + bounds.height <= viewport.height - 8);
   }
+});
+
+test('maximized work area fills the display except the expanded or collapsed left Dock', () => {
+  assert.deepEqual(workArea({ width: 1280, height: 820 }, false, true), { x: 64, y: 0, width: 1216, height: 820 });
+  assert.deepEqual(workArea({ width: 1280, height: 820 }, true, true), { x: 24, y: 0, width: 1256, height: 820 });
 });
 
 test('invalid window geometry receives finite defaults', () => {
