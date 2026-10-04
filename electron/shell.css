@@ -76,6 +76,8 @@ button:focus-visible, input:focus-visible, .wb-control span:focus-visible { outl
 .dock-menu, .window-menu { position: fixed; z-index: 100001; max-height: calc(100vh - var(--panel-height) - 12px); }
 .tools-menu button, .dock-menu button, .window-menu > button { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: none; border: 0; padding: 9px 10px; font-size: 12px; color: #354746; border-radius: 4px; overflow-wrap: anywhere; }
 .tools-menu button svg, .window-menu > button svg { width: 16px; height: 16px; flex-shrink: 0; }
+.tools-menu button[role="menuitemcheckbox"]::after { content: ""; width: 6px; height: 6px; border-radius: 50%; margin-left: auto; flex-shrink: 0; background: transparent; }
+.tools-menu button[aria-checked="true"]::after { background: #157d71; }
 .tools-menu button:hover, .dock-menu button:hover, .window-menu button:hover { background: #edf3f1; }
 .tools-menu hr, .dock-menu hr, .window-menu hr { border: 0; border-top: 1px solid #e0e7e5; margin: 5px; }
 .window-zoom { display: flex; align-items: center; justify-content: space-between; padding: 3px 5px; }

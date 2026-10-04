@@ -404,6 +404,7 @@ function setPerformanceOverlayVisible(isVisible) {
   }
 
   performanceOverlayVisible = isVisible;
+  syncOverlayMenuState();
   writeShellState();
 }
 
@@ -707,6 +708,7 @@ function setScreenRecordBarVisible(isVisible) {
   }
 
   screenRecordBarVisible = isVisible;
+  syncOverlayMenuState();
   writeShellState();
 }
 
@@ -1427,7 +1429,8 @@ async function finalizeActiveRecordingBeforeClose() {
 window.__aivudaFinalizeActiveRecordingBeforeClose = finalizeActiveRecordingBeforeClose;
 
 function toggleScreenRecordBar() {
-  showScreenRecordBar();
+  setScreenRecordBarVisible(!screenRecordBarVisible);
+  renderScreenRecordBar();
 }
 
 function createTab(rawUrl, options = {}) {
@@ -1611,11 +1614,17 @@ async function navigateActiveTab(rawUrl) {
   writeShellState();
 }
 
+function syncOverlayMenuState() {
+  document.getElementById("tools-fps")?.setAttribute("aria-checked", String(performanceOverlayVisible));
+  document.getElementById("tools-record")?.setAttribute("aria-checked", String(screenRecordBarVisible));
+}
+
 function setToolsMenuOpen(isOpen) {
   if (!toolsButton || !toolsMenu) return;
   toolsMenu.hidden = !isOpen;
   toolsButton.setAttribute("aria-expanded", String(isOpen));
   if (isOpen) {
+    syncOverlayMenuState();
     setWindowMenuOpen(false);
     document.getElementById("dock-menu").hidden = true;
     const tab = getActiveTab();
@@ -1651,12 +1660,12 @@ for (const [id, action] of [
 ]) document.getElementById(id).onclick = () => { setToolsMenuOpen(false); action(); };
 document.getElementById("tools-fps")?.addEventListener("click", () => {
   setToolsMenuOpen(false);
-  setPerformanceOverlayVisible(true);
+  setPerformanceOverlayVisible(!performanceOverlayVisible);
   syncPerformanceOverlayForActiveTab();
 });
 document.getElementById("tools-record")?.addEventListener("click", () => {
   setToolsMenuOpen(false);
-  showScreenRecordBar();
+  toggleScreenRecordBar();
 });
 document.getElementById("tools-clear-data")?.addEventListener("click", async () => {
   setToolsMenuOpen(false);
@@ -1756,7 +1765,7 @@ window.aivudaShell.onTogglePerformanceOverlay(() => {
   syncPerformanceOverlayForActiveTab();
 });
 window.aivudaShell.onToggleScreenRecordBar(() => {
-  showScreenRecordBar();
+  toggleScreenRecordBar();
 });
 window.aivudaShell.onClearBrowserData(async () => {
   await window.aivudaShell.clearBrowserData();

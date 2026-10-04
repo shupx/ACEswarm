@@ -33,6 +33,8 @@ hosts AivudaOS, including its Online Store for downloads. Store Admin hosts the
 AivudaAppStore upload/publication management backend. Internal IDs remain unchanged.
 The native application menu is removed. System contains global recording,
 performance, fullscreen, browser data and quit commands, plus current-page actions.
+The performance and recording entries toggle visibility and show a dot when
+enabled. Hiding the recording panel keeps an active recording running.
 Each window's upper-right controls expose the address bar, pinning and a menu for
 page zoom, reload and developer tools. Zoom retains Chromium's shared browser
 session behavior. Main-process input handlers preserve shortcuts even in guests.
@@ -44,6 +46,9 @@ Pinned entries also appear as desktop shortcuts.
 
 The existing shell-state file stores bookmarks, application launch URLs, page
 URLs, window geometry, minimize/maximize state and address-bar visibility.
+The outer Electron window stores its normal size and maximized state separately
+in `window-state.json` under the Electron user-data directory. Restored dimensions
+are constrained by the primary display's work area and the window's minimum size.
 Legacy tab/bookmark state is accepted. Saved local service origins are remapped
 to the current endpoints at startup. Address entry from the trusted desktop
 authorizes HTTP(S) origins; guest navigation remains subject to the existing

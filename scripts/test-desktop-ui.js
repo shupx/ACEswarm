@@ -30,7 +30,7 @@ async function gatewayPort() {
   throw new Error('Could not allocate test gateway port');
 }
 
-async function launch() {
+async function launch(expectedWindow) {
   application = await electron.launch({
     args: [path.join(root, 'tests/fixtures/desktop-electron.cjs'), '--no-sandbox'],
     env: {
@@ -45,6 +45,15 @@ async function launch() {
     timeout: 90000,
   });
   const page = await application.firstWindow({ timeout: 90000 });
+  if (expectedWindow) {
+    const restored = await application.evaluate(({ BrowserWindow }) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      const { width, height } = window.getNormalBounds();
+      return { width, height, maximized: window.isMaximized() };
+    });
+    assert.deepEqual(restored, expectedWindow, 'ACEswarm main window size and maximized state restore');
+    await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].unmaximize());
+  }
   await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1280, 820));
   page.on('pageerror', (error) => { errors.push(error.message); console.error('Renderer error:', error); });
   await page.waitForFunction(() => typeof isRestoringShellState !== 'undefined' && !isRestoringShellState && document.querySelector('#dock .dock-item[data-app-url]'), { timeout: 30000 });
@@ -80,6 +89,17 @@ async function checkRecording(page, mode) {
   await page.locator('[data-start-screen-record]').click();
   await page.waitForFunction(() => screenRecordStatus === 'recording' || screenRecordStatus === 'error', { timeout: 15000 });
   assert.equal(await page.evaluate(() => screenRecordStatus), 'recording', await page.evaluate(() => screenRecordStatusText));
+  if (mode === 'ffmpeg') {
+    await page.locator('#tools-button').click();
+    assert.equal(await page.locator('#tools-record').getAttribute('aria-checked'), 'true');
+    await page.screenshot({ path: path.join(screenshots, 'desktop-overlay-menu.png') });
+    await page.locator('#tools-record').click();
+    assert.equal(await page.locator('[data-pause-screen-record]').count(), 0);
+    assert.equal(await page.evaluate(() => screenRecordStatus), 'recording');
+    await page.locator('#tools-button').click();
+    assert.equal(await page.locator('#tools-record').getAttribute('aria-checked'), 'false');
+    await page.locator('#tools-record').click();
+  }
   await page.waitForFunction(() => screenRecordElapsedMs >= 700);
   await page.locator('[data-pause-screen-record]').click();
   await page.waitForFunction(() => screenRecordStatus === 'paused' || screenRecordStatus === 'error');
@@ -262,9 +282,18 @@ async function run() {
   await count(page, 4);
   console.log('PASS: multiple windows share one application Dock icon');
 
+  for (const [id, state] of [['tools-fps', 'performanceOverlayVisible'], ['tools-record', 'screenRecordBarVisible']]) {
+    for (const visible of [true, false, true, false]) {
+      await page.locator('#tools-button').click();
+      assert.equal(await page.locator('#' + id).getAttribute('aria-checked'), String(!visible));
+      await page.locator('#' + id).click();
+      assert.equal(await page.evaluate((name) => window.eval(name), state), visible);
+      assert.equal(await page.locator('#' + id).getAttribute('aria-checked'), String(visible));
+    }
+  }
+  console.log('PASS: FPS and recording menu entries toggle visibility and checked indicators');
   await page.locator('#tools-button').click();
   await page.locator('#tools-record').click();
-  assert.equal(await page.evaluate(() => screenRecordBarVisible), true);
   for (const mode of ['ffmpeg', 'native', 'native', 'native', 'ffmpeg-x11']) await checkRecording(page, mode);
   await page.evaluate(() => { screenRecordBarVisible = false; renderScreenRecordBar(); });
   await page.evaluate(() => {
@@ -305,6 +334,12 @@ async function run() {
   await page.locator('#' + robotId + ' .wb-min').click();
   await page.locator('#toggle-dock').click();
   await page.evaluate(() => writeShellState());
+  await application.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows()[0];
+    window.setSize(1100, 720);
+    window.maximize();
+  });
+  await page.waitForFunction(() => innerWidth > 1100);
   await application.close();
   application = null;
   const saved = JSON.parse(fs.readFileSync(path.join(temp, 'profile', 'shell-state.json')));
@@ -313,7 +348,8 @@ async function run() {
   assert.deepEqual(saved.tabs.find((tab) => tab.id === robotId).bounds, { x: 180, y: 90, width: 640, height: 400 });
   assert.equal(saved.tabs.find((tab) => tab.id === robotId).minimized, true);
 
-  page = await launch();
+  page = await launch({ width: 1100, height: 720, maximized: true });
+  console.log('PASS: ACEswarm outer window restores normal size and maximized state');
   await count(page, 2);
   assert.equal(await page.evaluate((id) => tabs.get(id).minimized, robotId), true);
   assert.equal(await page.evaluate(() => favorites.length), 1);

@@ -1,6 +1,6 @@
 const path = require('node:path');
 const fs = require('node:fs');
-const { app, BrowserWindow, ipcMain, Menu, session, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, session, shell, screen } = require('electron');
 if (process.platform === 'linux') app.commandLine.appendSwitch('disable-accelerated-video-encode');
 const { workspace } = require('./services/workspace');
 const { resolveRuntime } = require('./services/runtime');
@@ -38,7 +38,7 @@ function handleDesktopShortcut(event, input) {
   if (!input.control && !input.meta) return;
   if (key === 'q' && !input.shift) { event.preventDefault(); app.quit(); return; }
   const commands = input.shift ? {
-    i: 'toggle-devtools', p: 'show-performance-overlay', r: 'toggle-screen-record-bar', backspace: 'clear-browser-data',
+    i: 'toggle-devtools', p: 'toggle-performance-overlay', r: 'toggle-screen-record-bar', backspace: 'clear-browser-data',
   } : { t: 'new-tab', w: 'close-current-tab', r: 'reload-current-tab', l: 'toggle-browser-chrome', '0': 'reset-zoom', '-': 'zoom-out' };
   const command = key === '+' || key === '=' ? 'zoom-in' : commands[key];
   if (command) {
@@ -76,12 +76,29 @@ function allowedUrl(rawUrl) {
 }
 
 function createWindow() {
+  const windowStatePath = path.join(app.getPath('userData'), 'window-state.json');
+  let savedWindow = {};
+  try { savedWindow = JSON.parse(fs.readFileSync(windowStatePath, 'utf8')) || {}; } catch (_) {}
+  const workArea = screen.getPrimaryDisplay().workAreaSize;
+  const restoreSize = (value, fallback, minimum, maximum) => Math.min(Math.max(minimum, maximum), Math.max(minimum, Number.isInteger(value) ? value : fallback));
   window = new BrowserWindow({
-    width: 1280, height: 820, minWidth: 850, minHeight: 550,
+    width: restoreSize(savedWindow.width, 1280, 850, workArea.width),
+    height: restoreSize(savedWindow.height, 820, 550, workArea.height),
+    minWidth: 850, minHeight: 550,
     title: 'ACEswarm', backgroundColor: '#101828',
     icon: path.join(__dirname, 'assets', 'aivuda_icon.png'),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), webviewTag: true, contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
+  const saveWindowSize = () => {
+    if (window.isDestroyed() || window.isFullScreen()) return;
+    const { width, height } = window.getNormalBounds();
+    try {
+      fs.mkdirSync(path.dirname(windowStatePath), { recursive: true });
+      fs.writeFileSync(windowStatePath, JSON.stringify({ width, height, maximized: window.isMaximized() }));
+    } catch (error) { console.error('ACEswarm window size:', error.message); }
+  };
+  if (savedWindow.maximized === true) window.maximize();
+  for (const event of ['resize', 'maximize', 'unmaximize', 'close']) window.on(event, saveWindowSize);
   window.loadFile(path.join(__dirname, 'shell.html'));
   window.setMenuBarVisibility(false);
   window.webContents.on('before-input-event', handleDesktopShortcut);
