@@ -198,6 +198,28 @@ async function run() {
   await page.evaluate(() => getActiveTab().webview.executeJavaScript('localStorage.removeItem("aivuda_ui_appstore_base_url"); location.reload()'));
   await page.waitForFunction(async (url) => await getActiveTab().webview.executeJavaScript('localStorage.getItem("aivuda_ui_appstore_base_url")') === url, defaultStore);
   console.log('PASS: internal AivudaOS receives the actual store URL before startup, refreshes managed defaults and preserves user URLs');
+  await page.waitForFunction(async (base) => {
+    return getActiveTab().webview.executeJavaScript(`fetch(${JSON.stringify(base + '/aivuda_app_store/store/index')}).then(r => r.json()).then(data => data.items.length > 0).catch(() => false)`);
+  }, defaultStore);
+  const storeDownload = await page.evaluate((base) => getActiveTab().webview.executeJavaScript(`(async () => {
+    const base = ${JSON.stringify(base)};
+    const index = await (await fetch(base + '/aivuda_app_store/store/index')).json();
+    const app = index.items[0];
+    const info = await (await fetch(base + '/aivuda_app_store/store/apps/' + encodeURIComponent(app.app_id) + '/versions/' + encodeURIComponent(app.version) + '/download-url')).json();
+    const url = new URL(info.url, base).href;
+    const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) throw new Error('Store download status: ' + response.status);
+    const bytes = await response.arrayBuffer();
+    const digest = await crypto.subtle.digest('SHA-256', bytes);
+    const hash = Array.from(new Uint8Array(digest), n => n.toString(16).padStart(2, '0')).join('');
+    return { url, size: bytes.byteLength, expectedSize: info.size, hash, expectedHash: info.sha256 };
+  })()`), defaultStore);
+  assert.equal(storeDownload.size, storeDownload.expectedSize);
+  assert.equal(storeDownload.hash, storeDownload.expectedHash);
+  const storePreflight = await fetch(storeDownload.url, { method: 'OPTIONS', headers: { Origin: await page.evaluate(() => new URL(defaultUrl).origin), 'Access-Control-Request-Method': 'GET', 'Access-Control-Request-Headers': 'Range' } });
+  assert.equal(storePreflight.status, 204);
+  assert.equal(storePreflight.headers.get('access-control-allow-origin'), '*');
+  console.log('PASS: AivudaOS browser fetches store metadata and package bytes across origins with matching SHA-256; file preflight works');
   await page.locator('#show-desktop').click();
   assert.equal(await page.evaluate(() => desktopVisible), true);
   assert.equal(await page.locator('#dock-layout').isVisible(), false);

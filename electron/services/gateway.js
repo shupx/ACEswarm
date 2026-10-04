@@ -7,6 +7,15 @@ function gatewayConfig({ port, osPort, adminPort = port + 1, uiRoot, storeGatewa
 http://127.0.0.1:${storeGatewayPort} {
   bind 127.0.0.1
   handle_path /aivuda_app_store/files/* {
+    header {
+      Access-Control-Allow-Origin "*"
+      Access-Control-Allow-Methods "GET, HEAD, OPTIONS"
+      Access-Control-Allow-Headers "Authorization, Content-Type, Range"
+      Access-Control-Expose-Headers "Content-Length, Content-Range, Content-Disposition"
+      Access-Control-Max-Age "86400"
+    }
+    @storeFilesOptions method OPTIONS
+    respond @storeFilesOptions 204
     root * ${JSON.stringify(storeFilesRoot)}
     file_server
   }

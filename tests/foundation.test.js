@@ -40,6 +40,14 @@ test('gateway only binds loopback and preserves import markers', () => {
   assert.match(config, /BEGIN AIVUDA APP IMPORTS/);
   assert.doesNotMatch(config, /https:|:443|:80\s/);
 });
+test('public store downloads support cross-origin reads and preflight', () => {
+  const config = gatewayConfig({ port: 12345, osPort: 12346, uiRoot: '/tmp/ui', storeGatewayPort: 12347, storePort: 12348, storeFilesRoot: '/tmp/files', storeUiRoot: '/tmp/store-ui' });
+  const files = config.slice(config.indexOf('handle_path /aivuda_app_store/files/*'), config.indexOf('@storeApi'));
+  assert.match(files, /Access-Control-Allow-Origin "\*"/);
+  assert.match(files, /Access-Control-Allow-Headers "Authorization, Content-Type, Range"/);
+  assert.match(files, /Access-Control-Expose-Headers "Content-Length, Content-Range, Content-Disposition"/);
+  assert.match(files, /respond @storeFilesOptions 204/);
+});
 test('gateway regenerates ports and retains installed app imports', () => {
   const { prepareGateway } = require('../electron/services/gateway');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'aceswarm-gateway-'));

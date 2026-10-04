@@ -57,6 +57,10 @@ local AppStore gateway before page scripts run. A stored marker allows managed
 defaults to follow port changes while preserving manually saved URLs. Remote
 pages and installed app UI pages do not receive this default.
 
+The AppStore gateway serves public package files at `/aivuda_app_store/files/*`
+with CORS headers and OPTIONS support, allowing AivudaOS on its separate gateway
+origin to fetch packages for Online Store installation and Config Center imports.
+
 The native application menu is removed. System contains global recording,
 performance, fullscreen, browser data and quit commands, plus current-page actions.
 The performance and recording entries toggle visibility and show a dot when
