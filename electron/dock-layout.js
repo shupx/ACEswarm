@@ -21,12 +21,20 @@ function syncPanelBodies() {
     for (const panel of group.panels) {
       const header = group.element.querySelector(`[data-tab-panel-id="${panel.id}"]`);
       if (header && !header.querySelector('.panel-drag-icon')) {
-        const icon = desktopIcon('grip-vertical');
+        const icon = desktopIcon('ellipsis');
         icon.classList.add('panel-drag-icon');
         header.append(icon);
         iconsAdded = true;
       }
-      if (header) header.title = compact ? `Drag ${panel.title}` : panel.title;
+      if (header) {
+        header.classList.toggle('compact-window-control', compact);
+        header.classList.toggle('panel-menu', compact);
+        header.title = compact ? 'Window controls; drag to move' : panel.title;
+        header.setAttribute('role', compact ? 'button' : 'tab');
+        header.setAttribute('aria-label', compact ? 'Window controls' : panel.title);
+        if (compact) header.setAttribute('aria-haspopup', 'menu');
+        else { header.removeAttribute('aria-haspopup'); header.removeAttribute('aria-expanded'); }
+      }
     }
   }
   if (iconsAdded) refreshDesktopIcons();
@@ -147,7 +155,35 @@ function initializeDesktopLayout() {
   root.addEventListener('drop', () => { stackEl.classList.remove('interacting'); schedulePanelLayout(); }, true);
   root.addEventListener('pointermove', () => { if (stackEl.classList.contains('interacting')) schedulePanelLayout(); });
   layoutApplicationWindows();
+  installCompactWindowControls(root);
   installWorkspaceSnapping(root);
+}
+
+function installCompactWindowControls(root) {
+  let gesture;
+  root.addEventListener('pointerdown', (event) => {
+    const control = event.target.closest('.compact-window-control');
+    gesture = control && event.button === 0 ? { id: control.dataset.tabPanelId, x: event.clientX, y: event.clientY, moved: false } : null;
+  }, true);
+  window.addEventListener('pointermove', (event) => {
+    if (gesture && Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) > 6) gesture.moved = true;
+  });
+  for (const type of ['pointercancel', 'blur']) window.addEventListener(type, () => { gesture = null; });
+  root.addEventListener('click', (event) => {
+    const control = event.target.closest('.compact-window-control');
+    if (!control) return;
+    event.stopPropagation();
+    const tab = tabs.get(control.dataset.tabPanelId);
+    if (tab && (!gesture || (gesture.id === tab.id && !gesture.moved))) openWindowMenu(tab);
+    gesture = null;
+  }, true);
+  root.addEventListener('keydown', (event) => {
+    const control = event.target.closest('.compact-window-control');
+    if (!control || !['Enter', ' '].includes(event.key)) return;
+    event.preventDefault(); event.stopPropagation();
+    const tab = tabs.get(control.dataset.tabPanelId);
+    if (tab) openWindowMenu(tab);
+  }, true);
 }
 
 function addApplicationPanel(tab, options = {}) {

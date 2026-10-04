@@ -92,8 +92,12 @@ async function openPage(page, url) {
   await page.locator('#open-page-form button[type=submit]').click();
 }
 
+function windowControl(page, id) {
+  return page.locator('[data-tab-panel-id="' + id + '"].compact-window-control, .dv-groupview:not(.single-panel) .panel-controls[data-panel-id="' + id + '"] .panel-menu');
+}
+
 async function windowCommand(page, id, command) {
-  await page.locator('.panel-controls[data-panel-id="' + id + '"] .panel-menu').click();
+  await windowControl(page, id).click();
   await page.locator('#window-' + command).click();
 }
 
@@ -108,6 +112,9 @@ async function checkGroupHeader(page, id, compact) {
     return compact ? rect.height === 0 && Math.abs(anchor.top - bounds.top) < 1 : rect.height === 28;
   }, { id, compact });
   assert.equal(await page.locator('.panel-controls[data-panel-id="' + id + '"] button').count(), 1);
+  assert.equal(await windowControl(page, id).count(), 1);
+  assert.equal(await windowControl(page, id).isVisible(), true);
+  if (compact) assert.equal(await page.locator('.panel-controls[data-panel-id="' + id + '"]').isVisible(), false);
 }
 
 async function checkRecording(page, mode) {
@@ -203,7 +210,8 @@ async function run() {
   assert.equal((await page.locator('#webview-stack').boundingBox()).width, 640);
   await waitForGuestLayout(page);
   await page.screenshot({ path: path.join(screenshots, 'desktop-single-left.png') });
-  await page.locator('.panel-controls[data-panel-id="' + initialId + '"] .panel-menu').click();
+  assert.equal(await page.locator('#window-menu').isVisible(), false, 'drag does not open the menu');
+  await windowControl(page, initialId).click();
   await page.locator('#workspace-right').click();
   assert.equal((await page.locator('#webview-stack').boundingBox()).x, 640);
   await windowCommand(page, initialId, 'max');
@@ -300,11 +308,11 @@ async function run() {
   await sendDesktopShortcut(page, '0');
   await page.waitForFunction(() => getActiveTab().webview.getZoomFactor() === 1);
   assert.equal(await page.locator('#browser-toolbar').isVisible(), false);
-  await page.locator('.panel-controls[data-panel-id="' + robotId + '"] .panel-menu').click();
+  await windowControl(page, robotId).click();
   assert.equal(await page.locator('#window-menu').isVisible(), true);
-  await page.locator('.panel-controls[data-panel-id="' + robotId + '"] .panel-menu').click();
+  await windowControl(page, robotId).click();
   assert.equal(await page.locator('#window-menu').isVisible(), false);
-  await page.locator('.panel-controls[data-panel-id="' + robotId + '"] .panel-menu').click();
+  await windowControl(page, robotId).click();
   await page.locator('#window-zoom-in').click();
   assert.equal(await page.locator('#window-zoom-reset').textContent(), '110%');
   assert.ok(Math.abs(await page.evaluate(() => getActiveTab().webview.getZoomFactor()) - 1.1) < 0.01);
@@ -398,7 +406,7 @@ async function run() {
   await page.locator('#dock button[data-app-url="' + robotUrl + '"]').click();
   await page.waitForFunction((id) => activeTabId === id, robotId);
   console.log('PASS: Dockview drag docking, split resize, stacking, floating and guest state preservation');
-  console.log('PASS: single-panel headers reclaim page height; compact grips, menus and floating headers work');
+  console.log('PASS: single-panel headers reclaim page height; one control supports click and drag; floating headers work');
 
   await page.evaluate(() => getActiveTab().webview.executeJavaScript('document.getElementById("popup").click()'));
   await count(page, 3);
