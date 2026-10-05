@@ -311,6 +311,11 @@ async function run() {
   const duplicateWindow = await page.evaluate(() => activeWindowId);
   await page.locator('.app-window[data-window-id="' + duplicateWindow + '"] button[aria-label="Close window"]').click();
   await page.evaluate(id => activateTab(id), robotId);
+  assert.equal(await page.locator('.app-window[data-window-id="' + firstWindow + '"] .window-drag-handle').count(), 1);
+  assert.equal(await page.locator('.app-window[data-window-id="' + firstWindow + '"] button[aria-label="Close window"]').count(), 1);
+  const header = await page.locator('.app-window[data-window-id="' + firstWindow + '"] .dv-tabs-and-actions-container').first().boundingBox();
+  const windowFrame = await page.locator('.app-window[data-window-id="' + firstWindow + '"]').boundingBox();
+  assert.ok(header.y - windowFrame.y <= 2, 'Dockview tabs share the outer window top row');
   const normalBounds = await page.evaluate(id => ({ ...appWindows.get(id).bounds }), firstWindow);
   await page.locator('.app-window[data-window-id="' + firstWindow + '"] button[aria-label="Maximize or restore window"]').click();
   const maxBounds = await page.locator('.app-window[data-window-id="' + firstWindow + '"]').boundingBox();
@@ -324,9 +329,9 @@ async function run() {
   await page.locator('#close-page-dialog').click();
   await page.locator('.app-window[data-window-id="' + firstWindow + '"] button[aria-label="Maximize or restore window"]').click();
   assert.deepEqual(await page.evaluate(id => appWindows.get(id).bounds, firstWindow), normalBounds);
-  const titlebar = await page.locator('.app-window[data-window-id="' + firstWindow + '"] .app-window-title').boundingBox();
-  await page.mouse.move(titlebar.x + 80, titlebar.y + 12); await page.mouse.down();
-  await page.mouse.move(titlebar.x + 180, titlebar.y + 72, { steps: 12 }); await page.mouse.up();
+  const grip = await page.locator('.app-window[data-window-id="' + firstWindow + '"] .window-drag-handle').boundingBox();
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2); await page.mouse.down();
+  await page.mouse.move(grip.x + grip.width / 2 + 100, grip.y + grip.height / 2 + 60, { steps: 12 }); await page.mouse.up();
   assert.ok(await page.evaluate(id => appWindows.get(id).bounds.x > 50, firstWindow));
   const handle = await page.locator('.outer-resize-handle[data-window-id="' + firstWindow + '"][data-edge="se"]').boundingBox();
   const widthBefore = await page.evaluate(id => appWindows.get(id).bounds.width, firstWindow);

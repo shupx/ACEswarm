@@ -41,8 +41,9 @@ their z-order. Moving tabs between windows, rearranging splits and minimizing
 windows do not recreate guests. Closing a tab releases its WebView; closing an
 outer window releases all of its tabs.
 
-The titlebar moves the outer window; edges and corners resize it. Double-clicking
-the titlebar toggles maximization. Dragging the titlebar to the display edges
+The Dockview tab row is the only window header. Its drag handle moves the outer
+window; edges and corners resize it. Double-clicking the handle toggles
+maximization. Dragging the handle to the display edges
 snaps the whole window to the left/right half or maximizes it. Normal bounds are
 retained for restoration. All non-minimized windows can remain visible together.
 The desktop background and shortcuts remain fixed underneath them.
@@ -73,8 +74,9 @@ The native application menu is removed. System contains global recording,
 performance, fullscreen, browser data and quit commands, plus current-page actions.
 The performance and recording entries toggle visibility and show a dot when
 enabled. Hiding the recording panel keeps an active recording running.
-Each window's upper-right controls expose the address bar, pinning and a menu for
-page zoom, reload and developer tools. Zoom retains Chromium's shared browser
+Each window's tab row contains one set of outer window controls. Each Dockview
+group retains a menu for address bar, pinning, page zoom, reload and developer
+tools. Zoom retains Chromium's shared browser
 session behavior. Main-process input handlers preserve shortcuts even in guests.
 Applications are identified by their launch URL (ignoring the fragment), separately
 from a tab's current navigation URL. Launching an application opens a new outer

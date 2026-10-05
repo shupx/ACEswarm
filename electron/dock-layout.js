@@ -10,6 +10,7 @@ function schedulePanelLayout() {
 // Guest nodes remain mounted in the desktop host when panels change windows.
 function syncPanelBodies() {
   const hostRect = stackEl.getBoundingClientRect();
+  for (const owner of appWindows.values()) syncWindowHeader(owner);
   for (const tab of tabs.values()) {
     const owner = appWindows.get(tab.windowId);
     const panel = owner?.layout.getPanel(tab.id);
@@ -26,7 +27,30 @@ function syncPanelBodies() {
   }
 }
 
-function panelActions(group) {
+function syncWindowHeader(owner) {
+  const groups = owner.layout.groups.filter(group => group.element.isConnected).map(group => ({ group, rect: group.element.getBoundingClientRect() }));
+  if (!groups.length) return;
+  const top = Math.min(...groups.map(item => item.rect.top));
+  const firstRow = groups.filter(item => item.rect.top <= top + 2);
+  const left = firstRow.reduce((a, b) => a.rect.left <= b.rect.left ? a : b).group;
+  const right = firstRow.reduce((a, b) => a.rect.right >= b.rect.right ? a : b).group;
+  const gripSlot = owner.gripSlots.get(left);
+  const controlSlot = owner.controlSlots.get(right);
+  if (gripSlot && owner.grip.parentElement !== gripSlot) gripSlot.append(owner.grip);
+  if (controlSlot && owner.controls.parentElement !== controlSlot) controlSlot.append(owner.controls);
+}
+
+function windowGrip(group, owner) {
+  const element = document.createElement('div');
+  element.className = 'window-grip-slot';
+  return {
+    element,
+    init() { owner.gripSlots.set(group, element); schedulePanelLayout(); },
+    dispose() { owner.gripSlots.delete(group); schedulePanelLayout(); },
+  };
+}
+
+function panelActions(group, owner) {
   const element = document.createElement('div');
   element.className = 'panel-controls';
   const disposables = [];
@@ -55,8 +79,8 @@ function panelActions(group) {
   };
   return {
     element,
-    init() { disposables.push(group.api.onDidActivePanelChange(sync)); sync(); refreshDesktopIcons(); },
-    dispose() { disposables.forEach((item) => item.dispose()); },
+    init() { owner.controlSlots.set(group, element); disposables.push(group.api.onDidActivePanelChange(sync)); sync(); refreshDesktopIcons(); },
+    dispose() { owner.controlSlots.delete(group); disposables.forEach((item) => item.dispose()); schedulePanelLayout(); },
   };
 }
 
@@ -78,7 +102,8 @@ function initializeWindowLayout(owner) {
         dispose() { observer.disconnect(); },
       };
     },
-    createRightHeaderActionComponent: panelActions,
+    createPrefixHeaderActionComponent: group => windowGrip(group, owner),
+    createRightHeaderActionComponent: group => panelActions(group, owner),
   });
   layout.onDidActivePanelChange(panel => {
     if (layoutMutation || !panel || !tabs.has(panel.id)) return;

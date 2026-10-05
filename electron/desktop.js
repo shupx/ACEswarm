@@ -246,7 +246,7 @@ function openWindowMenu(tab) {
   const select = document.getElementById('window-target');
   select.replaceChildren();
   for (const owner of appWindows.values()) {
-    const option = new Option(owner.titleElement.textContent, owner.id); option.selected = owner.id === tab.windowId; select.append(option);
+    const option = new Option(tabs.get(owner.layout.activePanel?.id)?.title || 'Window', owner.id); option.selected = owner.id === tab.windowId; select.append(option);
   }
   select.append(new Option('New window…', 'new'));
   select.onchange = () => { const id = select.value; setWindowMenuOpen(false); moveTabToWindow(tab, id === 'new' ? undefined : id); };

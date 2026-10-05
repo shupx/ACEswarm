@@ -28,34 +28,34 @@ function createApplicationWindow(options = {}) {
   const frame = document.createElement('section');
   frame.className = 'app-window'; frame.dataset.windowId = id;
   frame.setAttribute('aria-label', 'Application window');
-  const titlebar = document.createElement('header'); titlebar.className = 'app-window-titlebar';
-  const title = document.createElement('span'); title.className = 'app-window-title';
-  titlebar.append(title);
+  const grip = document.createElement('button');
+  grip.className = 'window-drag-handle'; grip.title = 'Drag window'; grip.setAttribute('aria-label', 'Drag window');
+  grip.append(desktopIcon('grip-vertical'));
+  const controls = document.createElement('div'); controls.className = 'window-controls';
   const buttons = [
-    ['plus', 'Open tab', () => showOpenPageDialog(owner.id)],
-    ['ellipsis', 'Window controls', () => openWindowMenu(tabs.get(owner.layout.activePanel?.id))],
-    ['minus', 'Minimize window', () => minimizeOuterWindow(owner)],
-    ['maximize-2', 'Maximize or restore window', () => toggleOuterWindowMaximized(owner)],
+    ['plus', 'Open tab', () => showOpenPageDialog(owner.id), 'optional'],
+    ['minus', 'Minimize window', () => minimizeOuterWindow(owner), 'optional'],
+    ['maximize-2', 'Maximize or restore window', () => toggleOuterWindowMaximized(owner), 'optional'],
     ['x', 'Close window', () => closeOuterWindow(owner)],
   ];
-  for (const [icon, label, action] of buttons) {
-    const button = document.createElement('button'); button.className = 'icon-button'; button.title = label; button.setAttribute('aria-label', label);
+  for (const [icon, label, action, responsive] of buttons) {
+    const button = document.createElement('button'); button.className = `icon-button ${responsive || ''}`; button.title = label; button.setAttribute('aria-label', label);
     button.append(desktopIcon(icon));
     button.onpointerdown = event => event.stopPropagation();
     button.onclick = event => { event.stopPropagation(); activateWindow(owner.id); action(); };
-    titlebar.append(button);
+    controls.append(button);
   }
   const root = document.createElement('div'); root.className = 'dock-layout';
-  frame.append(titlebar, root); stackEl.append(frame);
-  Object.assign(owner, { frame, root, titleElement: title, handles: [] });
+  frame.append(root); stackEl.append(frame);
+  Object.assign(owner, { frame, root, grip, controls, gripSlots: new Map(), controlSlots: new Map(), handles: [] });
   initializeWindowLayout(owner);
   for (const edge of ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']) {
     const handle = document.createElement('div'); handle.className = 'outer-resize-handle'; handle.dataset.edge = edge; handle.dataset.windowId = id;
     stackEl.append(handle); owner.handles.push(handle);
     handle.onpointerdown = event => startOuterWindowGesture(event, owner, edge);
   }
-  titlebar.onpointerdown = event => { if (!event.target.closest('button')) startOuterWindowGesture(event, owner); };
-  titlebar.ondblclick = event => { if (!event.target.closest('button')) toggleOuterWindowMaximized(owner); };
+  grip.onpointerdown = event => startOuterWindowGesture(event, owner);
+  grip.ondblclick = event => { event.stopPropagation(); toggleOuterWindowMaximized(owner); };
   frame.addEventListener('pointerdown', () => activateWindow(owner.id), true);
   installWindowTabTransfer(owner);
   refreshDesktopIcons(); layoutApplicationWindows();
@@ -140,9 +140,8 @@ function layoutOuterWindows() {
     owner.frame.hidden = !visible;
     owner.frame.classList.toggle('active', activeWindowId === owner.id && !desktopVisible);
     Object.assign(owner.frame.style, { left: bounds.x + 'px', top: bounds.y + 'px', width: bounds.width + 'px', height: bounds.height + 'px', zIndex: String(owner.zIndex * 10) });
-    owner.layout.layout(Math.max(1, bounds.width - 2), Math.max(1, bounds.height - 30));
+    owner.layout.layout(Math.max(1, bounds.width - 2), Math.max(1, bounds.height - 2));
     const title = tabs.get(owner.layout.activePanel?.id)?.title || 'Window';
-    owner.titleElement.textContent = title;
     owner.frame.setAttribute('aria-label', title);
     for (const handle of owner.handles) {
       const edge = handle.dataset.edge;
