@@ -48,11 +48,11 @@ retained for restoration. All non-minimized windows can remain visible together.
 The desktop background and shortcuts remain fixed underneath them.
 
 Show desktop temporarily hides all windows without altering their inner layouts
-or minimized flags. Clicking it again restores them. The top taskbar contains one
-entry per outer window; clicking an entry restores and raises that window.
-Applications remains beside System on the left. The collapsible top panel's
-48/28-pixel height is reserved for maximized and snapped windows. Taskbar labels
-remain visible in both modes and scroll horizontally when necessary.
+or minimized flags. Clicking it again restores them. The compact bottom taskbar
+contains one entry per outer window; clicking an entry restores and raises that
+window. Applications remains beside System on the left. The bottom 28 pixels are
+reserved for the taskbar, including Show desktop and Open page. Taskbar labels
+scroll horizontally when necessary.
 
 Applications contains an expandable All list of installed apps with static UI
 entrypoints, obtained through the authenticated local AivudaOS API, followed by

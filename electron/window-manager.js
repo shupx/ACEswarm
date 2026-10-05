@@ -133,14 +133,13 @@ function displayedWindowBounds(owner) {
 }
 
 function layoutOuterWindows() {
-  const top = dockCollapsed ? 28 : 48;
-  Object.assign(stackEl.style, { top: top + 'px', left: '0px', right: '0px', bottom: '0px', width: 'auto', height: 'auto' });
+  Object.assign(stackEl.style, { top: '0px', left: '0px', right: '0px', bottom: '28px', width: 'auto', height: 'auto' });
   for (const owner of appWindows.values()) {
     const bounds = displayedWindowBounds(owner);
     const visible = !desktopVisible && !owner.minimized;
     owner.frame.hidden = !visible;
     owner.frame.classList.toggle('active', activeWindowId === owner.id && !desktopVisible);
-    Object.assign(owner.frame.style, { left: bounds.x + 'px', top: (bounds.y - top) + 'px', width: bounds.width + 'px', height: bounds.height + 'px', zIndex: String(owner.zIndex * 10) });
+    Object.assign(owner.frame.style, { left: bounds.x + 'px', top: bounds.y + 'px', width: bounds.width + 'px', height: bounds.height + 'px', zIndex: String(owner.zIndex * 10) });
     owner.layout.layout(Math.max(1, bounds.width - 2), Math.max(1, bounds.height - 30));
     const title = tabs.get(owner.layout.activePanel?.id)?.title || 'Window';
     owner.titleElement.textContent = title;
@@ -151,7 +150,7 @@ function layoutOuterWindows() {
       handle.hidden = !visible || owner.maximized || Boolean(owner.region);
       Object.assign(handle.style, {
         left: (bounds.x + (edge.includes('e') ? bounds.width - 5 : -3)) + 'px',
-        top: (bounds.y - top + (edge.includes('s') ? bounds.height - 5 : -3)) + 'px',
+        top: (bounds.y + (edge.includes('s') ? bounds.height - 5 : -3)) + 'px',
         width: (corner || edge === 'e' || edge === 'w' ? 8 : bounds.width + 6) + 'px',
         height: (corner || edge === 'n' || edge === 's' ? 8 : bounds.height + 6) + 'px',
         zIndex: String(owner.zIndex * 10 + 3), cursor: edge + '-resize',
@@ -200,10 +199,9 @@ function startOuterWindowGesture(event, owner, edge = '') {
   const finish = current => {
     controller.abort(); stackEl.classList.remove('interacting');
     if (changed && !edge && current.type === 'pointerup') {
-      const top = dockCollapsed ? 28 : 48;
       if (current.clientX <= 20) setOuterWindowRegion(owner, 'left');
       else if (current.clientX >= innerWidth - 20) setOuterWindowRegion(owner, 'right');
-      else if (current.clientY <= top + 10) setOuterWindowRegion(owner, 'full');
+      else if (current.clientY <= 10) setOuterWindowRegion(owner, 'full');
     }
     layoutApplicationWindows(); renderDesktop(); writeShellState();
   };
@@ -238,7 +236,7 @@ function renderWindowTasks(items) {
       setToolsMenuOpen(false); setWindowMenuOpen(false);
       menu.hidden = false;
       menu.style.left = Math.max(8, Math.min(event.clientX, innerWidth - menu.offsetWidth - 8)) + 'px';
-      menu.style.top = (dockCollapsed ? 32 : 52) + 'px';
+      menu.style.top = Math.max(8, innerHeight - 28 - menu.offsetHeight - 5) + 'px';
     };
     items.append(button);
   }
@@ -293,7 +291,7 @@ window.addEventListener('pointerup', event => {
   if (!drag || Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < 8) return;
   const drop = tabDropTarget(event.clientX, event.clientY);
   const target = drop.owner;
-  const background = !target && event.clientY > (dockCollapsed ? 28 : 48) && !document.elementFromPoint(event.clientX, event.clientY)?.closest('.desktop-bar, .window-menu, .dock-menu');
+  const background = !target && event.clientY < innerHeight - 28 && !document.elementFromPoint(event.clientX, event.clientY)?.closest('.desktop-bar, .window-menu, .dock-menu');
   if (background) drop.placement = { bounds: { x: event.clientX - 120, y: event.clientY - 14 } };
   if (target?.id === drag.source || drag.handled) return;
   if (target || background) requestAnimationFrame(() => {

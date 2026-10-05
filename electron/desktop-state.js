@@ -4,11 +4,11 @@
     try { const url = new URL(rawUrl); url.hash = ""; return url.toString(); }
     catch { return String(rawUrl || ""); }
   }
-  function workArea(viewport, collapsed = false, maximized = false) {
-    const panelHeight = collapsed ? 28 : 48;
+  function workArea(viewport, _collapsed = false, maximized = false) {
+    const panelHeight = 28;
     const x = maximized ? 0 : 8;
-    const y = panelHeight + (maximized ? 0 : 8);
-    return { x, y, width: Math.max(1, viewport.width - x - (maximized ? 0 : 8)), height: Math.max(1, viewport.height - y - (maximized ? 0 : 8)) };
+    const y = maximized ? 0 : 8;
+    return { x, y, width: Math.max(1, viewport.width - x - (maximized ? 0 : 8)), height: Math.max(1, viewport.height - panelHeight - y - (maximized ? 0 : 8)) };
   }
   function windowBounds(raw = {}, viewport = { width: 1280, height: 820 }, index = 0, collapsed = false) {
     raw = raw && typeof raw === "object" ? raw : {};
@@ -21,7 +21,7 @@
     return {
       width, height,
       x: Math.max(area.x, Math.min(area.x + area.width - width, finite(raw.x, 130 + (index % 5) * 24))),
-      y: Math.max(area.y, Math.min(area.y + area.height - height, finite(raw.y, 66 + (index % 5) * 24))),
+      y: Math.max(area.y, Math.min(area.y + area.height - height, finite(raw.y, 38 + (index % 5) * 24))),
     };
   }
   function remapUrl(rawUrl, previous = {}, current = {}) {

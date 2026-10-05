@@ -140,7 +140,7 @@ npm run smoke
 
 The desktop integration test launches the actual Electron main process and local
 services using a temporary browser profile and workspace. It checks page loading,
-application favorites, collapsed window tasks, independent outer windows,
+application favorites, compact bottom window tasks, independent outer windows,
 window movement/resizing/minimization/maximization, nested splits and splitter
 resizing inside windows, tab transfers via the taskbar and content edges,
 tab tear-off onto the desktop, preserved guest instances, version-3 session

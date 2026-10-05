@@ -13,7 +13,7 @@ const toolsMenu = document.getElementById("tools-menu");
 let defaultUrl = "http://127.0.0.1:80";
 let storeUrl = "";
 let serviceOrigins = {};
-let dockCollapsed = false;
+const dockCollapsed = true;
 let desktopVisible = false;
 let desktopActiveTabId = null;
 let favorites = [];
@@ -1815,7 +1815,6 @@ window.aivudaShell.getStartup().then(startup => {
     if (favorite.favicon) favorite.favicon = remap(favorite.favicon);
   }
   defaultScreenRecordingsDir = typeof startup.recordingsDir === 'string' ? startup.recordingsDir : '';
-  dockCollapsed = raw.dockCollapsed === true;
   const saved = normalizeSavedShellState(startup.savedState);
   if (saved) {
     favorites = saved.favorites;

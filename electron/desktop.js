@@ -133,8 +133,7 @@ function openDockMenu(event, entry) {
   menu.style.left = Math.max(8, Math.min(event.clientX, innerWidth - menu.offsetWidth - 8)) + "px";
   setToolsMenuOpen(false);
   setWindowMenuOpen(false);
-  const panelHeight = dockCollapsed ? 28 : 48;
-  menu.style.top = Math.max(panelHeight + 4, Math.min(event.clientY + 8, innerHeight - menu.offsetHeight - 8)) + "px";
+  menu.style.top = Math.max(8, Math.min(event.clientY - menu.offsetHeight - 8, innerHeight - 28 - menu.offsetHeight - 5)) + "px";
   menu.querySelector("button")?.focus();
 }
 
@@ -146,12 +145,6 @@ function renderDesktop() {
   const shortcuts = document.getElementById("desktop-shortcuts");
   dock.replaceChildren();
   shortcuts.replaceChildren();
-  const toggle = document.getElementById("toggle-dock");
-  toggle.title = dockCollapsed ? "Expand panel" : "Collapse panel";
-  toggle.setAttribute("aria-label", toggle.title);
-  toggle.setAttribute("aria-expanded", String(!dockCollapsed));
-  toggle.replaceChildren(desktopIcon(dockCollapsed ? "chevron-down" : "chevron-up"));
-  toggle.onclick = () => { dockCollapsed = !dockCollapsed; layoutApplicationWindows(); renderDesktop(); writeShellState(); };
   const items = document.createElement("div");
   items.className = "dock-items";
   dock.append(items);
@@ -259,7 +252,7 @@ function openWindowMenu(tab) {
   select.onchange = () => { const id = select.value; setWindowMenuOpen(false); moveTabToWindow(tab, id === 'new' ? undefined : id); };
   const rect = tab.panel.group.element.querySelector(".panel-menu").getBoundingClientRect();
   menu.style.left = Math.max(8, Math.min(rect.right - menu.offsetWidth, innerWidth - menu.offsetWidth - 8)) + "px";
-  menu.style.top = Math.max(dockCollapsed ? 32 : 52, Math.min(rect.bottom + 4, innerHeight - menu.offsetHeight - 8)) + "px";
+  menu.style.top = Math.max(8, Math.min(rect.bottom + 4, innerHeight - 28 - menu.offsetHeight - 5)) + "px";
   menu.querySelector("button:not(:disabled)")?.focus();
 }
 

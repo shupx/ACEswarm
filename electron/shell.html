@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>ACEswarm</title><link rel="stylesheet" href="./shell.css" /></head>
 <body>
-  <main id="shell" class="shell">
+  <main id="shell" class="shell dock-collapsed">
     <header class="desktop-bar">
         <div class="tools-menu-wrap">
           <button id="tools-button" class="system-button" title="ACEswarm System" aria-label="System" aria-haspopup="menu" aria-expanded="false"><img src="./assets/aivuda_icon.png" alt="" /><span>System</span><i data-lucide="chevron-down"></i></button>
@@ -27,7 +27,6 @@
         <button id="applications-button" class="system-button" aria-haspopup="menu" aria-expanded="false"><i data-lucide="layout-grid"></i><span>Applications</span><i data-lucide="chevron-down"></i></button>
         <div id="applications-menu" class="tools-menu" role="menu" aria-label="Applications" hidden></div>
       </div>
-      <button id="toggle-dock" class="dock-toggle" title="Collapse panel" aria-label="Collapse panel" aria-expanded="true"><i data-lucide="chevron-up"></i></button>
       <nav id="dock" class="dock" aria-label="Window taskbar"></nav>
       <span id="window-count">Desktop</span>
       <div class="desktop-actions">
