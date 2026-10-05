@@ -7,50 +7,21 @@ function schedulePanelLayout() {
   layoutFrame = requestAnimationFrame(syncPanelBodies);
 }
 
-// Guest nodes stay in one permanent host: moving Dockview renderers must not
-// detach Electron webviews and recreate their guest processes.
+// Guest nodes remain mounted in the desktop host when panels change windows.
 function syncPanelBodies() {
-  if (!desktopLayout) return;
-  let iconsAdded = false;
-  for (const group of desktopLayout.groups) {
-    const compact = group.panels.length === 1 && group.api.location.type === 'grid';
-    if (group.element.classList.contains('single-panel') !== compact) {
-      group.element.classList.toggle('single-panel', compact);
-      group.relayout();
-    }
-    for (const panel of group.panels) {
-      const header = group.element.querySelector(`[data-tab-panel-id="${panel.id}"]`);
-      if (header && !header.querySelector('.panel-drag-icon')) {
-        const icon = desktopIcon('ellipsis');
-        icon.classList.add('panel-drag-icon');
-        header.append(icon);
-        iconsAdded = true;
-      }
-      if (header) {
-        header.classList.toggle('compact-window-control', compact);
-        header.classList.toggle('panel-menu', compact);
-        header.title = compact ? 'Window controls; drag to move' : panel.title;
-        header.setAttribute('role', compact ? 'button' : 'tab');
-        header.setAttribute('aria-label', compact ? 'Window controls' : panel.title);
-        if (compact) header.setAttribute('aria-haspopup', 'menu');
-        else { header.removeAttribute('aria-haspopup'); header.removeAttribute('aria-expanded'); }
-      }
-    }
-  }
-  if (iconsAdded) refreshDesktopIcons();
   const hostRect = stackEl.getBoundingClientRect();
   for (const tab of tabs.values()) {
-    const panel = desktops.get(tab.desktopId)?.layout?.getPanel(tab.id);
+    const owner = appWindows.get(tab.windowId);
+    const panel = owner?.layout.getPanel(tab.id);
     if (panel) tab.panel = panel;
-    const visible = tab.desktopId === currentDesktopId && !desktopVisible && !tab.minimized && panel?.api.isVisible && tab.anchor?.isConnected;
+    const visible = !desktopVisible && !owner?.minimized && panel?.api.isVisible && tab.anchor?.isConnected;
     tab.body.hidden = !visible;
     if (!visible) continue;
     const rect = tab.anchor.getBoundingClientRect();
-    const float = panel.group.element.closest('.dv-resize-container');
     Object.assign(tab.body.style, {
       left: `${rect.left - hostRect.left}px`, top: `${rect.top - hostRect.top}px`,
       width: `${rect.width}px`, height: `${rect.height}px`,
-      zIndex: float ? String((Number(getComputedStyle(float).zIndex) || 100) + 1) : '1',
+      zIndex: String(owner.zIndex * 10 + 1),
     });
   }
 }
@@ -89,39 +60,17 @@ function panelActions(group) {
   };
 }
 
-function togglePanelMaximized() {
-  const api = getActiveTab()?.panel?.api;
-  if (!api) return;
-  if (api.location.type === 'floating') api.group.api.moveTo({ position: 'right' });
-  if (api.isMaximized()) {
-    api.exitMaximized();
-    workspaceRegion = workspaceMaximizeRestore;
-  } else {
-    workspaceMaximizeRestore = workspaceRegion;
-    workspaceRegion = 'full';
-    layoutApplicationWindows();
-    api.maximize();
-  }
-  layoutApplicationWindows(); renderDesktop(); writeShellState();
-}
 
-function initializeDesktopLayout() {
-  if (desktopLayout) return;
-  const root = document.createElement('div');
-  root.id = 'dock-layout';
-  root.className = 'dock-layout';
-  root.desktopEvents = new AbortController();
-  stackEl.prepend(root);
+function initializeWindowLayout(owner) {
   const library = window['dockview-core'];
-  desktopLayout = library.createDockview(root, {
+  owner.events = new AbortController();
+  const layout = owner.layout = library.createDockview(owner.root, {
     theme: library.themeLight,
     dndStrategy: 'pointer',
-    floatingGroupBounds: 'boundedWithinViewport',
-    floatingGroupDragHandle: 'titlebar',
-    getTabContextMenuItems: () => ['float', 'maximize', 'separator', 'close', 'closeOthers'],
+    disableFloatingGroups: true,
+    getTabContextMenuItems: () => ['close', 'closeOthers'],
     createComponent({ id }) {
-      const element = document.createElement('div');
-      element.className = 'panel-anchor';
+      const element = document.createElement('div'); element.className = 'panel-anchor';
       const observer = new ResizeObserver(schedulePanelLayout);
       return {
         element,
@@ -131,185 +80,82 @@ function initializeDesktopLayout() {
     },
     createRightHeaderActionComponent: panelActions,
   });
-  const owner = currentDesktop();
-  owner.layout = desktopLayout;
-  owner.root = root;
-  const layout = desktopLayout;
-  desktopLayout.onDidActivePanelChange((panel) => {
-    if (layout !== desktopLayout || layoutMutation || desktopVisible || !panel || !tabs.has(panel.id)) return;
-    activeTabId = panel.id;
-    tabs.get(panel.id).panel = panel;
-    updateActiveClasses(); updateAddressFromActiveTab(); updateNavigationState();
-    syncPerformanceOverlayForActiveTab(); schedulePanelLayout(); writeShellState();
+  layout.onDidActivePanelChange(panel => {
+    if (layoutMutation || !panel || !tabs.has(panel.id)) return;
+    owner.activeTabId = panel.id; tabs.get(panel.id).panel = panel;
+    if (activeWindowId === owner.id && !desktopVisible && !owner.minimized) {
+      activeTabId = panel.id;
+      updateActiveClasses(); updateAddressFromActiveTab(); updateNavigationState(); syncPerformanceOverlayForActiveTab();
+    }
+    schedulePanelLayout(); writeShellState();
   });
-  desktopLayout.onDidRemovePanel((panel) => {
-    if (!layoutMutation && tabs.has(panel.id)) removeApplicationWindow(tabs.get(panel.id));
+  layout.onDidRemovePanel(panel => {
+    if (!layoutMutation) requestAnimationFrame(() => {
+      if (!layout.getPanel(panel.id) && tabs.has(panel.id)) removeApplicationWindow(tabs.get(panel.id));
+    });
   });
-  desktopLayout.onDidLayoutChange(() => {
-    schedulePanelLayout(); renderDesktop(); writeShellState();
+  layout.onDidLayoutChange(() => { schedulePanelLayout(); renderDesktop(); writeShellState(); });
+  layout.onWillDrop(event => {
+    const tab = tabs.get(event.getData()?.panelId);
+    if (!tab || tab.windowId === owner.id) return;
+    event.preventDefault();
+    if (windowTabDrag) windowTabDrag.handled = true;
+    const reference = event.group?.activePanel?.id;
+    const direction = event.position === 'center' ? 'within' : event.position;
+    requestAnimationFrame(() => moveTabToWindow(tab, owner.id, { reference, direction }));
   });
-  root.addEventListener('pointerdown', (event) => {
-    if (event.target.closest('.dv-tabs-and-actions-container, .dv-sash, .dv-floating-titlebar, .dv-resize-container')) {
+  owner.root.addEventListener('pointerdown', event => {
+    if (event.target.closest('.dv-tabs-and-actions-container, .dv-sash')) {
       stackEl.classList.add('interacting');
       setToolsMenuOpen(false);
       if (!event.target.closest('.panel-menu')) setWindowMenuOpen(false);
       document.getElementById('dock-menu').hidden = true;
     }
   }, true);
-  root.addEventListener('dragstart', () => stackEl.classList.add('interacting'), true);
-  root.addEventListener('dragend', () => { stackEl.classList.remove('interacting'); schedulePanelLayout(); }, true);
-  root.addEventListener('drop', () => { stackEl.classList.remove('interacting'); schedulePanelLayout(); }, true);
-  root.addEventListener('pointermove', () => { if (stackEl.classList.contains('interacting')) schedulePanelLayout(); });
-  layoutApplicationWindows();
-  installCompactWindowControls(root);
-  installWorkspaceSnapping(root);
-  installDesktopTransfer(root);
+  owner.root.addEventListener('pointermove', () => { if (stackEl.classList.contains('interacting')) schedulePanelLayout(); });
 }
 
-function installCompactWindowControls(root) {
-  let gesture;
-  root.addEventListener('pointerdown', (event) => {
-    const control = event.target.closest('.compact-window-control');
-    gesture = control && event.button === 0 ? { id: control.dataset.tabPanelId, x: event.clientX, y: event.clientY, moved: false } : null;
-  }, true);
-  window.addEventListener('pointermove', (event) => {
-    if (gesture && Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) > 6) gesture.moved = true;
-  }, { signal: root.desktopEvents.signal });
-  for (const type of ['pointercancel', 'blur']) window.addEventListener(type, () => { gesture = null; }, { signal: root.desktopEvents.signal });
-  root.addEventListener('click', (event) => {
-    const control = event.target.closest('.compact-window-control');
-    if (!control) return;
-    event.stopPropagation();
-    const tab = tabs.get(control.dataset.tabPanelId);
-    if (tab && (!gesture || (gesture.id === tab.id && !gesture.moved))) openWindowMenu(tab);
-    gesture = null;
-  }, true);
-  root.addEventListener('keydown', (event) => {
-    const control = event.target.closest('.compact-window-control');
-    if (!control || !['Enter', ' '].includes(event.key)) return;
-    event.preventDefault(); event.stopPropagation();
-    const tab = tabs.get(control.dataset.tabPanelId);
-    if (tab) openWindowMenu(tab);
-  }, true);
-}
-
-function addApplicationPanel(tab, options = {}) {
+function addApplicationPanel(tab) {
+  const owner = appWindows.get(tab.windowId);
   const placement = tab.placement || {};
-  const reference = desktopLayout.getPanel(placement.reference);
+  const reference = owner.layout.getPanel(placement.reference);
   const config = { id: tab.id, component: 'webpage', title: tab.title, renderer: 'always' };
-  if (workspaceRegion !== 'full' && desktopLayout.panels.length && !placement.reference && !placement.floating && !options.bounds) {
-    const direction = { left: 'right', right: 'left', top: 'below', bottom: 'above' }[workspaceRegion];
-    config.position = { referencePanel: desktopLayout.activePanel || desktopLayout.panels[0], direction };
-    workspaceRegion = 'full';
-    layoutApplicationWindows();
-  }
-  if (placement.floating) config.floating = placement.floating;
-  else if (reference) config.position = { referencePanel: reference, direction: placement.direction || 'within', index: placement.index };
-  else if (options.bounds) {
-    const bounds = desktopState.windowBounds(options.bounds, { width: innerWidth, height: innerHeight }, 0, dockCollapsed);
-    config.floating = { ...bounds, y: bounds.y - (dockCollapsed ? 28 : 48) };
-  }
-  tab.panel = desktopLayout.addPanel(config);
-  if (options.maximized && tab.panel.api.location.type === 'grid') tab.panel.api.maximize();
+  if (reference) config.position = { referencePanel: reference, direction: placement.direction || 'within', index: placement.index };
+  else if (owner.layout.panels.length) config.position = { referencePanel: owner.layout.activePanel || owner.layout.panels[0], direction: 'within' };
+  tab.panel = owner.layout.addPanel(config);
   schedulePanelLayout();
-}
-
-function rememberPanelPlacement(tab) {
-  const layout = desktops.get(tab.desktopId)?.layout;
-  const group = tab.panel?.group;
-  if (!group) return;
-  const rect = group.element.getBoundingClientRect();
-  tab.placement = group.api.location.type === 'floating'
-    ? { floating: { x: rect.x - stackEl.getBoundingClientRect().x, y: rect.y - stackEl.getBoundingClientRect().y, width: rect.width, height: rect.height } }
-    : { reference: group.panels.find((panel) => panel.id !== tab.id)?.id, index: group.panels.findIndex((panel) => panel.id === tab.id) };
-  if (group.api.location.type === 'grid' && !tab.placement.reference) {
-    for (const [direction, restoreDirection] of [['left', 'right'], ['right', 'left'], ['up', 'below'], ['down', 'above']]) {
-      const neighbor = layout.adjacentGroupInDirection(group, direction);
-      if (!neighbor?.panels.length) continue;
-      tab.placement = { reference: neighbor.panels[0].id, direction: restoreDirection };
-      break;
-    }
-  }
 }
 
 function detachApplicationPanel(tab) {
-  if (!tab.panel) return;
-  const layout = desktops.get(tab.desktopId)?.layout;
-  if (!layout?.getPanel(tab.id)) { tab.panel = null; tab.body.hidden = true; return; }
-  rememberPanelPlacement(tab);
+  const owner = appWindows.get(tab.windowId);
+  if (!tab.panel || !owner?.layout.getPanel(tab.id)) { tab.panel = null; return; }
   layoutMutation = true;
-  try { layout.removePanel(tab.panel); } finally { layoutMutation = false; tab.panel = null; }
-  tab.body.hidden = true;
-  schedulePanelLayout();
+  try { owner.layout.removePanel(tab.panel); } finally { layoutMutation = false; tab.panel = null; }
+  tab.body.hidden = true; schedulePanelLayout();
 }
 
+function togglePanelMaximized() { toggleOuterWindowMaximized(); }
 function floatOrDockPanel(tab) {
-  if (!tab?.panel) return;
-  workspaceRegion = 'full';
-  layoutApplicationWindows();
-  if (tab.panel.api.location.type === 'floating') tab.panel.group.api.moveTo({ position: 'right' });
-  else {
-    if (desktopLayout.hasMaximizedGroup()) desktopLayout.exitMaximizedGroup();
-    const bounds = desktopState.windowBounds({}, { width: innerWidth, height: innerHeight }, 0, dockCollapsed);
-    desktopLayout.addFloatingGroup(tab.panel, { ...bounds, y: bounds.y - (dockCollapsed ? 28 : 48) });
-  }
-  schedulePanelLayout();
+  const owner = getApplicationWindow(tab);
+  if (!owner) return;
+  owner.maximized = false; owner.region = null; activateWindow(owner.id); layoutApplicationWindows(); writeShellState();
 }
+function setWorkspaceRegion(region) { setOuterWindowRegion(getApplicationWindow(), region); }
 
-function setWorkspaceRegion(region) {
-  if (!getActiveTab()) return;
-  if (desktopLayout.panels.length === 1 && desktopLayout.panels[0].api.location.type === 'floating') {
-    desktopLayout.panels[0].group.api.moveTo({ position: 'right' });
-  }
-  workspaceRegion = region;
-  if (desktopLayout.hasMaximizedGroup()) desktopLayout.exitMaximizedGroup();
-  layoutApplicationWindows();
-  renderDesktop();
-  writeShellState();
-}
-
-function installWorkspaceSnapping(root) {
-  const preview = document.createElement('div');
-  preview.className = 'workspace-snap-preview';
-  root.snapPreview = preview;
-  preview.hidden = true;
-  shellEl.append(preview);
-  let drag;
-  let target;
-  root.addEventListener('pointerdown', (event) => {
-    if (!event.target.closest('.dv-tab, .dv-floating-titlebar') || event.target.closest('button, .dv-default-tab-action')) return;
-    if (desktopLayout.panels.length !== 1 || desktopLayout.panels[0].api.location.type !== 'grid') return;
-    drag = { x: event.clientX, y: event.clientY };
-  });
-  window.addEventListener('pointermove', (event) => {
-    if (!drag || Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < 12) return;
-    const top = dockCollapsed ? 28 : 48;
-    target = event.clientX <= 32 ? 'left' : event.clientX >= innerWidth - 32 ? 'right' : event.clientY <= top + 20 ? 'full' : null;
-    preview.hidden = !target;
-    if (target) {
-      const bounds = desktopState.workspaceBounds({ width: innerWidth, height: innerHeight }, dockCollapsed, target);
-      Object.assign(preview.style, { left: bounds.x + 'px', top: bounds.y + 'px', width: bounds.width + 'px', height: bounds.height + 'px' });
-    }
-  }, { signal: root.desktopEvents.signal });
-  window.addEventListener('pointerup', () => {
-    const region = target;
-    drag = null; target = null; preview.hidden = true;
-    if (region) requestAnimationFrame(() => setWorkspaceRegion(region));
-  }, { signal: root.desktopEvents.signal });
-  for (const event of ['pointercancel', 'blur']) window.addEventListener(event, () => { drag = null; target = null; preview.hidden = true; }, { signal: root.desktopEvents.signal });
-}
-
-function restoreDesktopLayout(layout) {
-  if (!layout || !desktopLayout) return;
-  const visible = [...tabs.values()].filter((tab) => tab.desktopId === currentDesktopId && !tab.minimized).map((tab) => tab.id).sort();
-  if (JSON.stringify(Object.keys(layout.panels || {}).sort()) !== JSON.stringify(visible) || layout.popoutGroups?.length) return;
+function restoreWindowLayout(owner, layout) {
+  if (!layout) return;
+  const ids = [...tabs.values()].filter(tab => tab.windowId === owner.id).map(tab => tab.id).sort();
+  if (JSON.stringify(Object.keys(layout.panels || {}).sort()) !== JSON.stringify(ids) || layout.popoutGroups?.length) return;
+  // Previous versions allowed internal floating groups. Flatten those groups
+  // rather than creating a second, incompatible layer of native floating panels.
+  if (layout.floatingGroups?.length) return;
   layoutMutation = true;
   try {
-    desktopLayout.fromJSON(layout, { reuseExistingPanels: true });
-    for (const tab of tabs.values()) if (tab.desktopId === currentDesktopId) tab.panel = desktopLayout.getPanel(tab.id) || null;
+    owner.layout.fromJSON(layout, { reuseExistingPanels: true });
+    for (const tab of tabs.values()) if (tab.windowId === owner.id) tab.panel = owner.layout.getPanel(tab.id) || null;
   } catch (error) {
-    console.warn('Could not restore desktop layout:', error);
-    desktopLayout.clear();
-    for (const tab of tabs.values()) if (tab.desktopId === currentDesktopId && !tab.minimized) addApplicationPanel(tab);
+    console.warn('Could not restore window layout:', error);
+    owner.layout.clear();
+    for (const tab of tabs.values()) if (tab.windowId === owner.id) addApplicationPanel(tab);
   } finally { layoutMutation = false; schedulePanelLayout(); }
 }

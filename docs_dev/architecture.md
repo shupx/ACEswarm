@@ -18,48 +18,47 @@ AivudaOS and AivudaAppStore remain independent distributions. ACEswarm launches 
 
 ## Desktop shell
 
-First launch shows Desktop 1 with Console and AppStore Admin shortcuts,
+First launch shows one fixed desktop with Console and AppStore Admin shortcuts,
 without opening any application windows. Subsequent launches restore the saved session.
 
-The Electron renderer uses plain JavaScript, Dockview Core for tab groups,
-nested splits and floating panels, and Lucide for controls. Tabs can be dragged
-to group edges to split or onto tab bars to merge; splitters resize both sides.
-Single docked panels use one subtle ellipsis control at the top right: click to
-open the window menu or drag to move/dock the panel, reserving
-no height for a tab bar. Groups with multiple panels and floating groups retain
-a compact 28-pixel tab bar. The window menu provides pinning, floating/docking,
-minimizing, maximizing, closing, page zoom and browser actions.
-Each application owns an independent WebView using the persistent browser session.
-WebViews stay mounted in permanent shell containers; Dockview content anchors
-drive their position, size, visibility and floating z-order. Moving a panel or
-minimizing it does not recreate its guest. Closing releases the WebView.
+The Electron renderer uses plain JavaScript, Dockview Core and Lucide controls.
+The desktop window manager owns outer windows: their bounds, stacking order,
+minimization, maximization and half-screen placement. Each outer window owns its
+own Dockview instance, which manages only that window's tabs and nested splits.
+Launching an application creates a new outer window, even when the same app is
+already open. The titlebar's plus control opens another tab in that window.
 
-Each virtual desktop owns a Dockview instance, layout, active window and desktop
-visibility state. The top desktop strip switches between them and provides a
-plus button to create a desktop. Drag a window tab or compact ellipsis onto a
-desktop button (or the plus button) to move it without recreating its WebView.
-The window menu also provides a desktop selector. Desktop context menus support
-renaming, moving all windows to another desktop before removal, and restoring
-minimized windows. At least one desktop remains.
+Drag tabs to group edges to split or onto tab bars to merge. Tabs can also move
+between windows by dropping onto another window's content, tab bar or taskbar
+entry. Cross-window edge drops split the destination group. A drop on the desktop
+background creates a new outer window. The tab menu offers a window selector as
+an alternative to dragging. Moving the last tab out closes the empty source window.
 
-Show desktop hides the current workspace without removing Dockview panels or
-changing minimized flags. Clicking it again restores the layout. Desktop visibility and the last active panel
-survive restart. A workspace may occupy the full desktop or either horizontal or
-vertical half; the unused area exposes desktop shortcuts and the background.
-A single docked window supports edge dragging with a placement preview. Opening
-a second page in a half-screen workspace fills the complementary half. Group
-maximization fills the desktop below the top panel and restores the previous region.
+Each page owns an independent WebView using the persistent browser session.
+WebViews stay mounted in permanent desktop host containers; Dockview anchors
+drive their position, size and visibility, while outer-window stacking determines
+their z-order. Moving tabs between windows, rearranging splits and minimizing
+windows do not recreate guests. Closing a tab releases its WebView; closing an
+outer window releases all of its tabs.
 
-The collapsible top panel places Applications beside System on the left, followed
-by the desktop strip, desktop actions and clock. Its expanded/collapsed height
-(48/28 pixels) is reserved by the window manager. Maximized windows fill the
-viewport below it; Dockview recomputes the available workspace when it is toggled.
-Desktop entries show names in both modes and scroll horizontally when needed.
+The titlebar moves the outer window; edges and corners resize it. Double-clicking
+the titlebar toggles maximization. Dragging the titlebar to the display edges
+snaps the whole window to the left/right half or maximizes it. Normal bounds are
+retained for restoration. All non-minimized windows can remain visible together.
+The desktop background and shortcuts remain fixed underneath them.
+
+Show desktop temporarily hides all windows without altering their inner layouts
+or minimized flags. Clicking it again restores them. The top taskbar contains one
+entry per outer window; clicking an entry restores and raises that window.
+Applications remains beside System on the left. The collapsible top panel's
+48/28-pixel height is reserved for maximized and snapped windows. Taskbar labels
+remain visible in both modes and scroll horizontally when necessary.
+
 Applications contains an expandable All list of installed apps with static UI
 entrypoints, obtained through the authenticated local AivudaOS API, followed by
-favorite apps. Favorites have remove buttons; Console and AppStore Admin are
-permanent entries. Console hosts AivudaOS, including its Online Store for downloads. AppStore Admin hosts the
-AivudaAppStore upload/publication management backend. Internal IDs remain unchanged.
+favorite apps. Favorites have remove buttons; Console and AppStore Admin remain
+permanent entries. Console hosts AivudaOS, including its Online Store for downloads.
+AppStore Admin hosts the AivudaAppStore upload/publication management backend.
 
 Guest preload initializes the internal AivudaOS Online Store URL to the actual
 local AppStore gateway before page scripts run. A stored marker allows managed
@@ -78,18 +77,19 @@ Each window's upper-right controls expose the address bar, pinning and a menu fo
 page zoom, reload and developer tools. Zoom retains Chromium's shared browser
 session behavior. Main-process input handlers preserve shortcuts even in guests.
 Applications are identified by their launch URL (ignoring the fragment), separately
-from a window's current navigation URL. Launching an application activates an
-existing window on the current desktop or opens a new window there. Favorite
+from a tab's current navigation URL. Launching an application opens a new outer
+window. Favorite
 entries also appear as desktop shortcuts. Their context menus support new
 windows, switching windows and removing favorites.
 
 The existing shell-state file stores bookmarks, application launch URLs, page
-URLs, minimized panel placement, address-bar visibility and the serialized Dockview
-layouts for every virtual desktop (split proportions, tab order, floating bounds
-and maximized groups), window desktop IDs and the selected desktop.
-State version 3 accepts legacy tabs/bookmarks and WinBox bounds; legacy floating
-windows are migrated into Dockview floating panels. Invalid layouts fall back to
-the restored page list. Sessions predating virtual desktops migrate to Desktop 1.
+URLs, tab-to-window ownership, address-bar visibility and the serialized Dockview
+layout for every outer window, plus outer bounds, stacking, minimized/maximized
+state, half-screen placement and the active window.
+State version 4 migrates legacy tabs/bookmarks, WinBox bounds and virtual desktop
+sessions. Each former virtual desktop with pages becomes an outer window;
+legacy internal floating groups flatten into tabs. Invalid layouts fall back to
+the restored page list.
 The outer Electron window stores its normal size and maximized state separately
 in `window-state.json` under the Electron user-data directory. Restored dimensions
 are constrained by the primary display's work area and the window's minimum size.
@@ -124,7 +124,7 @@ ACEswarm/
 │   ├── shell.html/js/css       # Workbench shell
 │   ├── desktop.js             # Dock and application operations
 │   ├── dock-layout.js         # Dockview and stable WebView containers
-│   ├── workspaces.js          # Virtual desktops and application launcher
+│   ├── window-manager.js      # Outer windows, taskbar and application launcher
 │   └── services/
 │       ├── local-services.js   # Service lifecycle, ports, health checks
 │       ├── runtime.js          # Runtime and package resolution

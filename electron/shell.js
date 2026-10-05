@@ -16,8 +16,6 @@ let serviceOrigins = {};
 let dockCollapsed = false;
 let desktopVisible = false;
 let desktopActiveTabId = null;
-let workspaceRegion = 'full';
-let workspaceMaximizeRestore = 'full';
 let favorites = [];
 let activeTabId = null;
 let nextTabId = 1;
@@ -172,16 +170,12 @@ function normalizeSavedShellState(rawState) {
 }
 
 function buildShellStatePayload() {
-  captureDesktop();
   return {
-    version: 3,
-    currentDesktopId,
-    desktops: [...desktops.values()].map(({ id, title, layout, activeTabId, desktopVisible, desktopActiveTabId, workspaceRegion, workspaceMaximizeRestore }) => ({ id, title, layout: layout?.toJSON(), activeTabId, desktopVisible, desktopActiveTabId, workspaceRegion, workspaceMaximizeRestore })),
-    layout: desktopLayout?.toJSON(),
+    version: 4,
+    activeWindowId,
+    windows: [...appWindows.values()].map(owner => ({ id: owner.id, bounds: owner.bounds, maximized: owner.maximized, minimized: owner.minimized, region: owner.region, zIndex: owner.zIndex, activeTabId: owner.layout.activePanel?.id, layout: owner.layout.toJSON() })),
     desktopVisible,
     desktopActiveTabId,
-    workspaceRegion,
-    workspaceMaximizeRestore,
     serviceOrigins,
     dockCollapsed,
     activeTabId,
@@ -193,13 +187,12 @@ function buildShellStatePayload() {
     favorites,
     tabs: Array.from(tabs.values()).map((tab) => ({
       id: tab.id,
-      desktopId: tab.desktopId,
+      windowId: tab.windowId,
       title: tab.title,
       url: getTabUrl(tab),
       appUrl: tab.appUrl,
       favicon: tab.favicon,
       chromeExpanded: tab.chromeExpanded,
-      minimized: tab.minimized,
       placement: tab.placement,
     })),
   };
@@ -1494,7 +1487,7 @@ function createTab(rawUrl, options = {}) {
       setToolsMenuOpen(false);
       setWindowMenuOpen(false);
       document.getElementById("dock-menu").hidden = true;
-      if (tab.desktopId === currentDesktopId && !desktopVisible && activeTabId !== tab.id && !tab.minimized) activateTab(tab.id);
+      if (!desktopVisible && !appWindows.get(tab.windowId)?.minimized && activeTabId !== tab.id) activateTab(tab.id);
       return;
     }
     if (event.channel === "aivuda-shell:open-url-in-new-tab") {
@@ -1586,11 +1579,10 @@ function activateTab(id) {
   }
 
   const tab = tabs.get(id);
-  if (tab.desktopId !== currentDesktopId) switchDesktop(tab.desktopId);
+  activateWindow(tab.windowId);
   activeTabId = id;
   desktopVisible = false;
   desktopActiveTabId = id;
-  tab.minimized = false;
   if (!tab.panel) addApplicationPanel(tab);
   tab.panel.api.setActive();
   schedulePanelLayout();
@@ -1808,78 +1800,68 @@ window.setInterval(() => {
   writeShellState();
 }, shellStateAutosaveIntervalMs);
 
-window.aivudaShell.getStartup().then((startup) => {
-  const savedDesktops = Array.isArray(startup.savedState?.desktops) ? startup.savedState.desktops.filter(item => item && /^desktop-\d+$/.test(item.id)) : [];
-  for (const item of savedDesktops) {
-    desktops.set(item.id, { id: item.id, title: item.title || 'Desktop', desktopVisible: true });
-    nextDesktopId = Math.max(nextDesktopId, Number(item.id.slice(8)) + 1);
-  }
-  if (!desktops.size) desktops.set('desktop-1', { id: 'desktop-1', title: 'Desktop 1', desktopVisible: true });
-  currentDesktopId = [...desktops.keys()][0];
+window.aivudaShell.getStartup().then(startup => {
   defaultUrl = startup.defaultUrl || defaultUrl;
-  storeUrl = startup.storeUrl || "";
-  serviceOrigins = { os: defaultUrl, store: storeUrl, gateway: startup.gatewayUrl || "" };
-  const remap = (url) => desktopState.remapUrl(url, startup.savedState?.serviceOrigins, serviceOrigins);
-  if (startup.savedState) {
-    for (const tab of startup.savedState.tabs || []) {
-      tab.url = remap(tab.url);
-      tab.appUrl = remap(tab.appUrl || tab.url);
-      if (tab.favicon) tab.favicon = remap(tab.favicon);
-    }
-    for (const favorite of startup.savedState.favorites || []) {
-      favorite.url = remap(favorite.url);
-      if (favorite.favicon) favorite.favicon = remap(favorite.favicon);
-    }
+  storeUrl = startup.storeUrl || '';
+  serviceOrigins = { os: defaultUrl, store: storeUrl, gateway: startup.gatewayUrl || '' };
+  const raw = startup.savedState || {};
+  const remap = url => desktopState.remapUrl(url, raw.serviceOrigins, serviceOrigins);
+  for (const tab of raw.tabs || []) {
+    tab.url = remap(tab.url); tab.appUrl = remap(tab.appUrl || tab.url);
+    if (tab.favicon) tab.favicon = remap(tab.favicon);
   }
-  defaultScreenRecordingsDir = typeof startup.recordingsDir === "string" ? startup.recordingsDir : "";
-  const savedState = normalizeSavedShellState(startup.savedState);
-  dockCollapsed = startup.savedState?.dockCollapsed === true;
-  if (savedState) {
-    performanceOverlayVisible = savedState.performanceOverlayVisible;
-    favorites = savedState.favorites || [];
-    renderFavorites();
-    screenRecordBarVisible = savedState.screenRecordBarVisible;
-    screenRecordMode = savedState.screenRecordMode;
-    screenRecordBarPosition = savedState.screenRecordBarPosition;
-    const restoredTabs = savedState.tabs;
-    for (const tabState of restoredTabs) {
-      createTab(tabState.url, { ...tabState, chromeExpanded: tabState.chromeExpanded ?? savedState.chromeExpanded });
-    }
-    if (savedDesktops.length) {
-      for (const item of savedDesktops) {
-        switchDesktop(item.id);
-        restoreDesktopLayout(item.layout);
+  for (const favorite of raw.favorites || []) {
+    favorite.url = remap(favorite.url);
+    if (favorite.favicon) favorite.favicon = remap(favorite.favicon);
+  }
+  defaultScreenRecordingsDir = typeof startup.recordingsDir === 'string' ? startup.recordingsDir : '';
+  dockCollapsed = raw.dockCollapsed === true;
+  const saved = normalizeSavedShellState(startup.savedState);
+  if (saved) {
+    favorites = saved.favorites;
+    performanceOverlayVisible = saved.performanceOverlayVisible;
+    screenRecordBarVisible = saved.screenRecordBarVisible;
+    screenRecordMode = saved.screenRecordMode;
+    screenRecordBarPosition = saved.screenRecordBarPosition;
+    const descriptors = Array.isArray(raw.windows) ? raw.windows.filter(item => item && /^window-\d+$/.test(item.id)) : [];
+    if (!descriptors.length && saved.tabs.length) {
+      if (Array.isArray(raw.desktops) && raw.desktops.length) {
+        for (const item of raw.desktops) {
+          const members = saved.tabs.filter(tab => tab.desktopId === item.id);
+          if (!members.length) continue;
+          const id = `window-${descriptors.length + 1}`;
+          descriptors.push({ id, layout: item.layout, activeTabId: item.activeTabId, minimized: members.every(tab => tab.minimized) });
+          members.forEach(tab => { tab.windowId = id; });
+        }
+      } else if (raw.layout) {
+        descriptors.push({ id: 'window-1', layout: raw.layout, activeTabId: raw.activeTabId, maximized: true, minimized: saved.tabs.every(tab => tab.minimized) });
+        saved.tabs.forEach(tab => { tab.windowId = 'window-1'; });
       }
-      for (const item of savedDesktops) Object.assign(desktops.get(item.id), { activeTabId: item.activeTabId, desktopVisible: item.desktopVisible, desktopActiveTabId: item.desktopActiveTabId, workspaceRegion: item.workspaceRegion, workspaceMaximizeRestore: item.workspaceMaximizeRestore });
-      // Load the saved desktop state without overwriting it with restore-time state.
-      currentDesktopId = '';
-      switchDesktop(desktops.has(startup.savedState.currentDesktopId) ? startup.savedState.currentDesktopId : savedDesktops[0].id);
-      for (const desktop of desktops.values()) if (desktop.id !== currentDesktopId && desktop.root) { desktop.root.hidden = true; desktop.root.removeAttribute('id'); }
-      renderScreenRecordBar(); renderDesktop(); finishShellStateRestore(); return;
     }
-    switchDesktop('desktop-1');
-    restoreDesktopLayout(startup.savedState.layout);
-    workspaceRegion = ['left', 'right', 'top', 'bottom'].includes(startup.savedState.workspaceRegion) ? startup.savedState.workspaceRegion : 'full';
-    workspaceMaximizeRestore = ['left', 'right', 'top', 'bottom'].includes(startup.savedState.workspaceMaximizeRestore) ? startup.savedState.workspaceMaximizeRestore : 'full';
-    layoutApplicationWindows();
-    if (savedState.activeTabId && tabs.has(savedState.activeTabId) && !tabs.get(savedState.activeTabId).minimized) {
-      activateTab(savedState.activeTabId);
+    for (const item of descriptors) createApplicationWindow(item);
+    for (const tab of saved.tabs) createTab(tab.url, { ...tab, minimized: false, chromeExpanded: tab.chromeExpanded ?? saved.chromeExpanded });
+    for (const item of descriptors) {
+      const owner = appWindows.get(item.id);
+      if (!owner.layout.panels.length) { disposeEmptyWindow(owner); continue; }
+      restoreWindowLayout(owner, item.layout);
+      const panel = owner.layout.getPanel(item.activeTabId);
+      if (panel) panel.api.setActive();
+      owner.minimized = item.minimized === true;
+      owner.maximized = item.maximized === true;
+      owner.region = ['left', 'right', 'top', 'bottom'].includes(item.region) ? item.region : null;
+      if (Number.isFinite(item.zIndex)) owner.zIndex = Math.max(1, item.zIndex);
     }
-    if (startup.savedState.desktopVisible === true) {
-      desktopActiveTabId = startup.savedState.desktopActiveTabId || activeTabId;
-      desktopVisible = true;
-      activeTabId = null;
-      syncWindowToolbar();
-    }
-    renderScreenRecordBar();
-    renderDesktop();
-    finishShellStateRestore();
-    return;
+    normalizeWindowStack();
+    const selected = appWindows.get(raw.activeWindowId) || appWindows.get(tabs.get(saved.activeTabId)?.windowId) || [...appWindows.values()].find(owner => !owner.minimized);
+    activeWindowId = selected?.id || null;
+    desktopLayout = selected?.layout;
+    activeTabId = selected && !selected.minimized ? selected.layout.activePanel?.id || null : null;
+    desktopActiveTabId = raw.desktopActiveTabId || activeTabId;
+    desktopVisible = raw.desktopVisible === true || !appWindows.size;
+    if (desktopVisible) activeTabId = null;
+  } else {
+    desktopVisible = true;
   }
-
-  desktopVisible = true;
-  setChromeExpanded(false);
-  renderDesktop();
-  renderScreenRecordBar();
-  finishShellStateRestore();
+  syncWindowToolbar(); updateAddressFromActiveTab(); updateNavigationState();
+  renderDesktop(); renderScreenRecordBar(); layoutApplicationWindows(); finishShellStateRestore();
 });

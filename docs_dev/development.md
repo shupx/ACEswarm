@@ -140,20 +140,20 @@ npm run smoke
 
 The desktop integration test launches the actual Electron main process and local
 services using a temporary browser profile and workspace. It checks page loading,
-application favorites, collapsed desktop entries, multiple virtual desktops,
-cross-desktop window dragging without guest reload and independent desktop restoration,
-System menus, panel zoom/address controls, drag docking, nested splits,
-splitter resizing, floating panels and preserved guest instances,
-single-panel ellipsis controls for click-to-open menus and drag docking with no reserved header height,
-28-pixel headers for stacked tabs and floating groups,
-shortcuts with guest focus, page popups, restart persistence, and screenshots
-at 1280, 850 and 390 pixels wide. It also records videos in all three modes and
+application favorites, collapsed window tasks, independent outer windows,
+window movement/resizing/minimization/maximization, nested splits and splitter
+resizing inside windows, tab transfers via the taskbar and content edges,
+tab tear-off onto the desktop, preserved guest instances, version-3 session
+migration, restart persistence, and screenshots at 1280 and 390 pixels wide.
+It also records videos in all three modes and
 uses ffprobe/ffmpeg to verify decodable, nonblank output. It requires the development
 Python environment, Caddy, FFmpeg/ffprobe, OpenSSL and an X11 session with a window manager;
 it does not change the normal user workspace or Videos folder.
-It also checks desktop background pixels, workspace hide/restore without layout
-or guest loss, single-window half-screen snapping, desktop state across restarts,
-self-signed HTTPS loading and retrying a failed URL after its service starts.
+It also compares desktop background pixels and checks show-desktop restoration
+without layout or guest loss, window half-screen placement and desktop state
+across restarts.
+Existing checks for self-signed HTTPS, load-failure retry, managed store URL
+defaults, cross-origin package downloads and their SHA-256 hashes remain covered.
 
 ```bash
 npm run test:desktop
