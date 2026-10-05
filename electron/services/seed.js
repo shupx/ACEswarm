@@ -126,4 +126,43 @@ async function provision({ osUrl, storeUrl, storeApiUrl = storeUrl, configPath }
   return operation.result;
 }
 
-module.exports = { provision, discoverSeeds, verifyArtifact, publishSeed };
+function writeBootstrapState(filename, state) {
+  fs.mkdirSync(path.dirname(filename), { recursive: true });
+  const temporary = `${filename}.${crypto.randomUUID()}.tmp`;
+  try {
+    fs.writeFileSync(temporary, JSON.stringify(state, null, 2) + '\n', { flag: 'wx' });
+    fs.renameSync(temporary, filename);
+  } finally {
+    if (fs.existsSync(temporary)) fs.unlinkSync(temporary);
+  }
+}
+
+function prepareBootstrap({ stateDirectory, existingOsWorkspace = false }) {
+  const filename = path.join(stateDirectory, 'seed-bootstrap.json');
+  let state;
+  try { state = JSON.parse(fs.readFileSync(filename, 'utf8')); } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+  if (state !== undefined && (!state || state.schemaVersion !== 1 || !['pending', 'completed'].includes(state.status))) {
+    throw new Error('Invalid seed bootstrap state; refusing to reinitialize this workspace');
+  }
+  // Existing installations predate the marker. Preserve their user-managed apps.
+  if (!state && existingOsWorkspace) {
+    state = { schemaVersion: 1, status: 'completed', reason: 'existing-workspace', completedAt: new Date().toISOString() };
+    writeBootstrapState(filename, state);
+  } else if (!state) {
+    state = { schemaVersion: 1, status: 'pending' };
+    writeBootstrapState(filename, state);
+  }
+  return { filename, state };
+}
+
+async function provisionOnce({ stateDirectory, existingOsWorkspace = false, ...options }) {
+  const { filename, state } = prepareBootstrap({ stateDirectory, existingOsWorkspace });
+  if (state.status === 'completed') return { skipped: true, reason: state.reason || 'initialized' };
+  const result = await provision(options);
+  writeBootstrapState(filename, { schemaVersion: 1, status: 'completed', completedAt: new Date().toISOString() });
+  return result;
+}
+
+module.exports = { provision, provisionOnce, prepareBootstrap, discoverSeeds, verifyArtifact, publishSeed };

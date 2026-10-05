@@ -40,6 +40,21 @@ AivudaOS ignores the unknown `aceswarm` field. ACEswarm uses it to locate and ve
 
 ## Bootstrap sequence
 
+Bootstrap runs once per workspace. State is stored in
+`<workspace>/state/seed-bootstrap.json`: `pending` before provisioning and
+`completed` only after the configuration import succeeds. Failed or interrupted
+first initialization is retried on the next launch. Later launches skip the
+entire bootstrap, including publication and configuration import.
+
+Existing workspaces without a marker are detected by the AivudaOS
+`config/os.yaml` file before services start and marked as already initialized.
+Upgrading ACEswarm therefore preserves user-managed apps. Removing, updating,
+switching versions, or changing autostart on a seed app will not be undone at
+startup. New bundled seed versions also do not automatically update an initialized
+workspace; use Applications/Online Store or an explicit configuration import.
+A fresh workspace receives the currently bundled seeds. A corrupt state marker
+reports an error rather than silently reinstalling applications.
+
 ```text
 Read aceswarm-config-export.json
     ↓

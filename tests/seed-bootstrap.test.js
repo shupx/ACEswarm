@@ -5,7 +5,7 @@ const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
-const { provision, discoverSeeds, verifyArtifact } = require('../electron/services/seed');
+const { provision, provisionOnce, discoverSeeds, verifyArtifact } = require('../electron/services/seed');
 
 const digest = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
 
@@ -43,7 +43,9 @@ test('seed publication uses the AppStore API and queues the canonical config exp
   try {
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
     const base = `http://127.0.0.1:${server.address().port}/`;
-    assert.deepEqual(await provision({ osUrl: base, storeUrl: base, configPath }), { configured: ['demo'] });
+    const stateDirectory = path.join(directory, 'state');
+    assert.deepEqual(await provisionOnce({ stateDirectory, osUrl: base, storeUrl: base, configPath }), { configured: ['demo'] });
+    assert.equal(JSON.parse(fs.readFileSync(path.join(stateDirectory, 'seed-bootstrap.json'))).status, 'completed');
     const osLogin = calls.find((call) => call.pathname.endsWith('/aivuda_os/api/auth/login'));
     assert.deepEqual(JSON.parse(osLogin.body), { username: 'admin', password: 'admin123' });
     const storeLogin = calls.find((call) => call.pathname.endsWith('/aivuda_app_store/dev/auth/login'));
@@ -56,6 +58,15 @@ test('seed publication uses the AppStore API and queues the canonical config exp
     assert.ok(calls.some((call) => call.pathname.endsWith('/operations/op1')));
     assert.equal(calls.filter((call) => call.pathname.includes('/aivuda_os/api/apps/upload')).length, 0);
     parsedVersion = '2.0.0';
+    const requests = calls.length;
+    assert.deepEqual(await provisionOnce({ stateDirectory, existingOsWorkspace: true, osUrl: base, storeUrl: base, configPath: 'changed-or-missing-export.json' }), { skipped: true, reason: 'initialized' });
+    assert.equal(calls.length, requests, 'restart never republishes, reinstalls, switches versions or resets configuration');
+    const retryState = path.join(directory, 'retry-state');
+    await assert.rejects(provisionOnce({ stateDirectory: retryState, osUrl: base, storeUrl: base, configPath }), /identity mismatch/);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(retryState, 'seed-bootstrap.json'))).status, 'pending');
+    parsedVersion = '1.0.0';
+    assert.deepEqual(await provisionOnce({ stateDirectory: retryState, existingOsWorkspace: true, osUrl: base, storeUrl: base, configPath }), { configured: ['demo'] });
+    parsedVersion = '2.0.0';
     const imports = calls.filter((call) => call.pathname.endsWith('/config/import')).length;
     await assert.rejects(provision({ osUrl: base, storeUrl: base, configPath }), /identity mismatch/);
     assert.equal(calls.filter((call) => call.pathname.endsWith('/config/import')).length, imports);
@@ -66,6 +77,20 @@ test('seed publication uses the AppStore API and queues the canonical config exp
     await new Promise((resolve) => server.close(resolve));
     fs.rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test('existing workspaces migrate without bootstrap and invalid state never triggers installation', async () => {
+  const stateDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'aceswarm-seed-state-'));
+  try {
+    const options = { stateDirectory, existingOsWorkspace: true, configPath: 'missing.json' };
+    assert.deepEqual(await provisionOnce(options), { skipped: true, reason: 'existing-workspace' });
+    assert.equal(JSON.parse(fs.readFileSync(path.join(stateDirectory, 'seed-bootstrap.json'))).status, 'completed');
+    assert.deepEqual(await provisionOnce(options), { skipped: true, reason: 'existing-workspace' });
+    fs.writeFileSync(path.join(stateDirectory, 'seed-bootstrap.json'), 'null');
+    await assert.rejects(provisionOnce(options), /Invalid seed bootstrap state/);
+    fs.writeFileSync(path.join(stateDirectory, 'seed-bootstrap.json'), '{bad json');
+    await assert.rejects(provisionOnce(options), SyntaxError);
+  } finally { fs.rmSync(stateDirectory, { recursive: true, force: true }); }
 });
 
 test('discovery rejects unlisted, missing, escaped and symlinked archives', () => {

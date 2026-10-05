@@ -5,7 +5,7 @@ if (process.platform === 'linux') app.commandLine.appendSwitch('disable-accelera
 const { workspace } = require('./services/workspace');
 const { resolveRuntime } = require('./services/runtime');
 const { LocalServices } = require('./services/local-services');
-const { provision } = require('./services/seed');
+const { provisionOnce, prepareBootstrap } = require('./services/seed');
 const recording = require('./services/recording')(() => window, (failure) => sendToShell('aivuda-shell:recording-error', failure), (child) => services?.trackRecording(child));
 
 let services;
@@ -199,6 +199,8 @@ app.whenReady().then(async () => {
     installCertificateValidationBypass(session.defaultSession);
     installCertificateValidationBypass(session.fromPartition('persist:aivuda-shell'));
     paths = workspace();
+    const existingOsWorkspace = fs.existsSync(path.join(paths.os, 'config', 'os.yaml'));
+    prepareBootstrap({ stateDirectory: paths.state, existingOsWorkspace });
     const runtime = resolveRuntime({ packaged: app.isPackaged, resourcesPath: process.resourcesPath, sourceRoot: path.resolve(__dirname, '..') });
     services = new LocalServices(paths, runtime);
     endpoints = await services.start();
@@ -270,8 +272,8 @@ app.whenReady().then(async () => {
       try { return await recording[method](); } catch (error) { return { ok: false, error: error.message }; }
     });
     createWindow();
-    provision({ osUrl: endpoints.osApi, storeUrl: endpoints.store, storeApiUrl: endpoints.storeApi, configPath: path.join(app.isPackaged ? process.resourcesPath : path.resolve(__dirname, '..', 'resources'), 'seed-apps', 'aceswarm-config-export.json') })
-      .then(() => console.log('ACEswarm seed provisioning completed'))
+    provisionOnce({ stateDirectory: paths.state, existingOsWorkspace, osUrl: endpoints.osApi, storeUrl: endpoints.store, storeApiUrl: endpoints.storeApi, configPath: path.join(app.isPackaged ? process.resourcesPath : path.resolve(__dirname, '..', 'resources'), 'seed-apps', 'aceswarm-config-export.json') })
+      .then((result) => console.log(result.skipped ? `ACEswarm seed provisioning skipped: ${result.reason}` : 'ACEswarm seed provisioning completed'))
       .catch((error) => { services.failures.push(`Seed provisioning: ${error.message}`); console.error(error); });
   } catch (error) {
     await services?.stop();

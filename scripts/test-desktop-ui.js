@@ -530,6 +530,9 @@ async function run() {
     window.maximize();
   });
   await page.waitForFunction(() => innerWidth > 1100);
+  const bootstrapStatePath = path.join(temp, 'workspace', 'state', 'seed-bootstrap.json');
+  const bootstrapState = fs.readFileSync(bootstrapStatePath, 'utf8');
+  assert.equal(JSON.parse(bootstrapState).status, 'completed', 'First launch completes seed bootstrap');
   await application.close();
   application = null;
   const saved = JSON.parse(fs.readFileSync(path.join(temp, 'profile', 'shell-state.json')));
@@ -539,6 +542,8 @@ async function run() {
   assert.equal(saved.tabs.find((tab) => tab.id === robotId).minimized, true);
 
   page = await launch({ width: 1100, height: 720, maximized: true });
+  assert.equal(fs.readFileSync(bootstrapStatePath, 'utf8'), bootstrapState, 'Restart preserves completed seed bootstrap state');
+  console.log('PASS: seed bootstrap completes once and its state survives restart unchanged');
   console.log('PASS: ACEswarm outer window restores normal size and maximized state');
   await count(page, 2);
   assert.equal(await page.evaluate((id) => tabs.get(id).minimized, robotId), true);
