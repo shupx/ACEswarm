@@ -316,7 +316,8 @@ function renderApplicationsMenu() {
   const signature = JSON.stringify([installedApplications, favorites, defaultUrl, storeUrl]);
   if (menu.dataset.signature === signature) return;
   menu.dataset.signature = signature;
-  const expanded = document.getElementById('all-applications')?.open || false;
+  const expanded = document.getElementById('all-applications')?.open ?? true;
+  const query = document.getElementById('application-search')?.value || '';
   menu.replaceChildren();
   const all = document.createElement('details'); all.id = 'all-applications'; all.open = expanded;
   const summary = document.createElement('summary'); summary.textContent = 'All'; all.append(summary);
@@ -336,11 +337,26 @@ function renderApplicationsMenu() {
     }
     return row;
   };
-  for (const entry of installedApplications) all.append(launch(entry, false));
-  if (!installedApplications.length) {
-    const message = document.createElement('span'); message.className = 'menu-section-label';
-    message.textContent = 'No installed app UIs'; all.append(message);
-  }
+  const search = document.createElement('input'); search.id = 'application-search'; search.type = 'search';
+  search.placeholder = 'Search applications'; search.setAttribute('aria-label', 'Search applications'); search.value = query;
+  const list = document.createElement('div'); list.id = 'all-application-list';
+  const message = document.createElement('span'); message.className = 'menu-section-label';
+  const rows = installedApplications.map(entry => ({ entry, row: launch(entry, false) }));
+  for (const { row } of rows) list.append(row);
+  list.append(message);
+  const filter = () => {
+    const needle = search.value.trim().toLocaleLowerCase();
+    let count = 0;
+    for (const { entry, row } of rows) {
+      row.hidden = !`${entry.title} ${entry.url}`.toLocaleLowerCase().includes(needle);
+      if (!row.hidden) count++;
+    }
+    message.hidden = count > 0;
+    message.textContent = installedApplications.length ? 'No matching applications' : 'No installed app UIs';
+    list.scrollTop = 0;
+  };
+  search.oninput = filter; filter();
+  all.append(search, list);
   menu.append(all, document.createElement('hr'));
   const label = document.createElement('span'); label.className = 'menu-section-label'; label.textContent = 'Favorite apps'; menu.append(label);
   for (const entry of applicationEntries().filter(entry => entry.pinned)) menu.append(launch(entry, true));

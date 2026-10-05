@@ -16,7 +16,7 @@
     const availableWidth = area.width;
     const availableHeight = area.height;
     const finite = (value, fallback) => Number.isFinite(value) ? value : fallback;
-    const width = Math.max(Math.min(240, availableWidth), Math.min(availableWidth, finite(raw.width, Math.min(980, availableWidth - 110))));
+    const width = Math.max(Math.min(240, availableWidth), Math.min(availableWidth, finite(raw.width, availableWidth - 110)));
     const height = Math.max(Math.min(220, availableHeight), Math.min(availableHeight, finite(raw.height, availableHeight - 30)));
     return {
       width, height,

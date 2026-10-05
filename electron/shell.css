@@ -87,6 +87,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid #157d71; outline-
 #applications-menu { width: 280px; left: 0; max-width: calc(100vw - 110px); }
 #applications-menu summary { cursor: pointer; padding: 9px 10px; font-size: 13px; border-radius: 4px; }
 #applications-menu summary:hover { background: #edf3f1; }
+#application-search { display: block; width: calc(100% - 12px); height: 30px; margin: 4px 6px 8px; padding: 0 8px; border: 1px solid #c4cfce; border-radius: 4px; background: #fff; color: #354746; font-size: 12px; }
+#all-application-list { max-height: 210px; overflow-y: auto; overscroll-behavior: contain; }
+#all-application-list .application-menu-row { height: 42px; min-height: 42px; }
+#all-application-list .application-menu-row > button:first-child { overflow: hidden; white-space: nowrap; }
 .application-menu-row { display: flex; align-items: center; min-height: 36px; }
 .application-menu-row > button:first-child { flex: 1; min-width: 0; }
 .application-menu-row > button.icon-button { width: 30px; flex: 0 0 30px; padding: 6px; }
