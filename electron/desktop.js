@@ -145,6 +145,11 @@ function renderDesktop() {
   const shortcuts = document.getElementById("desktop-shortcuts");
   dock.replaceChildren();
   shortcuts.replaceChildren();
+  const launcher = document.createElement('button');
+  launcher.id = 'desktop-applications'; launcher.className = 'desktop-shortcut'; launcher.title = 'Applications';
+  const launcherIcon = document.createElement('span'); launcherIcon.className = 'app-icon'; launcherIcon.append(desktopIcon('layout-grid'));
+  const launcherLabel = document.createElement('span'); launcherLabel.className = 'shortcut-label'; launcherLabel.textContent = 'Applications';
+  launcher.append(launcherIcon, launcherLabel); launcher.onclick = openApplicationLauncher; shortcuts.append(launcher);
   const items = document.createElement("div");
   items.className = "dock-items";
   dock.append(items);

@@ -311,6 +311,52 @@ window.addEventListener('pointerup', event => {
 }, true);
 for (const event of ['pointercancel', 'blur']) window.addEventListener(event, () => { windowTabDrag = null; tabTransferPreview.hidden = true; });
 
+function renderApplicationLauncher() {
+  const grid = document.getElementById('launcher-grid');
+  const query = document.getElementById('launcher-search').value.trim().toLocaleLowerCase();
+  const entries = [...applicationEntries().filter(entry => entry.builtin), ...installedApplications];
+  const seen = new Set();
+  grid.replaceChildren();
+  for (const entry of entries) {
+    const key = desktopState.appKey(entry.url);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (!`${entry.title} ${entry.url}`.toLocaleLowerCase().includes(query)) continue;
+    const button = document.createElement('button'); button.className = 'desktop-shortcut'; button.dataset.appUrl = entry.url;
+    const label = document.createElement('span'); label.className = 'shortcut-label'; label.textContent = entry.title;
+    button.append(applicationIcon(entry), label); button.title = entry.title;
+    button.onclick = () => { document.getElementById('application-launcher').close(); openApplication(entry.url); };
+    grid.append(button);
+  }
+  const status = document.getElementById('launcher-status');
+  status.hidden = grid.childElementCount > 0; status.textContent = 'No matching applications';
+  refreshDesktopIcons();
+}
+
+async function openApplicationLauncher() {
+  const dialog = document.getElementById('application-launcher');
+  const search = document.getElementById('launcher-search');
+  setToolsMenuOpen(false); setWindowMenuOpen(false);
+  document.getElementById('applications-menu').hidden = true;
+  document.getElementById('applications-button').setAttribute('aria-expanded', 'false');
+  search.value = ''; renderApplicationLauncher(); dialog.showModal(); search.focus();
+  try {
+    installedApplications = await window.aivudaShell.getInstalledApplications();
+    renderApplicationsMenu(); renderApplicationLauncher();
+  } catch (error) {
+    const status = document.getElementById('launcher-status'); status.hidden = false;
+    status.textContent = 'Could not load applications. Open Console to check the local service.';
+    console.warn('Could not load applications:', error);
+  }
+}
+document.getElementById('launcher-search').oninput = renderApplicationLauncher;
+document.getElementById('close-application-launcher').onclick = () => document.getElementById('application-launcher').close();
+document.getElementById('application-launcher').onclick = event => {
+  if (event.target !== event.currentTarget) return;
+  const rect = event.currentTarget.getBoundingClientRect();
+  if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) event.currentTarget.close();
+};
+
 function renderApplicationsMenu() {
   const menu = document.getElementById('applications-menu');
   const signature = JSON.stringify([installedApplications, favorites, defaultUrl, storeUrl]);

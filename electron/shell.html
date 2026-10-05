@@ -36,6 +36,12 @@
       </div>
     </header>
     <section id="desktop-shortcuts" class="desktop-shortcuts" aria-label="Desktop applications"></section>
+    <dialog id="application-launcher" aria-labelledby="launcher-title">
+      <div class="dialog-heading"><h2 id="launcher-title">Applications</h2><button id="close-application-launcher" class="icon-button" title="Close" aria-label="Close applications"><i data-lucide="x"></i></button></div>
+      <input id="launcher-search" type="search" placeholder="Search applications" aria-label="Search all applications" />
+      <div id="launcher-grid"></div>
+      <p id="launcher-status" role="status" hidden></p>
+    </dialog>
     <section id="webview-stack" class="window-layer" aria-label="Application windows"></section>
     <div id="dock-menu" class="dock-menu" role="menu" hidden></div>
     <div id="window-menu" class="window-menu" role="menu" aria-label="Window controls" hidden>
