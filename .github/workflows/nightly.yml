@@ -1,8 +1,6 @@
 name: Nightly AppImage
 
 on:
-  push:
-    branches: [master, main]
   schedule:
     - cron: '0 18 * * *'
   workflow_dispatch:
