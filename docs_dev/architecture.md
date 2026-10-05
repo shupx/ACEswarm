@@ -41,6 +41,11 @@ their z-order. Moving tabs between windows, rearranging splits and minimizing
 windows do not recreate guests. Closing a tab releases its WebView; closing an
 outer window releases all of its tabs.
 
+Drop previews are drawn above guests for both internal splits and cross-window
+transfers. Sash hit regions mirror Dockview's native dividers above the guest
+layer and forward drag starts to Dockview, so the complete divider remains
+draggable while Dockview owns split sizing and constraints.
+
 The Dockview tab row is the only window header. Its empty space moves the outer
 window; edges and corners resize it. Double-clicking empty space toggles
 maximization. Dragging the header to the display edges
@@ -51,7 +56,9 @@ The desktop background and shortcuts remain fixed underneath them.
 Show desktop temporarily hides all windows without altering their inner layouts
 or minimized flags. Clicking it again restores them. The compact bottom taskbar
 contains one entry per outer window; clicking an entry restores and raises that
-window. Applications remains beside System on the left. The bottom 28 pixels are
+window, or minimizes it when it is already active and visible. Open page adds a
+tab to the current window, creating a window when none exists. Applications
+remains beside System on the left. The bottom 28 pixels are
 reserved for the taskbar, including Show desktop and Open page. Taskbar labels
 scroll horizontally when necessary.
 

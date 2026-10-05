@@ -10,7 +10,7 @@ function schedulePanelLayout() {
 // Guest nodes remain mounted in the desktop host when panels change windows.
 function syncPanelBodies() {
   const hostRect = stackEl.getBoundingClientRect();
-  for (const owner of appWindows.values()) syncWindowHeader(owner);
+  for (const owner of appWindows.values()) { syncWindowHeader(owner); syncWindowSashes(owner, hostRect); }
   for (const tab of tabs.values()) {
     const owner = appWindows.get(tab.windowId);
     const panel = owner?.layout.getPanel(tab.id);
@@ -23,6 +23,38 @@ function syncPanelBodies() {
       left: `${rect.left - hostRect.left}px`, top: `${rect.top - hostRect.top}px`,
       width: `${rect.width}px`, height: `${rect.height}px`,
       zIndex: String(owner.zIndex * 10 + 1),
+    });
+  }
+}
+
+// Native Dockview sashes sit below the permanently mounted guest pages.
+function syncWindowSashes(owner, hostRect) {
+  const sashes = new Set(owner.root.querySelectorAll('.dv-sash'));
+  for (const [sash, handle] of owner.sashHandles) {
+    if (!sashes.has(sash)) { handle.remove(); owner.sashHandles.delete(sash); }
+  }
+  for (const sash of sashes) {
+    let handle = owner.sashHandles.get(sash);
+    if (!handle) {
+      handle = document.createElement('div'); handle.className = 'dock-sash-handle';
+      handle.dataset.windowId = owner.id;
+      handle.onpointerdown = event => {
+        if (event.button !== 0) return;
+        event.preventDefault(); event.stopPropagation(); activateWindow(owner.id);
+        stackEl.classList.add('interacting');
+        sash.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: event.clientX, clientY: event.clientY, button: event.button, buttons: event.buttons, pointerId: event.pointerId, pointerType: event.pointerType }));
+      };
+      stackEl.append(handle); owner.sashHandles.set(sash, handle);
+    }
+    const rect = sash.getBoundingClientRect();
+    const vertical = rect.height > rect.width;
+    handle.hidden = owner.frame.hidden || sash.classList.contains('dv-disabled') || !rect.width || !rect.height;
+    handle.classList.toggle('vertical', vertical);
+    Object.assign(handle.style, {
+      left: (rect.left - hostRect.left - (vertical ? 2 : 0)) + 'px',
+      top: (rect.top - hostRect.top - (vertical ? 0 : 2)) + 'px',
+      width: (vertical ? 8 : rect.width) + 'px', height: (vertical ? rect.height : 8) + 'px',
+      cursor: vertical ? 'col-resize' : 'row-resize', zIndex: String(owner.zIndex * 10 + 2),
     });
   }
 }

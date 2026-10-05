@@ -282,8 +282,8 @@ function syncWindowToolbar() {
   }
 }
 
-function showOpenPageDialog(windowId = null) {
-  pendingWindowId = typeof windowId === 'string' ? windowId : null;
+function showOpenPageDialog(windowId = activeWindowId) {
+  pendingWindowId = typeof windowId === 'string' ? windowId : activeWindowId;
   const dialog = document.getElementById("open-page-dialog");
   document.getElementById("open-page-error").hidden = true;
   dialog.showModal();
@@ -293,7 +293,10 @@ function showOpenPageDialog(windowId = null) {
 document.getElementById("show-desktop").onclick = showDesktop;
 document.getElementById("close-page-dialog").onclick = () => document.getElementById("open-page-dialog").close();
 for (const [id, target] of [["open-home", () => defaultUrl], ["open-store", () => storeUrl || defaultUrl]]) {
-  document.getElementById(id).onclick = () => { document.getElementById("open-page-dialog").close(); openApplication(target()); };
+  document.getElementById(id).onclick = () => {
+    document.getElementById("open-page-dialog").close();
+    createTab(target(), { windowId: pendingWindowId }); pendingWindowId = null;
+  };
 }
 document.getElementById("open-page-form").onsubmit = async (event) => {
   event.preventDefault();

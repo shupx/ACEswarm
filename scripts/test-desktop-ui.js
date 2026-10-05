@@ -154,11 +154,15 @@ async function checkRecording(page, mode) {
   console.log('PASS: ' + mode + ' start, pause, resume, stop and decodable nonblank video (' + video.width + 'x' + video.height + ')');
 }
 
-async function dragPanel(page, id, destination) {
+async function dragPanel(page, id, destination, checkPreview = false) {
   const handle = await page.locator('[data-tab-panel-id="' + id + '"]').boundingBox();
   await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
   await page.mouse.down();
   await page.mouse.move(destination.x, destination.y, { steps: 25 });
+  if (checkPreview) {
+    assert.equal(await page.locator('#tab-transfer-preview').isVisible(), true, 'content drop preview is visible above guest pages');
+    await page.screenshot({ path: path.join(screenshots, 'window-dock-preview.png') });
+  }
   await page.mouse.up();
 }
 
@@ -226,6 +230,8 @@ async function run() {
   await assert.rejects(fetch(tlsUrl));
   await openPage(page, tlsUrl);
   await page.waitForFunction(() => getActiveTab().title === 'Self-signed Store');
+  assert.equal(await page.evaluate(() => activeWindowId), firstWindow, 'New page adds a tab to the current window');
+  assert.equal(await page.evaluate(() => appWindows.size), 1);
   assert.equal(await page.evaluate(() => getActiveTab().webview.executeJavaScript('document.getElementById("tls-loaded").textContent')), 'HTTPS connected');
   await page.evaluate(() => closeTab(activeTabId));
   const retryPort = await gatewayPort();
@@ -245,7 +251,7 @@ async function run() {
   await count(page, 1);
   console.log('PASS: untrusted HTTPS loads; generic load failure page retries the original URL');
 
-  await openPage(page, robotUrl);
+  await page.evaluate(url => openApplication(url), robotUrl);
   await page.waitForFunction(() => getActiveTab()?.ready && getActiveTab().title === 'Robot Console');
   const robotId = await page.evaluate(() => activeTabId);
   const secondWindow = await page.evaluate(() => activeWindowId);
@@ -264,12 +270,15 @@ async function run() {
   assert.equal(await page.evaluate(() => appWindows.size), 2);
   assert.equal(await page.evaluate(id => appWindows.get(id).layout.panels.length, secondWindow), 2);
   const secondRoot = await page.locator('.app-window[data-window-id="' + secondWindow + '"] .dock-layout').boundingBox();
-  await dragPanel(page, childId, { x: secondRoot.x + secondRoot.width - 40, y: secondRoot.y + secondRoot.height / 2 });
+  await dragPanel(page, childId, { x: secondRoot.x + secondRoot.width - 40, y: secondRoot.y + secondRoot.height / 2 }, true);
   await page.waitForFunction(id => appWindows.get(id).layout.groups.length === 2, secondWindow);
-  const sash = await page.locator('.app-window[data-window-id="' + secondWindow + '"] .dv-sash').first().boundingBox();
+  await waitForGuestLayout(page);
+  const beforeSplitWidth = await page.evaluate(id => tabs.get(id).panel.group.element.getBoundingClientRect().width, childId);
+  const sash = await page.locator('.dock-sash-handle[data-window-id="' + secondWindow + '"]').first().boundingBox();
   await page.mouse.move(sash.x + sash.width / 2, sash.y + sash.height / 2);
   await page.mouse.down(); await page.mouse.move(sash.x - 70, sash.y + sash.height / 2, { steps: 12 }); await page.mouse.up();
   await waitForGuestLayout(page);
+  assert.ok(Math.abs(await page.evaluate(id => tabs.get(id).panel.group.element.getBoundingClientRect().width, childId) - beforeSplitWidth) > 40, 'dragging the divider over page content resizes the split');
   const otherGroup = await page.evaluate(id => {
     const tab = tabs.get(id);
     const group = appWindows.get(tab.windowId).layout.groups.find(item => item.id !== tab.panel.group.id);
@@ -281,10 +290,24 @@ async function run() {
     const target = appWindows.get(tab.windowId).layout.getGroup(targetGroup);
     return tab.panel.group.element.getBoundingClientRect().right <= target.element.getBoundingClientRect().left + 1;
   }, { id: childId, targetGroup: otherGroup.id });
+  await page.evaluate(({ child, robot }) => {
+    const tab = tabs.get(child); detachApplicationPanel(tab);
+    tab.placement = { reference: robot, direction: 'below' }; addApplicationPanel(tab);
+  }, { child: childId, robot: robotId });
+  await waitForGuestLayout(page);
+  const beforeSplitHeight = await page.evaluate(id => tabs.get(id).panel.group.element.getBoundingClientRect().height, childId);
+  const horizontalSash = await page.locator('.dock-sash-handle[data-window-id="' + secondWindow + '"]:not(.vertical)').boundingBox();
+  await page.mouse.move(horizontalSash.x + horizontalSash.width / 2, horizontalSash.y + horizontalSash.height / 2);
+  await page.mouse.down(); await page.mouse.move(horizontalSash.x + horizontalSash.width / 2, horizontalSash.y - 60, { steps: 12 }); await page.mouse.up();
+  await waitForGuestLayout(page);
+  assert.ok(Math.abs(await page.evaluate(id => tabs.get(id).panel.group.element.getBoundingClientRect().height, childId) - beforeSplitHeight) > 40, 'the horizontal divider resizes across the full page width');
+  await page.evaluate(({ child, robot }) => tabs.get(child).panel.api.moveTo({ group: tabs.get(robot).panel.group, position: 'left' }), { child: childId, robot: robotId });
+  await waitForGuestLayout(page);
   assert.equal(await page.evaluate(id => appWindows.get(id).layout.groups.length, firstWindow), 1);
   console.log('PASS: independent outer windows; tabs, drag splitting and splitter resizing stay inside their window');
 
-  const firstTask = await page.locator('#dock [data-window-id="' + firstWindow + '"]').boundingBox();
+  await waitForGuestLayout(page);
+  const firstTask = await page.locator('#dock [data-window-id="' + firstWindow + '"]').evaluate(element => element.getBoundingClientRect().toJSON());
   const childGuest = await page.evaluate(id => tabs.get(id).webview.getWebContentsId(), childId);
   await dragPanel(page, childId, { x: firstTask.x + firstTask.width / 2, y: firstTask.y + firstTask.height / 2 });
   await page.waitForFunction(({ id, windowId }) => tabs.get(id).windowId === windowId, { id: childId, windowId: firstWindow });
@@ -358,6 +381,12 @@ async function run() {
   assert.deepEqual(await page.evaluate(id => appWindows.get(id).layout.toJSON(), firstWindow), beforeMinimize);
   await page.locator('#dock [data-window-id="' + firstWindow + '"]').click();
   assert.equal(await page.evaluate(id => tabs.get(id).webview.getWebContentsId(), robotId), robotGuest);
+  await page.locator('#dock [data-window-id="' + firstWindow + '"]').click();
+  assert.equal(await page.evaluate(id => appWindows.get(id).minimized, firstWindow), true);
+  assert.equal(await page.locator('.app-window[data-window-id="' + firstWindow + '"]').isVisible(), false);
+  await page.locator('#dock [data-window-id="' + firstWindow + '"]').click();
+  assert.equal(await page.evaluate(id => appWindows.get(id).minimized, firstWindow), false);
+  assert.deepEqual(await page.evaluate(id => appWindows.get(id).layout.toJSON(), firstWindow), beforeMinimize);
   await page.locator('#show-desktop').click();
   assert.equal(await page.locator('.app-window:visible').count(), 0);
   assert.deepEqual(await page.screenshot({ clip: { x: 1270, y: 775, width: 10, height: 10 } }), background);
@@ -386,7 +415,7 @@ async function run() {
   await page.screenshot({ path: path.join(screenshots, 'window-desktop-390.png') });
   await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1280, 820));
   await page.waitForFunction(() => innerWidth === 1280);
-  await openPage(page, robotUrl + '/restart');
+  await page.evaluate(url => openApplication(url), robotUrl + '/restart');
   const restartWindow = await page.evaluate(() => activeWindowId);
   await page.evaluate(id => minimizeOuterWindow(appWindows.get(id)), restartWindow);
   await page.locator('#show-desktop').click();

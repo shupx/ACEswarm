@@ -44,7 +44,7 @@ function createApplicationWindow(options = {}) {
   }
   const root = document.createElement('div'); root.className = 'dock-layout';
   frame.append(root); stackEl.append(frame);
-  Object.assign(owner, { frame, root, controls, controlSlots: new Map(), handles: [] });
+  Object.assign(owner, { frame, root, controls, controlSlots: new Map(), sashHandles: new Map(), handles: [] });
   initializeWindowLayout(owner);
   for (const edge of ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']) {
     const handle = document.createElement('div'); handle.className = 'outer-resize-handle'; handle.dataset.edge = edge; handle.dataset.windowId = id;
@@ -94,7 +94,7 @@ function setOuterWindowRegion(owner, region) {
 function disposeEmptyWindow(owner) {
   if (!owner || [...tabs.values()].some(tab => tab.windowId === owner.id)) return;
   layoutMutation = true;
-  try { owner.events.abort(); owner.layout.dispose(); owner.frame.remove(); owner.handles.forEach(handle => handle.remove()); } finally { layoutMutation = false; }
+  try { owner.events.abort(); owner.layout.dispose(); owner.frame.remove(); owner.handles.forEach(handle => handle.remove()); owner.sashHandles.forEach(handle => handle.remove()); } finally { layoutMutation = false; }
   appWindows.delete(owner.id);
   if (activeWindowId === owner.id) {
     activeWindowId = null; activeTabId = null; desktopLayout = undefined;
@@ -215,7 +215,10 @@ function renderWindowTasks(items) {
     button.classList.toggle('minimized', owner.minimized);
     button.append(applicationIcon({ url: tab?.appUrl || defaultUrl, favicon: tab?.favicon }));
     const label = document.createElement('span'); label.className = 'dock-label'; label.textContent = button.title;
-    button.append(label); button.onclick = () => activateWindow(owner.id);
+    button.append(label); button.onclick = () => {
+      if (owner.id === activeWindowId && !desktopVisible && !owner.minimized) minimizeOuterWindow(owner);
+      else activateWindow(owner.id);
+    };
     button.oncontextmenu = event => {
       event.preventDefault(); event.stopPropagation();
       const menu = document.getElementById('dock-menu'); menu.replaceChildren();
@@ -282,7 +285,7 @@ window.addEventListener('pointermove', event => {
   const drag = windowTabDrag;
   if (!drag || Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < 8) return;
   const target = tabDropTarget(event.clientX, event.clientY);
-  tabTransferPreview.hidden = !target.bounds || target.owner?.id === drag.source;
+  tabTransferPreview.hidden = !target.bounds;
   if (!tabTransferPreview.hidden) Object.assign(tabTransferPreview.style, { left: target.bounds.x + 'px', top: target.bounds.y + 'px', width: target.bounds.width + 'px', height: target.bounds.height + 'px' });
 });
 
