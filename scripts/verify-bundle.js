@@ -17,13 +17,18 @@ if (process.platform !== 'linux' || process.arch !== lock.architecture) throw ne
 for (const file of [python, caddy, path.join(packages, 'aivudaos', 'resources', 'ui', 'dist', 'index.html'), path.join(packages, 'aivudaappstore', 'resources', 'ui', 'dist', 'index.html')]) {
   if (!fs.existsSync(file)) throw new Error(`Missing bundled resource: ${file}; run npm run bundle:runtime`);
 }
-const environment = { ...process.env, PYTHONHOME: runtime, PYTHONPATH: packages };
-const importCheck = `import uvicorn, fastapi, yaml, aivudaos.gateway.main, aivudaappstore.backend.app.app, aivudaos, aivudaappstore
+const environment = { ...process.env };
+delete environment.PYTHONHOME;
+delete environment.PYTHONPATH;
+const importCheck = `import sys, subprocess
+sys.path.insert(0, ${JSON.stringify(packages)})
+import uvicorn, fastapi, yaml, aivudaos.gateway.main, aivudaappstore.backend.app.app, aivudaos, aivudaappstore
 from pathlib import Path
 root = Path(${JSON.stringify(packages)}).resolve()
 for module in (aivudaos, aivudaappstore):
-    assert Path(module.__file__).resolve().is_relative_to(root), module.__file__`;
-execFileSync(python, ['-c', importCheck], { env: { ...environment, AIVUDAOS_EMBEDDED_MODE: '1', AIVUDAOS_WS_ROOT: path.join(runtime, 'verify-os'), AIVUDAAPPSTORE_WS_ROOT: path.join(runtime, 'verify-store') }, stdio: 'pipe' });
+    assert Path(module.__file__).resolve().is_relative_to(root), module.__file__
+subprocess.run(['/bin/sh', '-c', 'python3 -c "import encodings"'], check=True)`;
+execFileSync(python, ['-E', '-c', importCheck], { env: { ...environment, AIVUDAOS_EMBEDDED_MODE: '1', AIVUDAOS_WS_ROOT: path.join(runtime, 'verify-os'), AIVUDAAPPSTORE_WS_ROOT: path.join(runtime, 'verify-store') }, stdio: 'pipe' });
 fs.rmSync(path.join(runtime, 'verify-os'), { recursive: true, force: true });
 fs.rmSync(path.join(runtime, 'verify-store'), { recursive: true, force: true });
 const version = (name) => {

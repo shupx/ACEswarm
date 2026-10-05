@@ -4,6 +4,7 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { prepareGateway } = require('./gateway');
 const { fixed } = require('./pages');
+const { pythonModuleArgs } = require('./python-module');
 
 const GATEWAY_PORT = Number(process.env.ACESWARM_GATEWAY_PORT || 28790);
 const STORE_GATEWAY_PORT = Number(process.env.ACESWARM_STORE_GATEWAY_PORT || 28791);
@@ -60,7 +61,8 @@ class LocalServices {
     }
     const log = fs.createWriteStream(path.join(this.paths.logs, `${name}.log`), { flags: 'a' });
     const env = { ...process.env, ...environment };
-    if (!this.runtime.packaged) delete env.PYTHONHOME;
+    delete env.PYTHONHOME;
+    if (this.runtime.packaged) delete env.PYTHONPATH;
     const child = spawn(binary, args, {
       env,
       detached: true,
@@ -92,20 +94,17 @@ class LocalServices {
       XDG_CONFIG_HOME: path.join(this.paths.os, 'caddy-config'),
       XDG_DATA_HOME: path.join(this.paths.os, 'caddy-data'),
     };
-    const common = this.runtime.packaged ? {
-      PYTHONHOME: path.join(this.runtime.resourcesPath, 'python-runtime'),
-      PYTHONPATH: path.join(this.runtime.resourcesPath, 'python-packages'),
-    } : {
+    const common = this.runtime.packaged ? {} : {
       PYTHONPATH: this.runtime.pythonPath,
     };
     const osChild = this.launch('aivudaos', this.runtime.python,
-      ['-m', 'uvicorn', 'aivudaos.gateway.main:app', '--host', '127.0.0.1', '--port', String(osPort)], {
+      pythonModuleArgs(this.runtime, 'uvicorn', ['aivudaos.gateway.main:app', '--host', '127.0.0.1', '--port', String(osPort)]), {
         ...common, ...caddyEnvironment, AIVUDAOS_EMBEDDED_MODE: '1', AIVUDAOS_WS_ROOT: this.paths.os,
         AIVUDAOS_PACKAGE_ROOT: path.join(this.runtime.osRoot, 'aivudaos', 'resources'),
       });
     await waitFor(`http://127.0.0.1:${osPort}/openapi.json`, osChild);
     const storeChild = this.launch('aivudaappstore', this.runtime.python,
-      ['-m', 'uvicorn', 'aivudaappstore.backend.app.app:app', '--host', '127.0.0.1', '--port', String(storePort)], {
+      pythonModuleArgs(this.runtime, 'uvicorn', ['aivudaappstore.backend.app.app:app', '--host', '127.0.0.1', '--port', String(storePort)]), {
         ...common, AIVUDAAPPSTORE_WS_ROOT: this.paths.store,
         AIVUDAAPPSTORE_PACKAGE_ROOT: path.join(this.runtime.storeRoot, 'aivudaappstore', 'resources'),
       });
@@ -135,10 +134,7 @@ class LocalServices {
   }
 
   startPackageMcps() {
-    const common = this.runtime.packaged ? {
-      PYTHONHOME: path.join(this.runtime.resourcesPath, 'python-runtime'),
-      PYTHONPATH: path.join(this.runtime.resourcesPath, 'python-packages'),
-    } : { PYTHONPATH: this.runtime.pythonPath };
+    const common = this.runtime.packaged ? {} : { PYTHONPATH: this.runtime.pythonPath };
     this.startMcpPackage('aivudaos-mcp', 'aivudaos.mcp_server', {
       ...common,
       AIVUDAOS_MCP_BASE_URL: this.endpoints.osApi.replace(/\/$/, ''),
@@ -152,7 +148,7 @@ class LocalServices {
   }
 
   startMcpPackage(name, moduleName, environment) {
-    return this.launch(name, this.runtime.python, ['-m', moduleName], environment, true);
+    return this.launch(name, this.runtime.python, pythonModuleArgs(this.runtime, moduleName), environment, true);
   }
 
   stop() {
