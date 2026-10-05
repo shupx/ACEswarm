@@ -140,7 +140,8 @@ npm run smoke
 
 The desktop integration test launches the actual Electron main process and local
 services using a temporary browser profile and workspace. It checks page loading,
-top-panel Dock pin/unpin, collapsed text entries and horizontal scrolling,
+application favorites, collapsed desktop entries, multiple virtual desktops,
+cross-desktop window dragging without guest reload and independent desktop restoration,
 System menus, panel zoom/address controls, drag docking, nested splits,
 splitter resizing, floating panels and preserved guest instances,
 single-panel ellipsis controls for click-to-open menus and drag docking with no reserved header height,

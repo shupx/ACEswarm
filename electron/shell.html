@@ -23,8 +23,12 @@
             <button id="system-quit" role="menuitem"><i data-lucide="power"></i>Quit ACEswarm</button>
           </div>
         </div>
+      <div class="tools-menu-wrap applications-wrap">
+        <button id="applications-button" class="system-button" aria-haspopup="menu" aria-expanded="false"><i data-lucide="layout-grid"></i><span>Applications</span><i data-lucide="chevron-down"></i></button>
+        <div id="applications-menu" class="tools-menu" role="menu" aria-label="Applications" hidden></div>
+      </div>
       <button id="toggle-dock" class="dock-toggle" title="Collapse panel" aria-label="Collapse panel" aria-expanded="true"><i data-lucide="chevron-up"></i></button>
-      <nav id="dock" class="dock" aria-label="Application Dock"></nav>
+      <nav id="dock" class="dock" aria-label="Desktops"></nav>
       <span id="window-count">Desktop</span>
       <div class="desktop-actions">
         <button id="show-desktop" class="icon-button" title="Show desktop" aria-label="Show desktop"><i data-lucide="panels-top-left"></i></button>
@@ -54,7 +58,9 @@
       <button id="window-address" role="menuitem"><i data-lucide="globe"></i>Address bar</button>
       <button id="window-devtools" role="menuitem"><i data-lucide="code"></i>Developer tools</button>
       <hr />
-      <button id="window-pin" role="menuitem"><i data-lucide="pin"></i>Pin to Dock</button>
+      <button id="window-pin" role="menuitem"><i data-lucide="star"></i>Add to Favorites</button>
+      <label class="menu-section-label" for="window-desktop">Move to desktop</label>
+      <select id="window-desktop" aria-label="Move to desktop"></select>
       <button id="window-float" role="menuitem"><i data-lucide="panels-top-left"></i>Float or dock panel</button>
       <button id="window-max" role="menuitem"><i data-lucide="maximize-2"></i>Maximize or restore</button>
       <button id="window-min" role="menuitem"><i data-lucide="minus"></i>Minimize</button>
@@ -66,7 +72,7 @@
     <button id="forward-button" class="icon-button" title="Forward" aria-label="Forward"><i data-lucide="arrow-right"></i></button>
     <button id="reload-button" class="icon-button" title="Reload" aria-label="Reload"><i data-lucide="rotate-cw"></i></button>
     <input id="address-input" type="url" aria-label="Page address" spellcheck="false" />
-    <button id="add-favorite" class="icon-button" title="Pin to Dock" aria-label="Pin to Dock"><i data-lucide="pin"></i></button>
+    <button id="add-favorite" class="icon-button" title="Add to Favorites" aria-label="Add to Favorites"><i data-lucide="star"></i></button>
     <span id="status-text">Ready</span>
     <button id="collapse-chrome" class="icon-button" title="Hide address bar" aria-label="Hide address bar"><i data-lucide="chevron-up"></i></button>
   </div>
@@ -76,14 +82,18 @@
       <label for="open-page-url">Address</label>
       <input id="open-page-url" type="text" placeholder="https:// or robot address" required autocomplete="off" />
       <p id="open-page-error" role="alert" hidden></p>
-      <div class="dialog-actions"><button id="open-home" type="button">Applications</button><button id="open-store" type="button">Store Admin</button><button class="primary" type="submit">Open</button></div>
+      <div class="dialog-actions"><button id="open-home" type="button">Console</button><button id="open-store" type="button">AppStore Admin</button><button class="primary" type="submit">Open</button></div>
     </form>
+  </dialog>
+  <dialog id="rename-desktop-dialog">
+    <form id="rename-desktop-form"><label for="desktop-name">Desktop name</label><input id="desktop-name" maxlength="40" required /><div class="dialog-actions"><button id="cancel-desktop-name" type="button">Cancel</button><button class="primary" type="submit">Rename</button></div></form>
   </dialog>
   <script src="../node_modules/lucide/dist/umd/lucide.min.js"></script>
   <script src="./desktop-state.js"></script>
   <script src="../node_modules/dockview-core/dist/dockview-core.min.js"></script>
   <script src="./dock-layout.js"></script>
   <script src="./desktop.js"></script>
+  <script src="./workspaces.js"></script>
   <script src="./shell.js"></script>
 </body>
 </html>

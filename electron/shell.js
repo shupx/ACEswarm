@@ -172,8 +172,11 @@ function normalizeSavedShellState(rawState) {
 }
 
 function buildShellStatePayload() {
+  captureDesktop();
   return {
     version: 3,
+    currentDesktopId,
+    desktops: [...desktops.values()].map(({ id, title, layout, activeTabId, desktopVisible, desktopActiveTabId, workspaceRegion, workspaceMaximizeRestore }) => ({ id, title, layout: layout?.toJSON(), activeTabId, desktopVisible, desktopActiveTabId, workspaceRegion, workspaceMaximizeRestore })),
     layout: desktopLayout?.toJSON(),
     desktopVisible,
     desktopActiveTabId,
@@ -190,6 +193,7 @@ function buildShellStatePayload() {
     favorites,
     tabs: Array.from(tabs.values()).map((tab) => ({
       id: tab.id,
+      desktopId: tab.desktopId,
       title: tab.title,
       url: getTabUrl(tab),
       appUrl: tab.appUrl,
@@ -296,7 +300,7 @@ function getSiteNameFromUrl(rawUrl) {
   try {
     const parsed = new URL(normalized);
     if (parsed.origin === new URL(defaultUrl).origin && !/^\/[^/]+\/ui(?:\/|$)/.test(parsed.pathname)) {
-      return "Applications";
+      return "Console";
     }
     const hostname = parsed.hostname.replace(/^www\./, "");
     if (hostname) {
@@ -304,7 +308,7 @@ function getSiteNameFromUrl(rawUrl) {
     }
   } catch (_error) {}
 
-  return "Applications";
+  return "Console";
 }
 
 function isGenericAivudaTitle(title) {
@@ -1490,7 +1494,7 @@ function createTab(rawUrl, options = {}) {
       setToolsMenuOpen(false);
       setWindowMenuOpen(false);
       document.getElementById("dock-menu").hidden = true;
-      if (!desktopVisible && activeTabId !== tab.id && !tab.minimized) activateTab(tab.id);
+      if (tab.desktopId === currentDesktopId && !desktopVisible && activeTabId !== tab.id && !tab.minimized) activateTab(tab.id);
       return;
     }
     if (event.channel === "aivuda-shell:open-url-in-new-tab") {
@@ -1581,10 +1585,11 @@ function activateTab(id) {
     return;
   }
 
+  const tab = tabs.get(id);
+  if (tab.desktopId !== currentDesktopId) switchDesktop(tab.desktopId);
   activeTabId = id;
   desktopVisible = false;
   desktopActiveTabId = id;
-  const tab = tabs.get(id);
   tab.minimized = false;
   if (!tab.panel) addApplicationPanel(tab);
   tab.panel.api.setActive();
@@ -1641,6 +1646,8 @@ function setToolsMenuOpen(isOpen) {
   toolsMenu.hidden = !isOpen;
   toolsButton.setAttribute("aria-expanded", String(isOpen));
   if (isOpen) {
+    document.getElementById('applications-menu').hidden = true;
+    document.getElementById('applications-button').setAttribute('aria-expanded', 'false');
     syncOverlayMenuState();
     setWindowMenuOpen(false);
     document.getElementById("dock-menu").hidden = true;
@@ -1802,6 +1809,13 @@ window.setInterval(() => {
 }, shellStateAutosaveIntervalMs);
 
 window.aivudaShell.getStartup().then((startup) => {
+  const savedDesktops = Array.isArray(startup.savedState?.desktops) ? startup.savedState.desktops.filter(item => item && /^desktop-\d+$/.test(item.id)) : [];
+  for (const item of savedDesktops) {
+    desktops.set(item.id, { id: item.id, title: item.title || 'Desktop', desktopVisible: true });
+    nextDesktopId = Math.max(nextDesktopId, Number(item.id.slice(8)) + 1);
+  }
+  if (!desktops.size) desktops.set('desktop-1', { id: 'desktop-1', title: 'Desktop 1', desktopVisible: true });
+  currentDesktopId = [...desktops.keys()][0];
   defaultUrl = startup.defaultUrl || defaultUrl;
   storeUrl = startup.storeUrl || "";
   serviceOrigins = { os: defaultUrl, store: storeUrl, gateway: startup.gatewayUrl || "" };
@@ -1831,6 +1845,19 @@ window.aivudaShell.getStartup().then((startup) => {
     for (const tabState of restoredTabs) {
       createTab(tabState.url, { ...tabState, chromeExpanded: tabState.chromeExpanded ?? savedState.chromeExpanded });
     }
+    if (savedDesktops.length) {
+      for (const item of savedDesktops) {
+        switchDesktop(item.id);
+        restoreDesktopLayout(item.layout);
+      }
+      for (const item of savedDesktops) Object.assign(desktops.get(item.id), { activeTabId: item.activeTabId, desktopVisible: item.desktopVisible, desktopActiveTabId: item.desktopActiveTabId, workspaceRegion: item.workspaceRegion, workspaceMaximizeRestore: item.workspaceMaximizeRestore });
+      // Load the saved desktop state without overwriting it with restore-time state.
+      currentDesktopId = '';
+      switchDesktop(desktops.has(startup.savedState.currentDesktopId) ? startup.savedState.currentDesktopId : savedDesktops[0].id);
+      for (const desktop of desktops.values()) if (desktop.id !== currentDesktopId && desktop.root) { desktop.root.hidden = true; desktop.root.removeAttribute('id'); }
+      renderScreenRecordBar(); renderDesktop(); finishShellStateRestore(); return;
+    }
+    switchDesktop('desktop-1');
     restoreDesktopLayout(startup.savedState.layout);
     workspaceRegion = ['left', 'right', 'top', 'bottom'].includes(startup.savedState.workspaceRegion) ? startup.savedState.workspaceRegion : 'full';
     workspaceMaximizeRestore = ['left', 'right', 'top', 'bottom'].includes(startup.savedState.workspaceMaximizeRestore) ? startup.savedState.workspaceMaximizeRestore : 'full';

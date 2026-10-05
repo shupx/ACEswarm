@@ -6,6 +6,7 @@ const { workspace } = require('./services/workspace');
 const { resolveRuntime } = require('./services/runtime');
 const { LocalServices } = require('./services/local-services');
 const { provisionOnce, prepareBootstrap } = require('./services/seed');
+const { installedApplications } = require('./services/applications');
 const recording = require('./services/recording')(() => window, (failure) => sendToShell('aivuda-shell:recording-error', failure), (child) => services?.trackRecording(child));
 
 let services;
@@ -227,6 +228,10 @@ app.whenReady().then(async () => {
       return { ok: true };
     });
     ipcMain.handle('aivuda-shell:get-startup', () => ({ defaultUrl: endpoints.os, initialUrl: endpoints.os, storeUrl: endpoints.store, gatewayUrl: endpoints.gateway, recordingsDir: path.join(app.getPath('videos'), 'ACEswarm'), savedState: shellState }));
+    ipcMain.handle('aivuda-shell:get-installed-applications', (event) => {
+      if (event.sender !== window?.webContents) throw new Error('Only the desktop can read the application catalog.');
+      return installedApplications(endpoints.osApi, endpoints.os);
+    });
     ipcMain.handle('aivuda-shell:authorize-url', (event, rawUrl) => {
       if (event.sender !== window?.webContents) return { ok: false, error: 'Only the desktop can authorize pages.' };
       try {

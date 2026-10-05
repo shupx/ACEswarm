@@ -40,7 +40,7 @@ function applicationIcon(entry) {
 
 function applicationEntries() {
   const entries = new Map();
-  for (const entry of [{ url: defaultUrl, title: "Applications", builtin: true }, { url: storeUrl, title: "Store Admin", builtin: true }, ...favorites]) {
+  for (const entry of [{ url: defaultUrl, title: "Console", builtin: true }, { url: storeUrl, title: "AppStore Admin", builtin: true }, ...favorites]) {
     if (!entry.url) continue;
     const key = desktopState.appKey(entry.url);
     if (!entries.has(key)) entries.set(key, { ...entry, title: entry.title || getSiteNameFromUrl(entry.url), key, pinned: true, windows: [] });
@@ -57,7 +57,7 @@ function applicationEntries() {
 
 function openApplication(url) {
   const key = desktopState.appKey(url);
-  const matches = [...tabs.values()].filter((tab) => desktopState.appKey(tab.appUrl) === key);
+  const matches = [...tabs.values()].filter((tab) => tab.desktopId === currentDesktopId && desktopState.appKey(tab.appUrl) === key);
   const tab = matches.find((tab) => tab.id === activeTabId) || matches.at(-1);
   if (tab) activateTab(tab.id);
   else createTab(url);
@@ -75,9 +75,12 @@ function minimizeApplicationWindow(tab) {
   if (!tab?.panel || tab.minimized) return;
   tab.minimized = true;
   detachApplicationPanel(tab);
+  const owner = desktops.get(tab.desktopId);
+  if (owner?.activeTabId === tab.id) owner.activeTabId = owner.layout?.activePanel?.id || null;
+  if (owner?.desktopActiveTabId === tab.id) owner.desktopActiveTabId = owner.layout?.activePanel?.id || null;
   if (activeTabId === tab.id) {
     activeTabId = null;
-    const next = [...tabs.values()].reverse().find((other) => !other.minimized);
+    const next = [...tabs.values()].reverse().find((other) => other.desktopId === currentDesktopId && !other.minimized);
     if (next) activateTab(next.id);
     else { updateAddressFromActiveTab(); updateNavigationState(); }
   }
@@ -87,7 +90,7 @@ function minimizeApplicationWindow(tab) {
 
 function showDesktop() {
   if (desktopVisible) {
-    const tab = tabs.get(desktopActiveTabId) || [...tabs.values()].find((entry) => !entry.minimized);
+    const tab = tabs.get(desktopActiveTabId) || [...tabs.values()].find((entry) => entry.desktopId === currentDesktopId && !entry.minimized);
     if (tab) { activateTab(tab.id); return; }
   }
   desktopActiveTabId = desktopLayout?.activePanel?.id || activeTabId || desktopActiveTabId;
@@ -117,7 +120,7 @@ function openDockMenu(event, entry) {
   command(entry.windows.length ? "Activate" : "Open", () => openApplication(entry.url));
   command("New window", () => createTab(entry.url));
   if (!entry.builtin) {
-    command(entry.pinned ? "Unpin from Dock" : "Pin to Dock", () => {
+    command(entry.pinned ? "Remove from Favorites" : "Add to Favorites", () => {
       if (entry.pinned) {
         favorites = favorites.filter((favorite) => desktopState.appKey(favorite.url) !== entry.key);
         renderDesktop(); writeShellState();
@@ -169,32 +172,12 @@ function renderDesktop() {
   const items = document.createElement("div");
   items.className = "dock-items";
   dock.append(items);
+  renderWorkspaceDock(items);
   for (const entry of applicationEntries()) {
-    const button = document.createElement("button");
-    button.className = "dock-item";
-    button.dataset.appUrl = entry.url;
-    button.title = entry.title + (entry.windows.length ? " (" + entry.windows.length + " windows)" : "");
-    button.setAttribute("aria-label", button.title);
-    button.setAttribute("aria-pressed", String(entry.windows.some((tab) => tab.id === activeTabId)));
-    button.classList.toggle("active", entry.windows.some((tab) => tab.id === activeTabId));
-    button.classList.toggle("minimized", entry.windows.length > 0 && entry.windows.every((tab) => tab.minimized));
-    button.append(applicationIcon(entry));
-    const text = document.createElement("span");
-    text.className = "dock-label";
-    text.textContent = entry.title;
-    button.append(text);
-    if (entry.windows.length) {
-      const dot = document.createElement("span"); dot.className = "running-dot"; button.append(dot);
-      if (entry.windows.length > 1) {
-        const badge = document.createElement("span"); badge.className = "window-badge"; badge.textContent = entry.windows.length; button.append(badge);
-      }
-    }
-    button.onclick = () => openApplication(entry.url);
-    button.oncontextmenu = (event) => openDockMenu(event, entry);
-    items.append(button);
     if (entry.pinned) {
       const shortcut = document.createElement("button");
       shortcut.className = "desktop-shortcut";
+      shortcut.dataset.appUrl = entry.url;
       shortcut.title = entry.title;
       shortcut.append(applicationIcon(entry));
       const label = document.createElement("span"); label.className = "shortcut-label"; label.textContent = entry.title; shortcut.append(label);
@@ -210,11 +193,15 @@ function renderDesktop() {
       event.preventDefault();
     }
   }, { passive: false });
-  document.getElementById("window-count").textContent = tabs.size ? tabs.size + (tabs.size === 1 ? " window" : " windows") : "Desktop";
+  const windowCount = [...tabs.values()].filter(tab => tab.desktopId === currentDesktopId).length;
+  document.getElementById("window-count").textContent = windowCount ? windowCount + (windowCount === 1 ? " window" : " windows") : "Desktop";
+  renderApplicationsMenu();
   refreshDesktopIcons();
 }
 
 function mountApplicationWindow(tab, options) {
+  tab.desktopId = desktops.has(options.desktopId) ? options.desktopId : currentDesktopId;
+  if (tab.desktopId !== currentDesktopId) switchDesktop(tab.desktopId);
   initializeDesktopLayout();
   tab.chromeExpanded = options.chromeExpanded === true;
   tab.minimized = false;
@@ -227,7 +214,7 @@ function mountApplicationWindow(tab, options) {
   stackEl.append(tab.body);
   addApplicationPanel(tab, options);
   tab.webview.addEventListener("focus", () => {
-    if (!desktopVisible && !tab.minimized && tab.panel?.api.isVisible) activateTab(tab.id);
+    if (tab.desktopId === currentDesktopId && !desktopVisible && !tab.minimized && tab.panel?.api.isVisible) activateTab(tab.id);
   });
   refreshDesktopIcons();
 }
@@ -241,9 +228,12 @@ function removeApplicationWindow(tab) {
   tab.webview.remove();
   tab.body.remove();
   tabs.delete(tab.id);
+  const owner = desktops.get(tab.desktopId);
+  if (owner?.activeTabId === tab.id) owner.activeTabId = owner.layout?.activePanel?.id || null;
+  if (owner?.desktopActiveTabId === tab.id) owner.desktopActiveTabId = owner.layout?.activePanel?.id || null;
   if (activeTabId === tab.id) {
     activeTabId = null;
-    const next = [...tabs.values()].reverse().find((other) => !other.minimized);
+    const next = [...tabs.values()].reverse().find((other) => other.desktopId === currentDesktopId && !other.minimized);
     if (next) activateTab(next.id);
   }
   updateAddressFromActiveTab(); updateNavigationState(); renderDesktop(); writeShellState();
@@ -267,14 +257,24 @@ function updateWindowZoom() {
 }
 
 function openWindowMenu(tab) {
+  if (!tab) return;
   const menu = document.getElementById("window-menu");
   if (!menu.hidden && menu.dataset.windowId === tab.id) { setWindowMenuOpen(false); return; }
   setToolsMenuOpen(false);
   document.getElementById("dock-menu").hidden = true;
+  document.getElementById('applications-menu').hidden = true;
+  document.getElementById('applications-button').setAttribute('aria-expanded', 'false');
   activateTab(tab.id);
   menu.dataset.windowId = tab.id;
   setWindowMenuOpen(true);
   updateWindowZoom();
+  const select = document.getElementById('window-desktop');
+  select.replaceChildren();
+  for (const desktop of desktops.values()) {
+    const option = new Option(desktop.title, desktop.id); option.selected = desktop.id === tab.desktopId; select.append(option);
+  }
+  select.append(new Option('New desktop…', 'new'));
+  select.onchange = () => { const id = select.value === 'new' ? addDesktop() : select.value; setWindowMenuOpen(false); moveWindowToDesktop(tab, id); };
   const rect = tab.panel.group.element.querySelector(".panel-menu").getBoundingClientRect();
   menu.style.left = Math.max(8, Math.min(rect.right - menu.offsetWidth, innerWidth - menu.offsetWidth - 8)) + "px";
   menu.style.top = Math.max(dockCollapsed ? 32 : 52, Math.min(rect.bottom + 4, innerHeight - menu.offsetHeight - 8)) + "px";
@@ -335,6 +335,7 @@ document.getElementById("open-page-form").onsubmit = async (event) => {
 };
 document.addEventListener("click", () => { document.getElementById("dock-menu").hidden = true; });
 document.getElementById("window-menu").addEventListener("click", (event) => event.stopPropagation());
+document.getElementById('window-menu').addEventListener('pointerdown', event => event.stopPropagation());
 document.getElementById("window-zoom-in").onclick = () => { adjustActiveTabZoom(zoomStep); updateWindowZoom(); };
 document.getElementById("window-zoom-out").onclick = () => { adjustActiveTabZoom(-zoomStep); updateWindowZoom(); };
 document.getElementById("window-zoom-reset").onclick = () => { resetActiveTabZoom(); updateWindowZoom(); };
@@ -342,13 +343,13 @@ for (const region of ['left', 'right', 'top', 'bottom', 'full']) {
   document.getElementById('workspace-' + region).onclick = () => { setWindowMenuOpen(false); setWorkspaceRegion(region); };
 }
 for (const [id, action] of [["window-reload", () => reloadActiveTab()], ["window-address", toggleActiveAddressBar], ["window-devtools", toggleActiveDevtools],
-  ["window-pin", () => addCurrentFavorite()], ["window-float", () => floatOrDockPanel(getActiveTab())],
-  ["window-max", togglePanelMaximized], ["window-min", () => minimizeApplicationWindow(getActiveTab())], ["window-close", () => closeTab(activeTabId)]]) {
-  document.getElementById(id).onclick = () => { setWindowMenuOpen(false); action(); };
+  ["window-pin", tab => pinApplication({ url: tab.appUrl, title: tab.title, favicon: tab.favicon })], ["window-float", tab => floatOrDockPanel(tab)],
+  ["window-max", togglePanelMaximized], ["window-min", tab => minimizeApplicationWindow(tab)], ["window-close", tab => closeTab(tab.id)]]) {
+  document.getElementById(id).onclick = () => { const tab = tabs.get(document.getElementById('window-menu').dataset.windowId); setWindowMenuOpen(false); if (tab) action(tab); };
 }
 document.addEventListener("click", (event) => { if (!event.target.closest(".panel-menu")) setWindowMenuOpen(false); });
 document.addEventListener("keydown", (event) => {
-  const menus = [document.getElementById("tools-menu"), document.getElementById("dock-menu"), document.getElementById("window-menu")];
+  const menus = [document.getElementById("tools-menu"), document.getElementById("dock-menu"), document.getElementById("window-menu"), document.getElementById('applications-menu')];
   const menu = menus.find((entry) => !entry.hidden);
   if (!menu) {
     if (event.key === "Escape" && !document.querySelector("dialog[open]")) setChromeExpanded(false);
@@ -363,7 +364,7 @@ document.addEventListener("keydown", (event) => {
     } else menu.hidden = true;
   } else if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
     event.preventDefault();
-    const items = [...menu.querySelectorAll("button:not(:disabled)")];
+    const items = [...menu.querySelectorAll("button:not(:disabled), summary")].filter(item => item.getClientRects().length);
     const index = items.indexOf(document.activeElement);
     const next = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : (index + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
     items[next]?.focus();

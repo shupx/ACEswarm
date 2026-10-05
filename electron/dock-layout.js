@@ -40,9 +40,9 @@ function syncPanelBodies() {
   if (iconsAdded) refreshDesktopIcons();
   const hostRect = stackEl.getBoundingClientRect();
   for (const tab of tabs.values()) {
-    const panel = desktopLayout.getPanel(tab.id);
+    const panel = desktops.get(tab.desktopId)?.layout?.getPanel(tab.id);
     if (panel) tab.panel = panel;
-    const visible = !desktopVisible && !tab.minimized && panel?.api.isVisible && tab.anchor?.isConnected;
+    const visible = tab.desktopId === currentDesktopId && !desktopVisible && !tab.minimized && panel?.api.isVisible && tab.anchor?.isConnected;
     tab.body.hidden = !visible;
     if (!visible) continue;
     const rect = tab.anchor.getBoundingClientRect();
@@ -109,6 +109,8 @@ function initializeDesktopLayout() {
   if (desktopLayout) return;
   const root = document.createElement('div');
   root.id = 'dock-layout';
+  root.className = 'dock-layout';
+  root.desktopEvents = new AbortController();
   stackEl.prepend(root);
   const library = window['dockview-core'];
   desktopLayout = library.createDockview(root, {
@@ -129,8 +131,12 @@ function initializeDesktopLayout() {
     },
     createRightHeaderActionComponent: panelActions,
   });
+  const owner = currentDesktop();
+  owner.layout = desktopLayout;
+  owner.root = root;
+  const layout = desktopLayout;
   desktopLayout.onDidActivePanelChange((panel) => {
-    if (layoutMutation || desktopVisible || !panel || !tabs.has(panel.id)) return;
+    if (layout !== desktopLayout || layoutMutation || desktopVisible || !panel || !tabs.has(panel.id)) return;
     activeTabId = panel.id;
     tabs.get(panel.id).panel = panel;
     updateActiveClasses(); updateAddressFromActiveTab(); updateNavigationState();
@@ -157,6 +163,7 @@ function initializeDesktopLayout() {
   layoutApplicationWindows();
   installCompactWindowControls(root);
   installWorkspaceSnapping(root);
+  installDesktopTransfer(root);
 }
 
 function installCompactWindowControls(root) {
@@ -167,8 +174,8 @@ function installCompactWindowControls(root) {
   }, true);
   window.addEventListener('pointermove', (event) => {
     if (gesture && Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) > 6) gesture.moved = true;
-  });
-  for (const type of ['pointercancel', 'blur']) window.addEventListener(type, () => { gesture = null; });
+  }, { signal: root.desktopEvents.signal });
+  for (const type of ['pointercancel', 'blur']) window.addEventListener(type, () => { gesture = null; }, { signal: root.desktopEvents.signal });
   root.addEventListener('click', (event) => {
     const control = event.target.closest('.compact-window-control');
     if (!control) return;
@@ -208,6 +215,7 @@ function addApplicationPanel(tab, options = {}) {
 }
 
 function rememberPanelPlacement(tab) {
+  const layout = desktops.get(tab.desktopId)?.layout;
   const group = tab.panel?.group;
   if (!group) return;
   const rect = group.element.getBoundingClientRect();
@@ -216,7 +224,7 @@ function rememberPanelPlacement(tab) {
     : { reference: group.panels.find((panel) => panel.id !== tab.id)?.id, index: group.panels.findIndex((panel) => panel.id === tab.id) };
   if (group.api.location.type === 'grid' && !tab.placement.reference) {
     for (const [direction, restoreDirection] of [['left', 'right'], ['right', 'left'], ['up', 'below'], ['down', 'above']]) {
-      const neighbor = desktopLayout.adjacentGroupInDirection(group, direction);
+      const neighbor = layout.adjacentGroupInDirection(group, direction);
       if (!neighbor?.panels.length) continue;
       tab.placement = { reference: neighbor.panels[0].id, direction: restoreDirection };
       break;
@@ -226,10 +234,11 @@ function rememberPanelPlacement(tab) {
 
 function detachApplicationPanel(tab) {
   if (!tab.panel) return;
-  if (!desktopLayout.getPanel(tab.id)) { tab.panel = null; tab.body.hidden = true; return; }
+  const layout = desktops.get(tab.desktopId)?.layout;
+  if (!layout?.getPanel(tab.id)) { tab.panel = null; tab.body.hidden = true; return; }
   rememberPanelPlacement(tab);
   layoutMutation = true;
-  try { desktopLayout.removePanel(tab.panel); } finally { layoutMutation = false; tab.panel = null; }
+  try { layout.removePanel(tab.panel); } finally { layoutMutation = false; tab.panel = null; }
   tab.body.hidden = true;
   schedulePanelLayout();
 }
@@ -261,7 +270,8 @@ function setWorkspaceRegion(region) {
 
 function installWorkspaceSnapping(root) {
   const preview = document.createElement('div');
-  preview.id = 'workspace-snap-preview';
+  preview.className = 'workspace-snap-preview';
+  root.snapPreview = preview;
   preview.hidden = true;
   shellEl.append(preview);
   let drag;
@@ -280,26 +290,26 @@ function installWorkspaceSnapping(root) {
       const bounds = desktopState.workspaceBounds({ width: innerWidth, height: innerHeight }, dockCollapsed, target);
       Object.assign(preview.style, { left: bounds.x + 'px', top: bounds.y + 'px', width: bounds.width + 'px', height: bounds.height + 'px' });
     }
-  });
+  }, { signal: root.desktopEvents.signal });
   window.addEventListener('pointerup', () => {
     const region = target;
     drag = null; target = null; preview.hidden = true;
     if (region) requestAnimationFrame(() => setWorkspaceRegion(region));
-  });
-  for (const event of ['pointercancel', 'blur']) window.addEventListener(event, () => { drag = null; target = null; preview.hidden = true; });
+  }, { signal: root.desktopEvents.signal });
+  for (const event of ['pointercancel', 'blur']) window.addEventListener(event, () => { drag = null; target = null; preview.hidden = true; }, { signal: root.desktopEvents.signal });
 }
 
 function restoreDesktopLayout(layout) {
   if (!layout || !desktopLayout) return;
-  const visible = [...tabs.values()].filter((tab) => !tab.minimized).map((tab) => tab.id).sort();
+  const visible = [...tabs.values()].filter((tab) => tab.desktopId === currentDesktopId && !tab.minimized).map((tab) => tab.id).sort();
   if (JSON.stringify(Object.keys(layout.panels || {}).sort()) !== JSON.stringify(visible) || layout.popoutGroups?.length) return;
   layoutMutation = true;
   try {
     desktopLayout.fromJSON(layout, { reuseExistingPanels: true });
-    for (const tab of tabs.values()) tab.panel = desktopLayout.getPanel(tab.id) || null;
+    for (const tab of tabs.values()) if (tab.desktopId === currentDesktopId) tab.panel = desktopLayout.getPanel(tab.id) || null;
   } catch (error) {
     console.warn('Could not restore desktop layout:', error);
     desktopLayout.clear();
-    for (const tab of tabs.values()) if (!tab.minimized) addApplicationPanel(tab);
+    for (const tab of tabs.values()) if (tab.desktopId === currentDesktopId && !tab.minimized) addApplicationPanel(tab);
   } finally { layoutMutation = false; schedulePanelLayout(); }
 }

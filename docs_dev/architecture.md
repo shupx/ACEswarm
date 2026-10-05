@@ -18,7 +18,7 @@ AivudaOS and AivudaAppStore remain independent distributions. ACEswarm launches 
 
 ## Desktop shell
 
-First launch shows the desktop with Applications and Store Admin shortcuts,
+First launch shows Desktop 1 with Console and AppStore Admin shortcuts,
 without opening any application windows. Subsequent launches restore the saved session.
 
 The Electron renderer uses plain JavaScript, Dockview Core for tab groups,
@@ -34,22 +34,31 @@ WebViews stay mounted in permanent shell containers; Dockview content anchors
 drive their position, size, visibility and floating z-order. Moving a panel or
 minimizing it does not recreate its guest. Closing releases the WebView.
 
-Show desktop hides the entire workspace without removing Dockview panels or
-changing minimized flags. Clicking it again, or activating a running application
-from the Dock, restores the layout. Desktop visibility and the last active panel
+Each virtual desktop owns a Dockview instance, layout, active window and desktop
+visibility state. The top desktop strip switches between them and provides a
+plus button to create a desktop. Drag a window tab or compact ellipsis onto a
+desktop button (or the plus button) to move it without recreating its WebView.
+The window menu also provides a desktop selector. Desktop context menus support
+renaming, moving all windows to another desktop before removal, and restoring
+minimized windows. At least one desktop remains.
+
+Show desktop hides the current workspace without removing Dockview panels or
+changing minimized flags. Clicking it again restores the layout. Desktop visibility and the last active panel
 survive restart. A workspace may occupy the full desktop or either horizontal or
 vertical half; the unused area exposes desktop shortcuts and the background.
 A single docked window supports edge dragging with a placement preview. Opening
 a second page in a half-screen workspace fills the complementary half. Group
 maximization fills the desktop below the top panel and restores the previous region.
 
-The collapsible top panel combines System, Applications/Store Admin, pinned page entries,
-running applications, desktop actions and the clock. Its expanded/collapsed height
+The collapsible top panel places Applications beside System on the left, followed
+by the desktop strip, desktop actions and clock. Its expanded/collapsed height
 (48/28 pixels) is reserved by the window manager. Maximized windows fill the
 viewport below it; Dockview recomputes the available workspace when it is toggled.
-Expanded Dock entries show icons; collapsed entries show application names,
-running state and window counts in a horizontally scrollable row. Applications
-hosts AivudaOS, including its Online Store for downloads. Store Admin hosts the
+Desktop entries show names in both modes and scroll horizontally when needed.
+Applications contains an expandable All list of installed apps with static UI
+entrypoints, obtained through the authenticated local AivudaOS API, followed by
+favorite apps. Favorites have remove buttons; Console and AppStore Admin are
+permanent entries. Console hosts AivudaOS, including its Online Store for downloads. AppStore Admin hosts the
 AivudaAppStore upload/publication management backend. Internal IDs remain unchanged.
 
 Guest preload initializes the internal AivudaOS Online Store URL to the actual
@@ -69,17 +78,18 @@ Each window's upper-right controls expose the address bar, pinning and a menu fo
 page zoom, reload and developer tools. Zoom retains Chromium's shared browser
 session behavior. Main-process input handlers preserve shortcuts even in guests.
 Applications are identified by their launch URL (ignoring the fragment), separately
-from a window's current navigation URL. Multiple windows share a Dock entry;
-ordinary clicks activate an existing window, while the context menu can open
-another window, switch windows, pin/unpin, reorder pinned entries, or close them.
-Pinned entries also appear as desktop shortcuts.
+from a window's current navigation URL. Launching an application activates an
+existing window on the current desktop or opens a new window there. Favorite
+entries also appear as desktop shortcuts. Their context menus support new
+windows, switching windows and removing favorites.
 
 The existing shell-state file stores bookmarks, application launch URLs, page
 URLs, minimized panel placement, address-bar visibility and the serialized Dockview
-layout (split proportions, tab order, floating bounds and maximized groups).
+layouts for every virtual desktop (split proportions, tab order, floating bounds
+and maximized groups), window desktop IDs and the selected desktop.
 State version 3 accepts legacy tabs/bookmarks and WinBox bounds; legacy floating
 windows are migrated into Dockview floating panels. Invalid layouts fall back to
-the restored page list.
+the restored page list. Sessions predating virtual desktops migrate to Desktop 1.
 The outer Electron window stores its normal size and maximized state separately
 in `window-state.json` under the Electron user-data directory. Restored dimensions
 are constrained by the primary display's work area and the window's minimum size.
@@ -114,6 +124,7 @@ ACEswarm/
 │   ├── shell.html/js/css       # Workbench shell
 │   ├── desktop.js             # Dock and application operations
 │   ├── dock-layout.js         # Dockview and stable WebView containers
+│   ├── workspaces.js          # Virtual desktops and application launcher
 │   └── services/
 │       ├── local-services.js   # Service lifecycle, ports, health checks
 │       ├── runtime.js          # Runtime and package resolution

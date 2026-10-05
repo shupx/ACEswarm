@@ -59,12 +59,17 @@ async function launch(expectedWindow) {
   }
   await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1280, 820));
   page.on('pageerror', (error) => { errors.push(error.message); console.error('Renderer error:', error); });
-  await page.waitForFunction(() => typeof isRestoringShellState !== 'undefined' && !isRestoringShellState && document.querySelector('#dock .dock-item[data-app-url]'), { timeout: 30000 });
+  await page.waitForFunction(() => typeof isRestoringShellState !== 'undefined' && !isRestoringShellState && document.querySelector('#dock .dock-item[data-desktop-id]'), { timeout: 30000 });
   return page;
 }
 
 async function count(page, expected) {
   await page.waitForFunction((value) => tabs.size === value, expected);
+}
+
+async function applicationButton(page, url) {
+  if (!await page.locator('#applications-menu').isVisible()) await page.locator('#applications-button').click();
+  return page.locator('#applications-menu button[data-app-url="' + url + '"]').last();
 }
 
 async function waitForGuestLayout(page) {
@@ -175,14 +180,14 @@ async function run() {
   assert.equal(await page.evaluate(() => desktopVisible), true);
   assert.equal(await page.evaluate(() => activeTabId), null);
   assert.equal(await page.locator('#dock-layout').isVisible(), false);
-  assert.deepEqual(await page.locator('#desktop-shortcuts .shortcut-label').allTextContents(), ['Applications', 'Store Admin']);
+  assert.deepEqual(await page.locator('#desktop-shortcuts .shortcut-label').allTextContents(), ['Console', 'AppStore Admin']);
   await page.screenshot({ path: path.join(screenshots, 'desktop-first-launch.png') });
   await page.locator('#desktop-shortcuts .desktop-shortcut').first().click();
   await count(page, 1);
   await page.waitForFunction(() => getActiveTab().webview.getURL().startsWith('http:'));
-  console.log('PASS: first launch shows an empty desktop; Applications opens from its shortcut');
-  await page.waitForFunction(() => getActiveTab().title === 'Applications');
-  assert.equal(await page.evaluate(() => resolveTabDisplayTitle('AivudaOS', defaultUrl)), 'Applications');
+  console.log('PASS: first launch shows an empty desktop; Console opens from its shortcut');
+  await page.waitForFunction(() => getActiveTab().title === 'Console');
+  assert.equal(await page.evaluate(() => resolveTabDisplayTitle('AivudaOS', defaultUrl)), 'Console');
   const initialId = await page.evaluate(() => activeTabId);
   const initialLayout = await page.evaluate(() => desktopLayout.toJSON());
   const initialGuest = await page.evaluate(() => getActiveTab().webview.getWebContentsId());
@@ -235,7 +240,7 @@ async function run() {
     return [...bitmap.subarray(offset, offset + 3)];
   }, [...desktopShot]);
   assert.ok(desktopPixel.some((value) => value < 245), 'Desktop center must show the desktop background, not white Dockview');
-  await page.locator('#dock button[data-app-url="' + await page.evaluate(() => defaultUrl) + '"]').click();
+  await (await applicationButton(page, await page.evaluate(() => defaultUrl))).click();
   assert.equal(await page.evaluate(() => desktopVisible), false);
   assert.equal(await page.evaluate(() => getActiveTab().webview.getWebContentsId()), initialGuest);
   assert.deepEqual(await page.evaluate(() => desktopLayout.toJSON()), initialLayout);
@@ -243,7 +248,7 @@ async function run() {
   await page.mouse.move(singleTab.x + singleTab.width / 2, singleTab.y + singleTab.height / 2);
   await page.mouse.down();
   await page.mouse.move(8, 450, { steps: 20 });
-  assert.equal(await page.locator('#workspace-snap-preview').isVisible(), true);
+  assert.equal(await page.locator('.workspace-snap-preview').isVisible(), true);
   await page.mouse.up();
   await page.waitForFunction(() => workspaceRegion === 'left');
   assert.equal((await page.locator('#webview-stack').boundingBox()).width, 640);
@@ -299,11 +304,11 @@ async function run() {
   await count(page, 1);
   console.log('PASS: untrusted HTTPS loads; generic load failure page retries the original URL');
   await page.evaluate(() => { nextTabId = 2; });
-  assert.equal(await page.locator('#dock .dock-label').nth(0).textContent(), 'Applications');
-  assert.equal(await page.locator('#dock .dock-label').nth(1).textContent(), 'Store Admin');
-  assert.deepEqual(await page.locator('#desktop-shortcuts .shortcut-label').allTextContents(), ['Applications', 'Store Admin']);
-  assert.equal(await page.locator('#open-home').textContent(), 'Applications');
-  assert.equal(await page.locator('#open-store').textContent(), 'Store Admin');
+  assert.equal(await page.locator('#dock .dock-label').nth(0).textContent(), 'Desktop 1');
+  assert.equal(await page.locator('#dock [data-app-url]').count(), 0);
+  assert.deepEqual(await page.locator('#desktop-shortcuts .shortcut-label').allTextContents(), ['Console', 'AppStore Admin']);
+  assert.equal(await page.locator('#open-home').textContent(), 'Console');
+  assert.equal(await page.locator('#open-store').textContent(), 'AppStore Admin');
   assert.equal(await application.evaluate(({ Menu }) => Menu.getApplicationMenu()), null);
   assert.equal(await page.evaluate(() => document.querySelector('#dock').closest('.desktop-bar') !== null), true);
   await page.locator('#tools-button').click();
@@ -322,18 +327,18 @@ async function run() {
   await windowCommand(page, robotId, 'pin');
   await page.waitForFunction((url) => favorites.some((entry) => entry.url === url), robotUrl);
   assert.equal(await page.locator('#desktop-shortcuts .desktop-shortcut').count(), 3);
-  console.log('PASS: custom page loads, receives title, and pins to Dock and desktop');
+  console.log('PASS: custom page loads, receives title, and joins favorites and desktop shortcuts');
 
   await page.evaluate(() => getActiveTab().webview.executeJavaScript('window.testInstance = "preserved"'));
   await windowCommand(page, robotId, 'min');
   await page.waitForFunction((id) => tabs.get(id).minimized, robotId);
   assert.equal(await page.locator('#' + robotId).isVisible(), false);
   assert.equal(await page.evaluate((id) => tabs.get(id).webview.getURL(), robotId), robotUrl);
-  await page.locator('#dock button[data-app-url="' + robotUrl + '"]').click();
+  await (await applicationButton(page, robotUrl)).click();
   await page.waitForFunction((id) => activeTabId === id && !tabs.get(id).minimized, robotId);
   await count(page, 2);
   assert.equal(await page.evaluate(() => getActiveTab().webview.executeJavaScript('window.testInstance')), 'preserved');
-  console.log('PASS: minimize keeps WebView alive; Dock restores without duplicate windows');
+  console.log('PASS: minimize keeps WebView alive; Applications restores without duplicate windows');
 
   await windowCommand(page, robotId, 'address');
   assert.equal(await page.locator('#browser-toolbar').isVisible(), true);
@@ -388,13 +393,13 @@ async function run() {
   assert.equal(maximized.x, 0); assert.equal(maximized.width, 1280);
   assert.equal(maximized.y, 28); assert.equal(maximized.height, 792);
   assert.equal(await page.locator('#dock .dock-label').nth(0).isVisible(), true);
-  assert.equal(await page.locator('#dock .app-icon').nth(0).isVisible(), false);
-  await page.locator('#dock button[data-app-url="' + await page.evaluate(() => defaultUrl) + '"]').click();
+  assert.equal(await page.locator('#dock .app-icon').count(), 0);
+  await (await applicationButton(page, await page.evaluate(() => defaultUrl))).click();
   await page.waitForFunction(() => activeTabId === 'tab-1');
-  await page.locator('#dock button[data-app-url="' + robotUrl + '"]').click();
+  await (await applicationButton(page, robotUrl)).click();
   await page.waitForFunction((id) => activeTabId === id, robotId);
   await count(page, 2);
-  await page.locator('#dock button[data-app-url="' + robotUrl + '"]').click({ button: 'right' });
+  await (await applicationButton(page, robotUrl)).click({ button: 'right' });
   assert.equal(await page.getByRole('menuitem', { name: 'New window', exact: true }).isVisible(), true);
   await page.keyboard.press('Escape');
   await page.locator('#tools-button').click();
@@ -443,7 +448,7 @@ async function run() {
   await page.screenshot({ path: path.join(screenshots, 'desktop-dockview-floating.png') });
   await windowCommand(page, robotId, 'float');
   assert.equal(await page.evaluate((id) => tabs.get(id).panel.api.location.type, robotId), 'grid');
-  await page.locator('#dock button[data-app-url="' + robotUrl + '"]').click();
+  await (await applicationButton(page, robotUrl)).click();
   await page.waitForFunction((id) => activeTabId === id, robotId);
   console.log('PASS: Dockview drag docking, split resize, stacking, floating and guest state preservation');
   console.log('PASS: single-panel headers reclaim page height; one control supports click and drag; floating headers work');
@@ -456,21 +461,19 @@ async function run() {
   await page.waitForFunction(() => getActiveTab().webview.getURL().endsWith('/script-child'));
   console.log('PASS: target=_blank and page-world window.open create internal windows');
 
-  await page.locator('#dock button[data-app-url="' + robotUrl + '"]').click({ button: 'right' });
+  await (await applicationButton(page, robotUrl)).click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'New window', exact: true }).click();
   await count(page, 5);
   await page.waitForFunction(() => getActiveTab().title === 'Robot Console');
-  assert.equal(await page.locator('#dock button[data-app-url="' + robotUrl + '"] .window-badge').textContent(), '2');
-  assert.equal(await page.locator('#dock button[data-app-url="' + robotUrl + '"]').count(), 1);
+  assert.equal(await page.locator('#desktop-shortcuts [data-app-url="' + robotUrl + '"]').count(), 1);
   await page.locator('#toggle-dock').click();
-  assert.equal(await page.locator('#dock button[data-app-url="' + robotUrl + '"] .window-badge').isVisible(), true);
-  assert.equal(await page.locator('#dock button[data-app-url="' + robotUrl + '"] .dock-label').textContent(), 'Robot Console');
+  assert.equal(await page.locator('#dock .dock-label').first().textContent(), 'Desktop 1');
   await page.screenshot({ path: path.join(screenshots, 'desktop-text-dock-multiple-windows.png') });
   await page.locator('#toggle-dock').click();
   const duplicateId = await page.evaluate(() => activeTabId);
   await page.locator('[data-tab-panel-id="' + duplicateId + '"] .dv-default-tab-action').click();
   await count(page, 4);
-  console.log('PASS: multiple windows share one application Dock icon');
+  console.log('PASS: multiple windows share one favorite entry and never appear in the desktop strip');
 
   for (const [id, state] of [['tools-fps', 'performanceOverlayVisible'], ['tools-record', 'screenRecordBarVisible']]) {
     for (const visible of [true, false, true, false]) {
@@ -512,10 +515,8 @@ async function run() {
   const dockRow = await page.locator('#dock .dock-items').boundingBox();
   await page.mouse.move(dockRow.x + dockRow.width / 2, dockRow.y + dockRow.height / 2);
   await page.mouse.wheel(0, 200);
-  await page.waitForFunction(() => document.querySelector('#dock .dock-items').scrollLeft > 0);
-  await page.locator('#dock button[data-app-url="' + robotUrl + '"]').click();
+  await (await applicationButton(page, robotUrl)).click();
   await page.waitForFunction((id) => activeTabId === id, robotId);
-  assert.ok(await page.evaluate(() => document.querySelector('#dock .dock-items').scrollLeft) > 0);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await page.locator('#toggle-dock').click();
   await application.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0].setContentSize(1280, 820); });
@@ -555,15 +556,15 @@ async function run() {
   assert.notEqual(await page.evaluate(() => defaultUrl), saved.serviceOrigins.os);
   assert.equal(await page.evaluate(() => new URL(tabs.get('tab-1').url).origin), await page.evaluate(() => new URL(defaultUrl).origin));
   assert.equal(await page.evaluate(() => tabs.get('tab-1').appUrl), await page.evaluate(() => defaultUrl));
-  await page.locator('#dock button[data-app-url="' + robotUrl + '"]').click();
+  await (await applicationButton(page, robotUrl)).click();
   assert.equal(await page.evaluate((id) => tabs.get(id).panel.group.id === tabs.get('tab-1').panel.group.id, robotId), true);
   console.log('PASS: restart restores pinned application, minimized state, geometry and remaps service ports');
   await windowCommand(page, robotId, 'close');
   await count(page, 1);
-  assert.equal(await page.locator('#dock button[data-app-url="' + robotUrl + '"]').count(), 1);
-  await page.locator('#dock button[data-app-url="' + robotUrl + '"]').click({ button: 'right' });
-  await page.getByRole('menuitem', { name: 'Unpin from Dock' }).click();
-  assert.equal(await page.locator('#dock button[data-app-url="' + robotUrl + '"]').count(), 0);
+  assert.equal(await page.locator('#desktop-shortcuts [data-app-url="' + robotUrl + '"]').count(), 1);
+  await (await applicationButton(page, robotUrl)).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Remove from Favorites' }).click();
+  assert.equal(await page.locator('#desktop-shortcuts [data-app-url="' + robotUrl + '"]').count(), 0);
   await page.evaluate(() => closeTab(activeTabId));
   await count(page, 0);
   assert.equal(await page.evaluate(() => activeTabId), null);
@@ -604,7 +605,8 @@ async function run() {
   await page.waitForFunction(() => [...tabs.values()].every((tab) => tab.ready));
   assert.equal(await page.evaluate(() => desktopVisible), true);
   assert.equal(await page.locator('#dock-layout').isVisible(), false);
-  await page.locator('#dock button[data-app-url="' + robotUrl + '"]').click();
+  await page.locator('#dock .workspace-button').first().click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Switch: Robot Console', exact: true }).first().click();
   assert.equal(await page.evaluate(() => desktopVisible), false);
   assert.equal(await page.evaluate(({ home }) => tabs.get(home).panel.api.location.type, layoutIds), 'floating');
   assert.equal(await page.evaluate(() => desktopLayout.groups.filter((group) => group.api.location.type === 'grid').length), 2);
@@ -624,7 +626,7 @@ async function run() {
   assert.equal(await page.evaluate(() => getActiveTab().appUrl), robotUrl);
   assert.equal(await page.evaluate(() => getActiveTab().panel.api.location.type), 'floating');
   assert.equal(await page.locator('#browser-toolbar').isVisible(), true);
-  console.log('PASS: legacy tabs and bookmarks migrate into desktop windows and Dock');
+  console.log('PASS: legacy tabs and bookmarks migrate into Desktop 1 and favorites');
   await page.evaluate(() => setWorkspaceRegion('right'));
   await page.locator('#show-desktop').click();
   await page.evaluate(() => writeShellState());
@@ -634,11 +636,91 @@ async function run() {
   await page.waitForFunction(() => tabs.get('tab-9')?.ready);
   assert.equal(await page.evaluate(() => workspaceRegion), 'right');
   assert.equal(await page.evaluate(() => desktopVisible), true);
-  await page.locator('#dock button[data-app-url="' + robotUrl + '"]').click();
+  await (await applicationButton(page, robotUrl)).click();
   assert.equal(await page.evaluate(() => desktopVisible), false);
   assert.equal((await page.locator('#webview-stack').boundingBox()).x, 640);
   assert.equal((await page.locator('#webview-stack').boundingBox()).width, 640);
   console.log('PASS: mixed workspace toggles without changing layout or guests; desktop and half-screen state survive restart');
+  await page.evaluate(() => setWorkspaceRegion('full'));
+  const originalDesktop = await page.evaluate(() => currentDesktopId);
+  const originalGuest = await page.evaluate(() => getActiveTab().webview.getWebContentsId());
+  await page.evaluate(() => getActiveTab().webview.executeJavaScript('window.desktopTransferState = "alive"'));
+  await page.locator('#add-desktop').click();
+  const secondDesktop = await page.evaluate(() => currentDesktopId);
+  assert.notEqual(secondDesktop, originalDesktop);
+  assert.equal(await page.evaluate(() => desktopVisible), true);
+  assert.equal(await page.locator('#tab-9').isVisible(), false);
+  await page.locator('#dock [data-desktop-id="' + originalDesktop + '"]').click();
+  await waitForGuestLayout(page);
+  assert.equal(await page.evaluate(() => getActiveTab().webview.getWebContentsId()), originalGuest);
+  const handle = await windowControl(page, 'tab-9').boundingBox();
+  const destination = await page.locator('#dock [data-desktop-id="' + secondDesktop + '"]').boundingBox();
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(destination.x + destination.width / 2, destination.y + destination.height / 2, { steps: 20 });
+  await page.mouse.up();
+  await page.waitForFunction(id => tabs.get('tab-9').desktopId === id, secondDesktop);
+  await waitForGuestLayout(page);
+  assert.equal(await page.evaluate(() => getActiveTab().webview.getWebContentsId()), originalGuest);
+  assert.equal(await page.evaluate(() => getActiveTab().webview.executeJavaScript('window.desktopTransferState')), 'alive');
+  const newDesktopHandle = await windowControl(page, 'tab-9').boundingBox();
+  const newDesktopTarget = await page.locator('#add-desktop').boundingBox();
+  await page.mouse.move(newDesktopHandle.x + newDesktopHandle.width / 2, newDesktopHandle.y + newDesktopHandle.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(newDesktopTarget.x + newDesktopTarget.width / 2, newDesktopTarget.y + newDesktopTarget.height / 2, { steps: 20 });
+  await page.mouse.up();
+  await page.waitForFunction(() => desktops.size === 3);
+  const thirdDesktop = await page.evaluate(() => currentDesktopId);
+  await windowControl(page, 'tab-9').click();
+  await page.locator('#window-desktop').selectOption(secondDesktop);
+  await page.waitForFunction(id => tabs.get('tab-9').desktopId === id && currentDesktopId === id, secondDesktop);
+  assert.equal(await page.evaluate(() => getActiveTab().webview.getWebContentsId()), originalGuest);
+  await page.locator('#dock [data-desktop-id="' + thirdDesktop + '"]').click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Rename desktop' }).click();
+  await page.locator('#desktop-name').fill('Temporary');
+  await page.locator('#rename-desktop-form button[type="submit"]').click();
+  assert.equal(await page.locator('#dock [data-desktop-id="' + thirdDesktop + '"] .dock-label').textContent(), 'Temporary');
+  await page.locator('#dock [data-desktop-id="' + thirdDesktop + '"]').click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Remove desktop (move windows)' }).click();
+  assert.equal(await page.evaluate(() => desktops.size), 2);
+  await page.locator('#applications-button').click();
+  await page.waitForFunction(() => installedApplications.length > 0);
+  await page.locator('#all-applications summary').click();
+  assert.ok(await page.locator('#all-applications [data-app-url]').count() > 0);
+  const installedUiUrl = await page.locator('#all-applications [data-app-url]').first().getAttribute('data-app-url');
+  await page.locator('#all-applications .application-menu-row').first().getByRole('button', { name: 'Add to favorites', exact: true }).click();
+  await page.waitForFunction(url => favorites.some(entry => entry.url === url), installedUiUrl);
+  await page.locator('#applications-menu > .application-menu-row').filter({ has: page.locator('[data-app-url="' + installedUiUrl + '"]') }).getByRole('button', { name: 'Remove from favorites', exact: true }).click();
+  assert.equal(await page.evaluate(url => favorites.some(entry => entry.url === url), installedUiUrl), false);
+  assert.equal(await page.locator('#applications-menu .application-menu-row').filter({ hasText: 'Console' }).locator('button[aria-label="Remove from favorites"]').count(), 0);
+  await page.screenshot({ path: path.join(screenshots, 'desktop-applications-menu.png') });
+  await page.locator('#all-applications [data-app-url]').first().click();
+  await page.waitForFunction(url => getActiveTab()?.ready && getActiveTab().appUrl === url, installedUiUrl);
+  assert.equal(await page.evaluate(() => currentDesktopId), secondDesktop);
+  assert.equal(await page.evaluate(() => getActiveTab().webview.getURL().startsWith('file:')), false);
+  await page.evaluate(() => closeTab(activeTabId));
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => showDesktop());
+  await page.locator('#dock [data-desktop-id="' + originalDesktop + '"]').click();
+  await openPage(page, robotUrl);
+  await page.waitForFunction(() => getActiveTab()?.ready);
+  await page.evaluate(() => setWorkspaceRegion('left'));
+  await page.evaluate(() => writeShellState());
+  await application.close(); application = null;
+  page = await launch();
+  assert.equal(await page.evaluate(() => desktops.size), 2);
+  assert.equal(await page.evaluate(() => currentDesktopId), originalDesktop);
+  assert.equal(await page.evaluate(() => workspaceRegion), 'left');
+  await page.locator('#dock [data-desktop-id="' + secondDesktop + '"]').click();
+  assert.equal(await page.evaluate(() => desktopVisible), true);
+  await page.locator('#show-desktop').click();
+  await page.waitForFunction(() => getActiveTab()?.ready);
+  assert.equal(await page.evaluate(() => activeTabId), 'tab-9');
+  await page.screenshot({ path: path.join(screenshots, 'desktop-multiple-workspaces.png') });
+  await page.evaluate(id => deleteDesktop(id), secondDesktop);
+  assert.equal(await page.evaluate(() => desktops.size), 1);
+  assert.equal(await page.evaluate(() => tabs.get('tab-9').desktopId), originalDesktop);
+  console.log('PASS: multiple desktops, pointer transfer without guest reload, installed UI menu, independent state restore and desktop removal');
   await page.evaluate(() => { screenRecordMode = 'native'; showScreenRecordBar(); });
   await page.locator('[data-start-screen-record]').click();
   await page.waitForFunction(() => screenRecordStatus === 'recording' || screenRecordStatus === 'error');

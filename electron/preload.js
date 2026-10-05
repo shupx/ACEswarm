@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 const on = (channel, callback, map = false) => ipcRenderer.on(channel, (_event, payload) => callback(map ? payload : undefined));
 contextBridge.exposeInMainWorld('aivudaShell', {
+  getInstalledApplications: () => ipcRenderer.invoke('aivuda-shell:get-installed-applications'),
   desktopCommand: (command) => ipcRenderer.invoke('aivuda-shell:desktop-command', command),
   onRecordingError: (callback) => on('aivuda-shell:recording-error', callback, true),
   authorizeUrl: (url) => ipcRenderer.invoke('aivuda-shell:authorize-url', url),
