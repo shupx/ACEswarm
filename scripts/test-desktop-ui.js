@@ -266,7 +266,23 @@ async function run() {
   await page.locator('#open-page-url').fill(robotUrl + '/child');
   await page.locator('#open-page-form button[type="submit"]').click();
   await page.waitForFunction(() => getActiveTab()?.ready && getActiveTab().title === 'Child');
-  const childId = await page.evaluate(() => activeTabId);
+  let childId = await page.evaluate(() => activeTabId);
+  const contextTab = page.locator('[data-tab-panel-id="' + childId + '"]');
+  await contextTab.click({ button: 'right' });
+  const contextMenu = page.locator('.dv-context-menu');
+  await contextMenu.waitFor({ state: 'visible' });
+  assert.equal(await contextMenu.evaluate(menu => {
+    const rect = menu.getBoundingClientRect();
+    return menu.contains(document.elementFromPoint(rect.left + rect.width / 2, rect.bottom - 10));
+  }), true, 'tab context menu is above the guest page and receives pointer input');
+  await page.screenshot({ path: path.join(screenshots, 'window-tab-context-menu.png') });
+  await contextMenu.getByRole('menuitem', { name: 'Close', exact: true }).click();
+  await page.waitForFunction(id => !tabs.has(id), childId);
+  await page.locator('.app-window[data-window-id="' + secondWindow + '"] button[aria-label="Open tab"]').click();
+  await page.locator('#open-page-url').fill(robotUrl + '/child');
+  await page.locator('#open-page-form button[type="submit"]').click();
+  await page.waitForFunction(() => getActiveTab()?.ready && getActiveTab().title === 'Child');
+  childId = await page.evaluate(() => activeTabId);
   assert.equal(await page.evaluate(() => appWindows.size), 2);
   assert.equal(await page.evaluate(id => appWindows.get(id).layout.panels.length, secondWindow), 2);
   const secondRoot = await page.locator('.app-window[data-window-id="' + secondWindow + '"] .dock-layout').boundingBox();

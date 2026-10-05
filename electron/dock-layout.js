@@ -123,6 +123,12 @@ function initializeWindowLayout(owner) {
     },
     createRightHeaderActionComponent: group => panelActions(group, owner),
   });
+  // Popovers must escape the window stacking context beneath guest pages.
+  owner.popoverHost = owner.root.querySelector('.dv-popover-anchor');
+  if (owner.popoverHost) {
+    owner.popoverHost.classList.add('window-popovers', library.themeLight.className);
+    document.getElementById('shell').append(owner.popoverHost);
+  }
   layout.onDidActivePanelChange(panel => {
     if (layoutMutation || !panel || !tabs.has(panel.id)) return;
     owner.activeTabId = panel.id; tabs.get(panel.id).panel = panel;

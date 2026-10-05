@@ -94,7 +94,7 @@ function setOuterWindowRegion(owner, region) {
 function disposeEmptyWindow(owner) {
   if (!owner || [...tabs.values()].some(tab => tab.windowId === owner.id)) return;
   layoutMutation = true;
-  try { owner.events.abort(); owner.layout.dispose(); owner.frame.remove(); owner.handles.forEach(handle => handle.remove()); owner.sashHandles.forEach(handle => handle.remove()); } finally { layoutMutation = false; }
+  try { owner.events.abort(); owner.layout.dispose(); owner.popoverHost?.remove(); owner.frame.remove(); owner.handles.forEach(handle => handle.remove()); owner.sashHandles.forEach(handle => handle.remove()); } finally { layoutMutation = false; }
   appWindows.delete(owner.id);
   if (activeWindowId === owner.id) {
     activeWindowId = null; activeTabId = null; desktopLayout = undefined;
