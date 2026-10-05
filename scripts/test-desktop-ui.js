@@ -264,12 +264,23 @@ async function run() {
   assert.equal(await page.evaluate(() => appWindows.size), 2);
   assert.equal(await page.evaluate(id => appWindows.get(id).layout.panels.length, secondWindow), 2);
   const secondRoot = await page.locator('.app-window[data-window-id="' + secondWindow + '"] .dock-layout').boundingBox();
-  await dragPanel(page, childId, { x: secondRoot.x + secondRoot.width - 4, y: secondRoot.y + secondRoot.height / 2 });
+  await dragPanel(page, childId, { x: secondRoot.x + secondRoot.width - 40, y: secondRoot.y + secondRoot.height / 2 });
   await page.waitForFunction(id => appWindows.get(id).layout.groups.length === 2, secondWindow);
   const sash = await page.locator('.app-window[data-window-id="' + secondWindow + '"] .dv-sash').first().boundingBox();
   await page.mouse.move(sash.x + sash.width / 2, sash.y + sash.height / 2);
   await page.mouse.down(); await page.mouse.move(sash.x - 70, sash.y + sash.height / 2, { steps: 12 }); await page.mouse.up();
   await waitForGuestLayout(page);
+  const otherGroup = await page.evaluate(id => {
+    const tab = tabs.get(id);
+    const group = appWindows.get(tab.windowId).layout.groups.find(item => item.id !== tab.panel.group.id);
+    return { id: group.id, rect: group.element.getBoundingClientRect().toJSON() };
+  }, childId);
+  await dragPanel(page, childId, { x: otherGroup.rect.x + 40, y: otherGroup.rect.y + otherGroup.rect.height / 2 });
+  await page.waitForFunction(({ id, targetGroup }) => {
+    const tab = tabs.get(id);
+    const target = appWindows.get(tab.windowId).layout.getGroup(targetGroup);
+    return tab.panel.group.element.getBoundingClientRect().right <= target.element.getBoundingClientRect().left + 1;
+  }, { id: childId, targetGroup: otherGroup.id });
   assert.equal(await page.evaluate(id => appWindows.get(id).layout.groups.length, firstWindow), 1);
   console.log('PASS: independent outer windows; tabs, drag splitting and splitter resizing stay inside their window');
 
@@ -309,9 +320,15 @@ async function run() {
   await (await applicationButton(page, await page.evaluate(() => defaultUrl))).click();
   assert.equal(await page.evaluate(() => appWindows.size), 2, 'Launching an existing application creates a new window');
   const duplicateWindow = await page.evaluate(() => activeWindowId);
+  assert.equal(await page.locator('.window-drag-handle').count(), 0);
+  const duplicateBounds = await page.evaluate(id => ({ ...appWindows.get(id).bounds }), duplicateWindow);
+  const blankHeader = await page.locator('.app-window[data-window-id="' + duplicateWindow + '"] .dv-void-container').boundingBox();
+  assert.ok(blankHeader.width >= 20, 'a single-tab header has draggable empty space');
+  await page.mouse.move(blankHeader.x + blankHeader.width / 2, blankHeader.y + blankHeader.height / 2); await page.mouse.down();
+  await page.mouse.move(blankHeader.x + blankHeader.width / 2 + 80, blankHeader.y + blankHeader.height / 2 + 45, { steps: 12 }); await page.mouse.up();
+  assert.ok(await page.evaluate(({ id, x }) => appWindows.get(id).bounds.x > x, { id: duplicateWindow, x: duplicateBounds.x }));
   await page.locator('.app-window[data-window-id="' + duplicateWindow + '"] button[aria-label="Close window"]').click();
   await page.evaluate(id => activateTab(id), robotId);
-  assert.equal(await page.locator('.app-window[data-window-id="' + firstWindow + '"] .window-drag-handle').count(), 1);
   assert.equal(await page.locator('.app-window[data-window-id="' + firstWindow + '"] button[aria-label="Close window"]').count(), 1);
   const header = await page.locator('.app-window[data-window-id="' + firstWindow + '"] .dv-tabs-and-actions-container').first().boundingBox();
   const windowFrame = await page.locator('.app-window[data-window-id="' + firstWindow + '"]').boundingBox();
@@ -329,10 +346,6 @@ async function run() {
   await page.locator('#close-page-dialog').click();
   await page.locator('.app-window[data-window-id="' + firstWindow + '"] button[aria-label="Maximize or restore window"]').click();
   assert.deepEqual(await page.evaluate(id => appWindows.get(id).bounds, firstWindow), normalBounds);
-  const grip = await page.locator('.app-window[data-window-id="' + firstWindow + '"] .window-drag-handle').boundingBox();
-  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2); await page.mouse.down();
-  await page.mouse.move(grip.x + grip.width / 2 + 100, grip.y + grip.height / 2 + 60, { steps: 12 }); await page.mouse.up();
-  assert.ok(await page.evaluate(id => appWindows.get(id).bounds.x > 50, firstWindow));
   const handle = await page.locator('.outer-resize-handle[data-window-id="' + firstWindow + '"][data-edge="se"]').boundingBox();
   const widthBefore = await page.evaluate(id => appWindows.get(id).bounds.width, firstWindow);
   await page.mouse.move(handle.x + 3, handle.y + 3); await page.mouse.down();

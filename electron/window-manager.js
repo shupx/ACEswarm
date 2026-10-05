@@ -28,9 +28,6 @@ function createApplicationWindow(options = {}) {
   const frame = document.createElement('section');
   frame.className = 'app-window'; frame.dataset.windowId = id;
   frame.setAttribute('aria-label', 'Application window');
-  const grip = document.createElement('button');
-  grip.className = 'window-drag-handle'; grip.title = 'Drag window'; grip.setAttribute('aria-label', 'Drag window');
-  grip.append(desktopIcon('grip-vertical'));
   const controls = document.createElement('div'); controls.className = 'window-controls';
   const buttons = [
     ['plus', 'Open tab', () => showOpenPageDialog(owner.id), 'optional'],
@@ -47,15 +44,13 @@ function createApplicationWindow(options = {}) {
   }
   const root = document.createElement('div'); root.className = 'dock-layout';
   frame.append(root); stackEl.append(frame);
-  Object.assign(owner, { frame, root, grip, controls, gripSlots: new Map(), controlSlots: new Map(), handles: [] });
+  Object.assign(owner, { frame, root, controls, controlSlots: new Map(), handles: [] });
   initializeWindowLayout(owner);
   for (const edge of ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']) {
     const handle = document.createElement('div'); handle.className = 'outer-resize-handle'; handle.dataset.edge = edge; handle.dataset.windowId = id;
     stackEl.append(handle); owner.handles.push(handle);
     handle.onpointerdown = event => startOuterWindowGesture(event, owner, edge);
   }
-  grip.onpointerdown = event => startOuterWindowGesture(event, owner);
-  grip.ondblclick = event => { event.stopPropagation(); toggleOuterWindowMaximized(owner); };
   frame.addEventListener('pointerdown', () => activateWindow(owner.id), true);
   installWindowTabTransfer(owner);
   refreshDesktopIcons(); layoutApplicationWindows();
@@ -245,13 +240,21 @@ function installWindowTabTransfer(owner) {
   owner.root.addEventListener('pointerdown', event => {
     const header = event.target.closest('[data-tab-panel-id]');
     if (event.button !== 0 || !header || event.target.closest('button, .dv-default-tab-action')) return;
-    windowTabDrag = { id: header.dataset.tabPanelId, source: owner.id, x: event.clientX, y: event.clientY, handled: false };
+    const panel = tabs.get(header.dataset.tabPanelId)?.panel;
+    windowTabDrag = { id: header.dataset.tabPanelId, source: owner.id, groupId: panel?.group.id, groupCount: owner.layout.groups.length, x: event.clientX, y: event.clientY, handled: false };
   }, true);
 }
 
 function tabDropTarget(x, y) {
-  const node = document.elementsFromPoint(x, y).map(element => element.closest('.window-task, .app-window')).find(Boolean);
-  const owner = node && appWindows.get(node.dataset.windowId);
+  const element = document.elementFromPoint(x, y);
+  if (element?.closest('.desktop-bar, .window-menu, .dock-menu, .tools-menu')) {
+    const task = element.closest('.window-task');
+    return task ? { owner: appWindows.get(task.dataset.windowId), placement: { direction: 'within' } } : {};
+  }
+  const owner = [...appWindows.values()].filter(item => !item.frame.hidden).sort((a, b) => b.zIndex - a.zIndex).find(item => {
+    const rect = item.frame.getBoundingClientRect();
+    return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+  });
   if (!owner) return {};
   const group = owner.layout.groups.find(item => {
     const rect = item.element.getBoundingClientRect();
@@ -259,7 +262,7 @@ function tabDropTarget(x, y) {
   }) || owner.layout.activePanel?.group;
   let direction = 'within';
   let bounds;
-  if (group && node.classList.contains('app-window')) {
+  if (group) {
     const rect = group.element.getBoundingClientRect();
     if (y > rect.top + 28) {
       const edges = [['left', x - rect.left, rect.width], ['right', rect.right - x, rect.width], ['above', y - rect.top, rect.height], ['below', rect.bottom - y, rect.height]];
@@ -292,9 +295,14 @@ window.addEventListener('pointerup', event => {
   const target = drop.owner;
   const background = !target && event.clientY < innerHeight - 28 && !document.elementFromPoint(event.clientX, event.clientY)?.closest('.desktop-bar, .window-menu, .dock-menu');
   if (background) drop.placement = { bounds: { x: event.clientX - 120, y: event.clientY - 14 } };
-  if (target?.id === drag.source || drag.handled) return;
   if (target || background) requestAnimationFrame(() => {
-    if (!drag.handled) moveTabToWindow(tabs.get(drag.id), target?.id, drop.placement);
+    const tab = tabs.get(drag.id);
+    if (target?.id === drag.source) {
+      const direction = drop.placement.direction;
+      const group = target.layout.getPanel(drop.placement.reference)?.group;
+      const moved = tab?.panel?.group.id !== drag.groupId || target.layout.groups.length !== drag.groupCount;
+      if (!moved && group && direction !== 'within' && tab?.panel) tab.panel.api.moveTo({ group, position: direction === 'above' ? 'top' : direction === 'below' ? 'bottom' : direction });
+    } else if (!drag.handled) moveTabToWindow(tab, target?.id, drop.placement);
     stackEl.classList.remove('interacting');
   });
 }, true);

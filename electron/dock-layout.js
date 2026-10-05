@@ -32,22 +32,9 @@ function syncWindowHeader(owner) {
   if (!groups.length) return;
   const top = Math.min(...groups.map(item => item.rect.top));
   const firstRow = groups.filter(item => item.rect.top <= top + 2);
-  const left = firstRow.reduce((a, b) => a.rect.left <= b.rect.left ? a : b).group;
   const right = firstRow.reduce((a, b) => a.rect.right >= b.rect.right ? a : b).group;
-  const gripSlot = owner.gripSlots.get(left);
   const controlSlot = owner.controlSlots.get(right);
-  if (gripSlot && owner.grip.parentElement !== gripSlot) gripSlot.append(owner.grip);
   if (controlSlot && owner.controls.parentElement !== controlSlot) controlSlot.append(owner.controls);
-}
-
-function windowGrip(group, owner) {
-  const element = document.createElement('div');
-  element.className = 'window-grip-slot';
-  return {
-    element,
-    init() { owner.gripSlots.set(group, element); schedulePanelLayout(); },
-    dispose() { owner.gripSlots.delete(group); schedulePanelLayout(); },
-  };
 }
 
 function panelActions(group, owner) {
@@ -102,7 +89,6 @@ function initializeWindowLayout(owner) {
         dispose() { observer.disconnect(); },
       };
     },
-    createPrefixHeaderActionComponent: group => windowGrip(group, owner),
     createRightHeaderActionComponent: group => panelActions(group, owner),
   });
   layout.onDidActivePanelChange(panel => {
@@ -122,7 +108,11 @@ function initializeWindowLayout(owner) {
   layout.onDidLayoutChange(() => { schedulePanelLayout(); renderDesktop(); writeShellState(); });
   layout.onWillDrop(event => {
     const tab = tabs.get(event.getData()?.panelId);
-    if (!tab || tab.windowId === owner.id) return;
+    if (!tab) return;
+    if (tab.windowId === owner.id) {
+      if (windowTabDrag) windowTabDrag.handled = true;
+      return;
+    }
     event.preventDefault();
     if (windowTabDrag) windowTabDrag.handled = true;
     const reference = event.group?.activePanel?.id;
@@ -130,11 +120,21 @@ function initializeWindowLayout(owner) {
     requestAnimationFrame(() => moveTabToWindow(tab, owner.id, { reference, direction }));
   });
   owner.root.addEventListener('pointerdown', event => {
-    if (event.target.closest('.dv-tabs-and-actions-container, .dv-sash')) {
+    const header = event.target.closest('.dv-tabs-and-actions-container');
+    if (event.button === 0 && header && !event.target.closest('.dv-tab, [data-tab-panel-id], button, [role="button"], input, select')) {
+      startOuterWindowGesture(event, owner);
+      return;
+    }
+    if (header || event.target.closest('.dv-sash')) {
       stackEl.classList.add('interacting');
       setToolsMenuOpen(false);
       if (!event.target.closest('.panel-menu')) setWindowMenuOpen(false);
       document.getElementById('dock-menu').hidden = true;
+    }
+  }, true);
+  owner.root.addEventListener('dblclick', event => {
+    if (event.target.closest('.dv-tabs-and-actions-container') && !event.target.closest('.dv-tab, [data-tab-panel-id], button, [role="button"], input, select')) {
+      event.stopPropagation(); toggleOuterWindowMaximized(owner);
     }
   }, true);
   owner.root.addEventListener('pointermove', () => { if (stackEl.classList.contains('interacting')) schedulePanelLayout(); });

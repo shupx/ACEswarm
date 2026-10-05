@@ -41,9 +41,9 @@ their z-order. Moving tabs between windows, rearranging splits and minimizing
 windows do not recreate guests. Closing a tab releases its WebView; closing an
 outer window releases all of its tabs.
 
-The Dockview tab row is the only window header. Its drag handle moves the outer
-window; edges and corners resize it. Double-clicking the handle toggles
-maximization. Dragging the handle to the display edges
+The Dockview tab row is the only window header. Its empty space moves the outer
+window; edges and corners resize it. Double-clicking empty space toggles
+maximization. Dragging the header to the display edges
 snaps the whole window to the left/right half or maximizes it. Normal bounds are
 retained for restoration. All non-minimized windows can remain visible together.
 The desktop background and shortcuts remain fixed underneath them.

@@ -28,9 +28,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid #157d71; outline-
 .window-layer { position: absolute; inset: 0 0 var(--panel-height); pointer-events: none; }
 .app-window { position: absolute; display: flex; flex-direction: column; border: 1px solid #bdccca; border-radius: 5px; overflow: hidden; background: #fff; box-shadow: 0 6px 22px #243d3824; pointer-events: auto; }
 .app-window.active { border-color: #55988a; box-shadow: 0 8px 26px #243d3833; }
-.window-drag-handle { width: 22px; height: 28px; flex: 0 0 22px; padding: 5px; display: grid; place-items: center; border: 0; background: transparent; color: #6b827d; cursor: grab; }
-.window-drag-handle:hover { background: #dfece8; color: #286e60; }
-.window-drag-handle svg { width: 14px; height: 14px; }
+.app-window .dv-tabs-and-actions-container { cursor: grab; }
+.app-window .dv-tabs-and-actions-container .dv-tab { cursor: pointer; }
 .window-controls { display: flex; align-items: center; }
 .window-controls .icon-button { width: 26px; height: 26px; padding: 6px; }
 .window-controls .icon-button svg { width: 14px; height: 14px; }
