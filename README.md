@@ -4,9 +4,12 @@ ACEswarm is a ground-station workbench for distributed drone and robot swarms.
 
 ## Download
 
-Download the Linux x86_64 AppImage from the release server (tested on Ubuntu 22.04, higher versions should work). 
+Download the Linux x86_64 AppImage (tested on Ubuntu 22.04; higher versions should work):
 
-[Download ACEswarm AppImage](https://download.example.com/aceswarm/latest/ACEswarm-x86_64.AppImage)
+- [Nightly AppImage](https://github.com/shupx/ACEswarm/releases/nightly): latest development build, automatically rebuilt at 02:00 Asia/Shanghai when the source has changed since the last successful build.
+- [Latest stable release](https://github.com/shupx/ACEswarm/releases/latest): download the AppImage from the release's **Assets** section. This link becomes available once a stable release is published.
+
+The commands below assume the downloaded file is named `ACEswarm-x86_64.AppImage`; substitute its actual filename.
 
 ## Run
 
