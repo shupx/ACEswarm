@@ -1643,8 +1643,6 @@ function setToolsMenuOpen(isOpen) {
     syncOverlayMenuState();
     setWindowMenuOpen(false);
     document.getElementById("dock-menu").hidden = true;
-    const tab = getActiveTab();
-    for (const id of ["system-reload", "system-window-tools", "system-devtools"]) document.getElementById(id).disabled = !tab?.ready;
     toolsMenu.querySelector("button")?.focus();
   }
 }
@@ -1668,9 +1666,6 @@ toolsButton?.addEventListener("click", (event) => {
 toolsMenu.addEventListener("click", (event) => event.stopPropagation());
 for (const [id, action] of [
   ["system-open-page", showOpenPageDialog], ["system-desktop", showDesktop],
-  ["system-address", toggleActiveAddressBar], ["system-reload", reloadActiveTab],
-  ["system-window-tools", () => { const tab = getActiveTab(); if (tab) openWindowMenu(tab); }],
-  ["system-devtools", toggleActiveDevtools],
   ["system-fullscreen", () => window.aivudaShell.desktopCommand("fullscreen")],
   ["system-quit", () => window.aivudaShell.desktopCommand("quit")],
 ]) document.getElementById(id).onclick = () => { setToolsMenuOpen(false); action(); };

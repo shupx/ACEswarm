@@ -106,9 +106,10 @@ function panelActions(group, owner) {
 
 function initializeWindowLayout(owner) {
   const library = window['dockview-core'];
+  const theme = document.documentElement.dataset.theme === 'dark' ? library.themeDark : library.themeLight;
   owner.events = new AbortController();
   const layout = owner.layout = library.createDockview(owner.root, {
-    theme: library.themeLight,
+    theme,
     dndStrategy: 'pointer',
     disableFloatingGroups: true,
     getTabContextMenuItems: () => ['close', 'closeOthers'],
@@ -126,7 +127,7 @@ function initializeWindowLayout(owner) {
   // Popovers must escape the window stacking context beneath guest pages.
   owner.popoverHost = owner.root.querySelector('.dv-popover-anchor');
   if (owner.popoverHost) {
-    owner.popoverHost.classList.add('window-popovers', library.themeLight.className);
+    owner.popoverHost.classList.add('window-popovers', theme.className);
     document.getElementById('shell').append(owner.popoverHost);
   }
   layout.onDidActivePanelChange(panel => {

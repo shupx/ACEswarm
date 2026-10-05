@@ -16,9 +16,9 @@ test('guest startup initializes and refreshes the managed store URL while preser
   function load(entries, defaultUrl = 'http://127.0.0.1:28791') {
     const storage = new Map(entries);
     vm.runInNewContext(guest, {
-      require: () => ({ ipcRenderer: { sendSync: () => defaultUrl, sendToHost() {} } }),
+      require: () => ({ ipcRenderer: { sendSync: channel => channel === 'aivuda-shell:get-appearance' ? null : defaultUrl, sendToHost() {}, on() {} } }),
       window: { addEventListener() {}, open() {} }, console,
-      localStorage: { getItem: (name) => storage.get(name) ?? null, setItem: (name, value) => storage.set(name, value) },
+      localStorage: { getItem: (name) => storage.get(name) ?? null, setItem: (name, value) => storage.set(name, value), removeItem: name => storage.delete(name) },
     });
     return storage;
   }
@@ -80,7 +80,9 @@ test('System and window controls replace the native application menu', () => {
   assert.match(main, /Menu\.setApplicationMenu\(null\)/);
   assert.match(main, /before-input-event/);
   assert.match(html, /aria-label="System"/);
-  assert.match(html, /id="system-address"/);
+  assert.doesNotMatch(html, /id="system-(address|reload|window-tools|devtools)"/);
+  assert.match(html, /id="system-theme"/);
+  assert.match(html, /id="system-language"/);
   assert.match(html, /id="window-zoom-in"/);
   assert.doesNotMatch(main, /label: 'File'|label: 'View'|label: 'Address Bar'/);
 });

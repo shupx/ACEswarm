@@ -1,6 +1,7 @@
 const path = require('node:path');
 const fs = require('node:fs');
-const { app, BrowserWindow, ipcMain, Menu, session, shell, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, session, shell, screen, nativeTheme, webContents } = require('electron');
+const { normalizePreferences, resolveAppearance } = require('./services/appearance');
 if (process.platform === 'linux') app.commandLine.appendSwitch('disable-accelerated-video-encode');
 const { workspace } = require('./services/workspace');
 const { resolveRuntime } = require('./services/runtime');
@@ -19,6 +20,28 @@ let quitting = false;
 
 let shellStatePath;
 let shellState;
+let appearancePreferences = normalizePreferences();
+let appearancePath;
+
+function currentAppearance() {
+  return resolveAppearance(appearancePreferences, app.getLocale(), nativeTheme.shouldUseDarkColors);
+}
+
+function isBuiltinPage(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    return [endpoints.os, endpoints.store].some(endpoint => new URL(endpoint).origin === url.origin) &&
+      !/^\/[^/]+\/ui(?:\/|$)/.test(url.pathname);
+  } catch (_) { return false; }
+}
+
+function broadcastAppearance() {
+  const value = currentAppearance();
+  sendToShell('aivuda-shell:appearance', value);
+  for (const contents of webContents.getAllWebContents()) {
+    if (contents.hostWebContents === window?.webContents && isBuiltinPage(contents.getURL())) contents.send('aivuda-shell:appearance', value);
+  }
+}
 
 function installCertificateValidationBypass(targetSession) {
   if (certificateBypassSessions.has(targetSession)) return;
@@ -207,6 +230,23 @@ app.whenReady().then(async () => {
     endpoints = await services.start();
     shellStatePath = path.join(app.getPath('userData'), 'shell-state.json');
     readShellState();
+    appearancePath = path.join(app.getPath('userData'), 'appearance.json');
+    try { appearancePreferences = normalizePreferences(JSON.parse(fs.readFileSync(appearancePath, 'utf8'))); } catch (_) {}
+    nativeTheme.themeSource = appearancePreferences.theme;
+    nativeTheme.on('updated', broadcastAppearance);
+    ipcMain.on('aivuda-shell:get-appearance', event => {
+      event.returnValue = event.sender === window?.webContents ||
+        (event.sender.hostWebContents === window?.webContents && event.senderFrame === event.sender.mainFrame && isBuiltinPage(event.senderFrame.url)) ? currentAppearance() : null;
+    });
+    ipcMain.handle('aivuda-shell:set-appearance', (event, value) => {
+      if (event.sender !== window?.webContents) throw new Error('Only the desktop can change appearance.');
+      const preferences = normalizePreferences(value);
+      fs.writeFileSync(appearancePath, JSON.stringify(preferences, null, 2));
+      appearancePreferences = preferences;
+      nativeTheme.themeSource = preferences.theme;
+      broadcastAppearance();
+      return currentAppearance();
+    });
     services.startPackageMcps();
     createApplicationMenu();
     ipcMain.on('aivuda-shell:get-default-appstore-url', (event) => {

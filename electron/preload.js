@@ -2,6 +2,9 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 const on = (channel, callback, map = false) => ipcRenderer.on(channel, (_event, payload) => callback(map ? payload : undefined));
 contextBridge.exposeInMainWorld('aivudaShell', {
+  getAppearance: () => ipcRenderer.sendSync('aivuda-shell:get-appearance'),
+  setAppearance: value => ipcRenderer.invoke('aivuda-shell:set-appearance', value),
+  onAppearance: callback => on('aivuda-shell:appearance', callback, true),
   getInstalledApplications: () => ipcRenderer.invoke('aivuda-shell:get-installed-applications'),
   desktopCommand: (command) => ipcRenderer.invoke('aivuda-shell:desktop-command', command),
   onRecordingError: (callback) => on('aivuda-shell:recording-error', callback, true),

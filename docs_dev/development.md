@@ -181,3 +181,13 @@ Test packaged resources without opening an Electron window:
 cd /path/to/ACEswarm
 ACESWARM_RESOURCES=$PWD/dist/linux-unpacked/resources npm run smoke
 ```
+
+## Language and Theme
+
+System offers Theme (Follow System / Light / Dark) and Language (Follow System / English / Simplified Chinese). Both default to Follow System. Desktop preferences persist in Electron userData/appearance.json; unsupported system languages resolve to English and unavailable theme information resolves to Light.
+
+Console and AppStore Admin default to Follow System for both settings. Their upstream code reads only standard browser APIs: navigator.language and matchMedia('(prefers-color-scheme: dark)'). Existing explicit page choices remain independent. Unsupported language or unavailable browser APIs fall back to English/Light.
+
+ACEswarm adapts the browser environment: Electron nativeTheme.themeSource supplies the desktop theme to hosted pages. For local built-in pages, the guest preload sets navigator.language/languages and adapts the standard dark/light matchMedia queries before page scripts run, avoiding inconsistent Electron guest theme reports. Updates dispatch standard languagechange and MediaQueryList change events. No upstream package depends on ACEswarm names, storage keys, IPC or custom events for appearance. Individual page overrides still take precedence. Rebuild both submodule frontends and the AppImage to ship changes.
+
+Address bar, Reload, Window controls and Developer tools remain in window menus; they are no longer duplicated in System.

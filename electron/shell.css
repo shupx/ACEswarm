@@ -1,4 +1,16 @@
 :root { color-scheme: light; font-family: Inter, "Segoe UI", system-ui, sans-serif; color: #24292e; background: #dde4e6; letter-spacing: 0; }
+.appearance-setting { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; font-size: 12px; }
+.appearance-setting select { width: 132px; padding: 5px; border: 1px solid #c4cfce; border-radius: 4px; background: #fff; color: inherit; }
+:root[data-theme="dark"] { color-scheme: dark; color: #e2e8e5; background: #202524; }
+:root[data-theme="dark"] .shell { background: #202524; }
+:root[data-theme="dark"] :is(.desktop-bar, .tools-menu, .dock-menu, .window-menu, dialog, #application-launcher, .browser-toolbar) { background: #2b3230; color: #e2e8e5; border-color: #4d5b56; }
+:root[data-theme="dark"] :is(.system-button, .desktop-shortcut, .icon-button, .tools-menu button, .dock-menu button, .window-menu > button, .window-task, #window-zoom-reset, .dock-label) { color: #e2e8e5; }
+:root[data-theme="dark"] :is(button:hover, summary:hover, .system-button[aria-expanded="true"], .window-task.active) { background: #3b4943; }
+:root[data-theme="dark"] :is(input, select, #application-search, #launcher-search, #window-target, .dialog-actions button) { background: #202724; color: #e2e8e5; border-color: #52635a; }
+:root[data-theme="dark"] :is(.menu-section-label, #launcher-status, #window-count, #desktop-clock, dialog label) { color: #b6c4bd; }
+:root[data-theme="dark"] .app-window { background: #202724; border-color: #52635a; }
+:root[data-theme="dark"] .dock-layout { --dv-activegroup-visiblepanel-tab-background-color: #3b4943; --dv-activegroup-visiblepanel-tab-color: #e2e8e5; --dv-inactivegroup-visiblepanel-tab-background-color: #2b3230; --dv-inactivegroup-visiblepanel-tab-color: #b6c4bd; --dv-tabs-and-actions-container-background-color: #2b3230; --dv-paneview-header-border-color: #52635a; }
+:root[data-theme="dark"] .app-window.active .dock-layout .dv-tabs-and-actions-container { background: #303f38; }
 * { box-sizing: border-box; }
 html { overflow: hidden; }
 body { margin: 0; height: 100vh; overflow: hidden; }

@@ -10,10 +10,8 @@
             <button id="system-open-page" role="menuitem"><i data-lucide="plus"></i>Open page</button>
             <button id="system-desktop" role="menuitem"><i data-lucide="panels-top-left"></i>Show desktop</button>
             <hr />
-            <button id="system-address" role="menuitem"><i data-lucide="globe"></i>Address bar</button>
-            <button id="system-reload" role="menuitem"><i data-lucide="rotate-cw"></i>Reload page</button>
-            <button id="system-window-tools" role="menuitem"><i data-lucide="sliders-horizontal"></i>Window controls</button>
-            <button id="system-devtools" role="menuitem"><i data-lucide="code"></i>Developer tools</button>
+            <label class="appearance-setting"><span>Theme</span><select id="system-theme" aria-label="Theme"><option value="system">Follow System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+            <label class="appearance-setting"><span>Language</span><select id="system-language" aria-label="Language"><option value="system">Follow System</option><option value="en-US">English</option><option value="zh-CN">简体中文</option></select></label>
             <hr />
             <button id="tools-fps" role="menuitemcheckbox" aria-checked="false"><i data-lucide="activity"></i>FPS / GPU Overlay</button>
             <button id="tools-record" role="menuitemcheckbox" aria-checked="false"><i data-lucide="video"></i>Screen Record</button>
@@ -98,5 +96,6 @@
   <script src="./desktop.js"></script>
   <script src="./window-manager.js"></script>
   <script src="./shell.js"></script>
+  <script src="./appearance.js"></script>
 </body>
 </html>
