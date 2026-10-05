@@ -28,6 +28,11 @@
       <nav id="dock" class="dock" aria-label="Window taskbar"></nav>
       <span id="window-count">Desktop</span>
       <div class="desktop-actions">
+        <div id="background-apps" aria-label="Running applications" hidden>
+          <button id="background-apps-toggle" class="icon-button" title="More running applications" aria-label="More running applications" aria-expanded="false" aria-controls="background-apps-overflow" hidden><i data-lucide="chevron-up"></i></button>
+          <div id="background-apps-visible"></div>
+          <div id="background-apps-overflow" role="group" aria-label="More running applications" hidden></div>
+        </div>
         <button id="show-desktop" class="icon-button" title="Show desktop" aria-label="Show desktop"><i data-lucide="panels-top-left"></i></button>
         <button id="new-tab" class="icon-button" title="Open page" aria-label="Open page"><i data-lucide="plus"></i></button>
         <time id="desktop-clock"></time>
@@ -96,6 +101,7 @@
   <script src="./desktop.js"></script>
   <script src="./window-manager.js"></script>
   <script src="./shell.js"></script>
+  <script src="./background-apps.js"></script>
   <script src="./appearance.js"></script>
 </body>
 </html>

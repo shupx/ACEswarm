@@ -27,6 +27,14 @@ button:focus-visible, input:focus-visible { outline: 2px solid #157d71; outline-
 #window-count { font-size: 12px; color: #687378; }
 .desktop-actions { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
 .desktop-actions .icon-button { width: 24px; height: 24px; padding: 3px; }
+#background-apps, #background-apps-visible { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+#background-apps { position: relative; padding-right: 6px; border-right: 1px solid #c5cdd1; }
+#background-apps .app-icon { width: 18px; height: 18px; border-radius: 3px; }
+#background-apps .app-icon svg { width: 16px; height: 16px; }
+#background-apps-overflow { position: absolute; bottom: calc(100% + 8px); right: 0; display: grid; grid-template-columns: repeat(4, 28px); gap: 6px; padding: 8px; max-height: calc(100vh - 48px); overflow-y: auto; border: 1px solid #c4cfce; border-radius: 6px; background: #fff; box-shadow: 0 6px 20px #223e3925; }
+#background-apps-overflow .icon-button { width: 28px; height: 28px; }
+#background-apps-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+:root[data-theme="dark"] #background-apps-overflow { background: #2b3230; border-color: #4d5b56; }
 .icon-button { display: inline-grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 5px; background: transparent; color: #48575c; flex-shrink: 0; padding: 5px; }
 .icon-button:hover { background: #e3e9e9; color: #146c61; }
 .icon-button:disabled { opacity: .35; cursor: default; }
@@ -148,3 +156,4 @@ dialog input { width: 100%; padding: 10px; border: 1px solid #b9c8c4; border-rad
 .dialog-actions .primary { margin-left: auto; background: #267761; border-color: #267761; color: white; }
 #open-page-error { color: #b43e43; font-size: 12px; }
 @media (max-width: 640px) { #window-count, #status-text, #desktop-clock { display: none; } .desktop-bar { padding: 0 5px; gap: 4px; } .system-button { padding: 0 5px; gap: 5px; } .system-button > svg { display: none; } }
+@media (max-width: 420px) { #tools-button span { display: none; } }
