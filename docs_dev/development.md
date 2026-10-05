@@ -91,6 +91,10 @@ dist/ACEswarm-<version>-x86_64.AppImage
 [Nightly AppImage](../.github/workflows/nightly.yml) builds on pushes to the default
 branch (`master` or `main`), daily at 18:00 UTC (02:00 Asia/Shanghai), and through
 the Actions page's **Run workflow** button on the default branch.
+Scheduled runs build only when the current commit differs from the last
+successful AppImage build. Runs that skipped packaging are excluded from this
+comparison; failed builds can be retried on the next schedule. Pushes and manual
+runs still build unconditionally.
 It checks out the pinned submodules, runs source checks, and uses the existing
 release build to package Linux x86_64. Only a successful build moves the `nightly`
 tag and updates the **Nightly** prerelease with these assets:
