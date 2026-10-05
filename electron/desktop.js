@@ -335,7 +335,7 @@ for (const [id, action] of [["window-reload", () => reloadActiveTab()], ["window
 }
 document.addEventListener("click", (event) => { if (!event.target.closest(".panel-menu")) setWindowMenuOpen(false); });
 document.addEventListener("keydown", (event) => {
-  const menus = [document.getElementById("tools-menu"), document.getElementById("dock-menu"), document.getElementById("window-menu"), document.getElementById('applications-menu')];
+  const menus = [document.getElementById('background-app-menu'), document.getElementById("tools-menu"), document.getElementById("dock-menu"), document.getElementById("window-menu"), document.getElementById('applications-menu')];
   const menu = menus.find((entry) => !entry.hidden);
   if (!menu) {
     if (event.key === "Escape" && !document.querySelector("dialog[open]")) setChromeExpanded(false);
@@ -343,7 +343,8 @@ document.addEventListener("keydown", (event) => {
   }
   if (event.key === "Escape") {
     event.preventDefault();
-    if (menu.id === "tools-menu") { setToolsMenuOpen(false); toolsButton.focus(); }
+    if (menu.id === 'background-app-menu') closeBackgroundAppMenu(true);
+    else if (menu.id === "tools-menu") { setToolsMenuOpen(false); toolsButton.focus(); }
     else if (menu.id === "window-menu") {
       setWindowMenuOpen(false);
       tabs.get(menu.dataset.windowId)?.panel?.group.element.querySelector(".panel-menu")?.focus();

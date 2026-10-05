@@ -21,16 +21,23 @@ async function run() {
       const storeUrl = 'http://localhost/store/';
       const desktopState = { appKey: url => url };
       const tabs = new Map();
-      let lastOpened, lastActivated;
+      let lastOpened, lastActivated, lastCommand, resolveCommand;
       function openApplication(url) { lastOpened = url; }
       function activateTab(id) { lastActivated = id; }
-      window.aivudaShell = { getRunningApplications: async () => [] };
+      window.aivudaShell = {
+        getRunningApplications: async () => [],
+        controlApplication: (appId, action) => {
+          lastCommand = [appId, action];
+          return new Promise(resolve => { resolveCommand = resolve; });
+        },
+      };
     ` });
     await page.addScriptTag({ content: fs.readFileSync(path.join(root, 'electron/desktop.js'), 'utf8').split('function applicationEntries()')[0] });
     await page.addScriptTag({ path: path.join(root, 'electron/background-apps.js') });
     await page.waitForTimeout(50);
     const entries = Array.from({ length: 7 }, (_, index) => ({
       appId: `app-${index}`, title: `Background application ${index}`, url: `http://localhost/app-${index}/`, hasUi: index !== 6,
+      detailUrl: `http://localhost/dashboard/apps/app-${index}`,
     }));
     await page.evaluate(entries => renderBackgroundApps(entries), entries);
     assert.equal(await page.locator('#background-apps-visible button').count(), 4);
@@ -64,12 +71,43 @@ async function run() {
       await page.mouse.click(width / 2, 100);
       assert.equal(await page.locator('#background-apps-overflow').isVisible(), false);
     }
+    const menu = page.locator('#background-app-menu');
+    const icon = page.locator('#background-apps-visible button').first();
+    await icon.click({ button: 'right' });
+    assert.deepEqual(await menu.locator('button').allTextContents(), ['Open UI', 'Detail', 'Stop', 'Restart']);
+    const menuBounds = await menu.boundingBox();
+    assert.ok(menuBounds.x >= 0 && menuBounds.x + menuBounds.width <= 375 && menuBounds.y >= 0);
+    await page.screenshot({ path: path.join(root, '.smoke/desktop/background-app-menu.png') });
+    await menu.locator('[data-action="ui"]').click();
+    assert.equal(await page.evaluate(() => lastActivated), 'existing');
+    await icon.click({ button: 'right' });
+    await menu.locator('[data-action="detail"]').click();
+    assert.equal(await page.evaluate(() => lastOpened), entries[0].detailUrl);
+    for (const action of ['stop', 'restart']) {
+      await page.evaluate(entries => renderBackgroundApps(entries), entries);
+      await icon.click({ button: 'right' });
+      await menu.locator(`[data-action="${action}"]`).click();
+      assert.deepEqual(await page.evaluate(() => lastCommand), ['app-0', action]);
+      await icon.click({ button: 'right' });
+      assert.equal(await menu.locator('[data-action="stop"]').isDisabled(), true);
+      assert.equal(await menu.locator('[data-action="restart"]').isDisabled(), true);
+      await page.evaluate(() => resolveCommand({ ok: true }));
+      await page.waitForFunction(() => pendingBackgroundAppActions.size === 0 && document.getElementById('background-apps').hidden);
+      await page.mouse.click(100, 100);
+    }
+    await page.evaluate(entries => renderBackgroundApps(entries), entries);
+    await page.locator('#background-apps-toggle').click();
+    await page.locator('#background-apps-overflow button').last().click({ button: 'right' });
+    assert.equal(await menu.locator('[data-action="ui"]').isDisabled(), true);
+    assert.equal(await menu.locator('[data-action="detail"]').isEnabled(), true);
+    await menu.locator('[data-action="detail"]').click();
+    assert.equal(await page.evaluate(() => lastOpened), entries[6].detailUrl);
     await page.evaluate(entries => renderBackgroundApps(entries.slice(0, 4)), entries);
     assert.equal(await page.locator('#background-apps-toggle').isVisible(), false);
     await page.evaluate(() => renderBackgroundApps([]));
     assert.equal(await page.locator('#background-apps').isVisible(), false);
     assert.deepEqual(errors, []);
-    console.log('PASS: running application tray, overflow, activation, keyboard, outside click and narrow layouts');
+    console.log('PASS: application tray, context menu, UI/detail routes, stop/restart, pending controls and narrow layouts');
   } finally { await browser.close(); }
 }
 

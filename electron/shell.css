@@ -34,6 +34,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid #157d71; outline-
 #background-apps-overflow { position: absolute; bottom: calc(100% + 8px); right: 0; display: grid; grid-template-columns: repeat(4, 28px); gap: 6px; padding: 8px; max-height: calc(100vh - 48px); overflow-y: auto; border: 1px solid #c4cfce; border-radius: 6px; background: #fff; box-shadow: 0 6px 20px #223e3925; }
 #background-apps-overflow .icon-button { width: 28px; height: 28px; }
 #background-apps-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+#background-app-menu button svg { width: 16px; height: 16px; flex-shrink: 0; }
+#background-app-menu button:disabled { opacity: .4; cursor: default; background: transparent; }
 :root[data-theme="dark"] #background-apps-overflow { background: #2b3230; border-color: #4d5b56; }
 .icon-button { display: inline-grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 5px; background: transparent; color: #48575c; flex-shrink: 0; padding: 5px; }
 .icon-button:hover { background: #e3e9e9; color: #146c61; }

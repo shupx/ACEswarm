@@ -1,6 +1,7 @@
 const shellTranslations = {
   'System': '系统', 'Applications': '应用', 'Desktop': '桌面', 'All': '全部',
   'Running applications': '正在运行的应用', 'More running applications': '更多正在运行的应用',
+  'Application actions': '应用操作', 'Open UI': '打开 UI', 'Detail': '详情', 'Stop': '停止', 'Restart': '重启',
   'Theme': '主题', 'Language': '语言', 'Follow System': '跟随系统', 'Light': '浅色', 'Dark': '深色',
   'Open page': '打开页面', 'Show desktop': '显示桌面', 'FPS / GPU Overlay': 'FPS / GPU 浮层',
   'Screen Record': '录屏', 'Fullscreen': '全屏', 'Clear Browser Data': '清除浏览器数据', 'Quit ACEswarm': '退出 ACEswarm',

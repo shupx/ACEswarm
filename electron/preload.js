@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('aivudaShell', {
   onAppearance: callback => on('aivuda-shell:appearance', callback, true),
   getInstalledApplications: () => ipcRenderer.invoke('aivuda-shell:get-installed-applications'),
   getRunningApplications: () => ipcRenderer.invoke('aivuda-shell:get-running-applications'),
+  controlApplication: (appId, action) => ipcRenderer.invoke('aivuda-shell:control-application', appId, action),
   desktopCommand: (command) => ipcRenderer.invoke('aivuda-shell:desktop-command', command),
   onRecordingError: (callback) => on('aivuda-shell:recording-error', callback, true),
   authorizeUrl: (url) => ipcRenderer.invoke('aivuda-shell:authorize-url', url),

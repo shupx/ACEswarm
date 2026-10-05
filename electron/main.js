@@ -7,7 +7,7 @@ const { workspace } = require('./services/workspace');
 const { resolveRuntime } = require('./services/runtime');
 const { LocalServices } = require('./services/local-services');
 const { provisionOnce, prepareBootstrap } = require('./services/seed');
-const { installedApplications, runningApplications } = require('./services/applications');
+const { installedApplications, runningApplications, controlApplication } = require('./services/applications');
 const recording = require('./services/recording')(() => window, (failure) => sendToShell('aivuda-shell:recording-error', failure), (child) => services?.trackRecording(child));
 
 let services;
@@ -275,6 +275,16 @@ app.whenReady().then(async () => {
     ipcMain.handle('aivuda-shell:get-running-applications', (event) => {
       if (event.sender !== window?.webContents) throw new Error('Only the desktop can read running applications.');
       return runningApplications(endpoints.osApi, endpoints.os);
+    });
+    ipcMain.handle('aivuda-shell:control-application', async (event, appId, action) => {
+      if (event.sender !== window?.webContents) throw new Error('Only the desktop can control applications.');
+      try {
+        await controlApplication(endpoints.osApi, appId, action);
+        return { ok: true };
+      } catch (error) {
+        require('electron').dialog.showErrorBox('Application action failed', error.message);
+        return { ok: false, error: error.message };
+      }
     });
     ipcMain.handle('aivuda-shell:authorize-url', (event, rawUrl) => {
       if (event.sender !== window?.webContents) return { ok: false, error: 'Only the desktop can authorize pages.' };
