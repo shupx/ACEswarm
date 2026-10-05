@@ -251,7 +251,7 @@ async function run() {
   await count(page, 1);
   console.log('PASS: untrusted HTTPS loads; generic load failure page retries the original URL');
 
-  await page.evaluate(url => openApplication(url), robotUrl);
+  await page.evaluate(async url => { await window.aivudaShell.authorizeUrl(url); createTab(url); }, robotUrl);
   await page.waitForFunction(() => getActiveTab()?.ready && getActiveTab().title === 'Robot Console');
   const robotId = await page.evaluate(() => activeTabId);
   const secondWindow = await page.evaluate(() => activeWindowId);
@@ -341,7 +341,9 @@ async function run() {
   console.log('PASS: tab tear-off creates a floating outer window; floating windows exchange tabs without reload');
 
   await (await applicationButton(page, await page.evaluate(() => defaultUrl))).click();
-  assert.equal(await page.evaluate(() => appWindows.size), 2, 'Launching an existing application creates a new window');
+  assert.equal(await page.evaluate(() => appWindows.size), 1, 'Launching an application adds a tab to the current window');
+  assert.equal(await page.evaluate(() => activeWindowId), firstWindow);
+  await page.evaluate(() => moveTabToWindow(getActiveTab()));
   const duplicateWindow = await page.evaluate(() => activeWindowId);
   assert.equal(await page.locator('.window-drag-handle').count(), 0);
   const duplicateBounds = await page.evaluate(id => ({ ...appWindows.get(id).bounds }), duplicateWindow);
@@ -410,12 +412,13 @@ async function run() {
   await page.waitForFunction(() => innerWidth === 390);
   await page.waitForFunction(() => [...appWindows.values()].every(owner => owner.frame.getBoundingClientRect().right <= innerWidth + 1));
   await waitForGuestLayout(page);
+  await page.waitForFunction(() => document.documentElement.scrollWidth <= innerWidth);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   assert.equal(await page.evaluate(() => [...appWindows.values()].every(owner => owner.frame.getBoundingClientRect().right <= innerWidth + 1)), true);
   await page.screenshot({ path: path.join(screenshots, 'window-desktop-390.png') });
   await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1280, 820));
   await page.waitForFunction(() => innerWidth === 1280);
-  await page.evaluate(url => openApplication(url), robotUrl + '/restart');
+  await page.evaluate(url => createTab(url), robotUrl + '/restart');
   const restartWindow = await page.evaluate(() => activeWindowId);
   await page.evaluate(id => minimizeOuterWindow(appWindows.get(id)), restartWindow);
   await page.locator('#show-desktop').click();

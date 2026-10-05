@@ -25,8 +25,8 @@ The Electron renderer uses plain JavaScript, Dockview Core and Lucide controls.
 The desktop window manager owns outer windows: their bounds, stacking order,
 minimization, maximization and half-screen placement. Each outer window owns its
 own Dockview instance, which manages only that window's tabs and nested splits.
-Launching an application creates a new outer window, even when the same app is
-already open. The titlebar's plus control opens another tab in that window.
+Launching an application adds a tab to the current window, creating a window
+when none exists. The tab row's plus control also opens a tab in that window.
 
 Drag tabs to group edges to split or onto tab bars to merge. Tabs can also move
 between windows by dropping onto another window's content, tab bar or taskbar
@@ -86,8 +86,8 @@ group retains a menu for address bar, pinning, page zoom, reload and developer
 tools. Zoom retains Chromium's shared browser
 session behavior. Main-process input handlers preserve shortcuts even in guests.
 Applications are identified by their launch URL (ignoring the fragment), separately
-from a tab's current navigation URL. Launching an application opens a new outer
-window. Favorite
+from a tab's current navigation URL. Applications menus and desktop shortcuts
+open apps as tabs in the current window. Favorite
 entries also appear as desktop shortcuts. Their context menus support new
 windows, switching windows and removing favorites.
 

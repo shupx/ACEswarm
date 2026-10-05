@@ -56,7 +56,7 @@ function applicationEntries() {
 }
 
 function openApplication(url) {
-  createTab(url);
+  createTab(url, { windowId: activeWindowId });
 }
 
 function pinApplication(entry) {
