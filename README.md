@@ -93,4 +93,9 @@ To repeat first-launch provisioning, close ACEswarm, back up the workspace, and 
 
 ## Developer documentation
 
+ACEswarm automatically enables local Playwright connections and a browser
+discovery MCP server at `http://127.0.0.1:28792/mcp`. Agents can call
+`get_browser_connection` to obtain the running browser address. See
+[agent connection instructions](docs_dev/agent-browser.md).
+
 Development, architecture, runtime, bootstrap, build, and release documentation is in [`docs_dev/`](docs_dev/).

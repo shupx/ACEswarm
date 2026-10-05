@@ -31,14 +31,19 @@ async function run() {
         args: [path.join(root, 'tests/fixtures/desktop-electron.cjs'), '--no-sandbox'],
         env: { ...process.env, ELECTRON_RUN_AS_NODE: '', ACESWARM_UI_TEST_PROFILE: path.join(temp, mode, 'profile'),
           ACESWARM_WS_ROOT: path.join(temp, mode, 'workspace'), ACESWARM_GATEWAY_PORT: String(gateway),
-          ACESWARM_STORE_GATEWAY_PORT: String(store), ACESWARM_PYTHON: path.join(root, '.venv/bin/python') },
+          ACESWARM_STORE_GATEWAY_PORT: String(store), ACESWARM_MCP_PORT: '0', ACESWARM_PYTHON: path.join(root, '.venv/bin/python') },
         timeout: 90000,
       });
       const owner = application.process();
       let children = [];
       try {
         const page = await application.firstWindow();
-        await page.waitForFunction(() => document.querySelector('#dock .dock-item[data-app-url]'), { timeout: 30000 });
+        await page.waitForFunction(() => document.querySelector('#dock') &&
+          typeof isRestoringShellState !== 'undefined' && !isRestoringShellState, { timeout: 30000 });
+        const discoveryFile = path.join(temp, mode, 'workspace/state/agent-connection.json');
+        const discoveryDeadline = Date.now() + 10000;
+        while (!fs.existsSync(discoveryFile) && Date.now() < discoveryDeadline) await new Promise(resolve => setTimeout(resolve, 50));
+        const discovery = JSON.parse(fs.readFileSync(discoveryFile));
         if (mode === 'SIGKILL') {
           await page.evaluate(() => { screenRecordDetailsExpanded = true; showScreenRecordBar(); });
           await page.locator('[data-screen-record-mode="ffmpeg"]').click();
@@ -64,7 +69,10 @@ async function run() {
         while (children.some((child) => running(child.pid)) && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 100));
         assert.deepEqual(children.filter((child) => running(child.pid)), [], `${mode} left running processes`);
         for (const port of [gateway, store]) await assert.rejects(fetch(`http://127.0.0.1:${port}/`, { signal: AbortSignal.timeout(1000) }));
-        console.log(`PASS: ${mode} releases all ${children.length} subprocesses and both gateway ports`);
+        await assert.rejects(fetch(discovery.mcpUrl, { signal: AbortSignal.timeout(1000) }));
+        await assert.rejects(fetch(`${discovery.cdpEndpoint}/json/version`, { signal: AbortSignal.timeout(1000) }));
+        if (mode !== 'SIGKILL') assert.equal(fs.existsSync(discoveryFile), false);
+        console.log(`PASS: ${mode} releases all ${children.length} subprocesses, gateway, MCP, and CDP ports`);
       } finally {
         if (running(owner.pid)) await application.close();
         for (const child of children) if (running(child.pid)) {

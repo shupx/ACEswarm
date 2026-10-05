@@ -42,6 +42,7 @@ async function launch(expectedWindow) {
       ACESWARM_WS_ROOT: path.join(temp, 'workspace'),
       ACESWARM_GATEWAY_PORT: String(await gatewayPort()),
       ACESWARM_STORE_GATEWAY_PORT: String(await gatewayPort()),
+      ACESWARM_MCP_PORT: '0',
       ACESWARM_PYTHON: path.join(root, '.venv/bin/python'),
       ACESWARM_CADDY: path.join(root, 'resources/app-gateway/caddy'),
     },

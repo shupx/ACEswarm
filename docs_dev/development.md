@@ -125,8 +125,9 @@ and configurable; internal backend and Caddy admin ports are dynamically allocat
 AivudaOS and AivudaAppStore MCP servers are started as separate stdio processes
 using the private Python runtime. Their logs are `aivudaos-mcp.log` and
 `aivudaappstore-mcp.log` in the workspace logs directory. These processes are not
-exposed through an HTTP endpoint or external client bridge. ACEswarm has no
-Control API or MCP server of its own; desktop agent integration is deferred.
+exposed through an HTTP endpoint or external client bridge. ACEswarm separately
+hosts a browser discovery MCP endpoint and a CDP listener for desktop agent
+connections; see [agent-browser.md](agent-browser.md).
 ACEswarm does not call standalone installation scripts, systemd, Avahi, or ports 80/443.
 
 ## Tests

@@ -6,11 +6,16 @@ if (process.platform === 'linux') app.commandLine.appendSwitch('disable-accelera
 const { workspace } = require('./services/workspace');
 const { resolveRuntime } = require('./services/runtime');
 const { LocalServices } = require('./services/local-services');
+const { configureBrowserConnection, startAgentConnection } = require('./services/agent-connection');
+const primaryInstance = app.requestSingleInstanceLock();
+if (!primaryInstance) app.quit();
+const browserConfiguration = primaryInstance ? configureBrowserConnection(app) : null;
 const { provisionOnce, prepareBootstrap } = require('./services/seed');
 const { installedApplications, runningApplications, controlApplication } = require('./services/applications');
 const recording = require('./services/recording')(() => window, (failure) => sendToShell('aivuda-shell:recording-error', failure), (child) => services?.trackRecording(child));
 
 let services;
+let agentConnection;
 let window;
 let endpoints;
 const remoteOrigins = new Set();
@@ -211,14 +216,14 @@ async function shutdown() {
     finally { clearTimeout(timer); await recording.stop(); }
   };
   const recordingResult = await Promise.allSettled([finalizeRecording()]);
-  const results = [...recordingResult, ...await Promise.allSettled([services?.stop()])];
+  const results = [...recordingResult, ...await Promise.allSettled([agentConnection?.stop(), services?.stop()])];
   for (const result of results) if (result.status === 'rejected') console.error('ACEswarm shutdown:', result.reason);
 }
 process.on('SIGTERM', handleTerminationSignal);
 process.on('SIGINT', handleTerminationSignal);
 
 app.whenReady().then(async () => {
-  if (!app.requestSingleInstanceLock()) { app.quit(); return; }
+  if (!primaryInstance) return;
   try {
     installCertificateValidationBypass(session.defaultSession);
     installCertificateValidationBypass(session.fromPartition('persist:aivuda-shell'));
@@ -331,10 +336,12 @@ app.whenReady().then(async () => {
       try { return await recording[method](); } catch (error) { return { ok: false, error: error.message }; }
     });
     createWindow();
+    agentConnection = await startAgentConnection({ configuration: browserConfiguration, stateDirectory: paths.state });
     provisionOnce({ stateDirectory: paths.state, existingOsWorkspace, osUrl: endpoints.osApi, storeUrl: endpoints.store, storeApiUrl: endpoints.storeApi, configPath: path.join(app.isPackaged ? process.resourcesPath : path.resolve(__dirname, '..', 'resources'), 'seed-apps', 'aceswarm-config-export.json') })
       .then((result) => console.log(result.skipped ? `ACEswarm seed provisioning skipped: ${result.reason}` : 'ACEswarm seed provisioning completed'))
       .catch((error) => { services.failures.push(`Seed provisioning: ${error.message}`); console.error(error); });
   } catch (error) {
+    await agentConnection?.stop();
     await services?.stop();
     console.error('ACEswarm startup failed:', error);
     require('electron').dialog.showErrorBox('ACEswarm startup failed', `${error.message}\n\nLogs: ${paths?.logs || 'not initialized'}`);

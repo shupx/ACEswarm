@@ -177,8 +177,10 @@ home/projects/simulation/... → ACEswarm pages
 ## IPC and package MCP boundary
 
 The renderer uses the `aivudaShell` preload bridge and Electron IPC for desktop
-operations. ACEswarm has no standalone control backend, Control API, or MCP server
-of its own. Agent control of the ACEswarm desktop is deferred to a future design.
+operations. Electron also enables a random loopback CDP listener and hosts an
+MCP Streamable HTTP endpoint for agents. Its `get_browser_connection` tool
+provides the live Playwright attachment address and page targets. See
+[agent-browser.md](agent-browser.md) for the connection contract and lifecycle.
 
 After starting the local backends and Gateway, Electron launches two separate
 stdio MCP processes with the private Python runtime:
