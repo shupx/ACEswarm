@@ -97,4 +97,13 @@ ACEswarm exposes the running desktop through CDP at `http://127.0.0.1:28793`
 (override with `ACESWARM_CDP_PORT`). Agents attach directly using Playwright MCP. See
 [agent connection instructions](docs_dev/agent-browser.md).
 
+Configure Codex with one command (requires Node.js/npm):
+
+```bash
+codex mcp add aceswarm -- npx -y @playwright/mcp@0.0.83 --cdp-endpoint http://127.0.0.1:28793
+```
+
+Start ACEswarm before using the browser tools in Codex. If you set
+`ACESWARM_CDP_PORT`, replace `28793` in the command with that port.
+
 Development, architecture, runtime, bootstrap, build, and release documentation is in [`docs_dev/`](docs_dev/).
