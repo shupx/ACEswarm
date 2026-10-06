@@ -61,7 +61,7 @@
       }
     ],
     "linux": {
-      "icon": "electron/assets/aivuda_icon.png",
+      "icon": "electron/assets/aivuda_icon_256.png",
       "target": [
         "AppImage"
       ],

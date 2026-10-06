@@ -27,6 +27,17 @@ The AppImage includes the Python runtime, AivudaOS, AivudaAppStore, the local ap
 
 On first launch, ACEswarm starts its local services, publishes the bundled applications to the local AppStore, imports the bundled AivudaOS configuration, and opens the workbench. First launch can take longer than subsequent launches.
 
+### add to system menu
+
+To add ACEswarm to your system menu, use [Appimagelauncher-amd64](https://github.com/TheAssassin/AppImageLauncher/releases/download/v3.0.0-beta-3/appimagelauncher_3.0.0-beta-2-gha287.96cb937_amd64.deb) or [AppImageLauncher-arm64](https://github.com/TheAssassin/AppImageLauncher/releases/download/v3.0.0-beta-3/appimagelauncher_3.0.0-beta-2-gha287.96cb937_arm64.deb):
+
+```bash
+sudo dpkg -i appimagelauncher_3.0.0-beta-2-gha287.96cb937_amd64.deb
+```
+
+After installation, double-click the AppImage and select `integrate and run` to add it to your system menu.
+
+
 ## User data
 
 The default user workspace is:
