@@ -183,13 +183,14 @@ to the existing desktop and WebViews. See
 [agent-browser.md](agent-browser.md) for the connection contract and lifecycle.
 
 After starting the local backends and Gateway, Electron launches two separate
-stdio MCP processes with the private Python runtime:
+Streamable HTTP MCP processes with the private Python runtime:
 
 - `python -m aivudaos.mcp_server`
 - `python -m aivudaappstore.mcp_server`
 
-These servers wrap their respective public HTTP APIs with each service's normal
-authentication. Their stdin pipes remain open and stdout/stderr are logged by
-the service manager; no external client bridge or HTTP MCP endpoint is provided.
+These servers expose `/mcp` on loopback ports 28794 and 28795 by default and
+wrap every backend API route with each service's normal authentication. The
+service manager waits for `/health`, logs stdout/stderr, and publishes `osMcp`
+and `storeMcp` in its endpoints. See [package-mcp.md](package-mcp.md) for clients.
 They are tracked by the process guardian and stopped with the other services.
 ACEswarm integrations do not access either service's databases.

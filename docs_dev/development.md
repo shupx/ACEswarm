@@ -122,10 +122,11 @@ See [ports.md](ports.md) for the default and configurable ports.
 
 All listeners bind to loopback. The two browser-facing Gateway ports are fixed
 and configurable; internal backend and Caddy admin ports are dynamically allocated.
-AivudaOS and AivudaAppStore MCP servers are started as separate stdio processes
+AivudaOS and AivudaAppStore MCP servers are started as separate Streamable HTTP processes
 using the private Python runtime. Their logs are `aivudaos-mcp.log` and
-`aivudaappstore-mcp.log` in the workspace logs directory. These processes are not
-exposed through an HTTP endpoint or external client bridge. ACEswarm exposes
+`aivudaappstore-mcp.log` in the workspace logs directory. Their `/mcp` endpoints
+default to ports 28794 and 28795; startup waits for readiness. See
+[package-mcp.md](package-mcp.md) for authentication and configuration. ACEswarm exposes
 a configurable fixed CDP listener for direct Playwright MCP desktop agent
 connections; see [agent-browser.md](agent-browser.md).
 ACEswarm does not call standalone installation scripts, systemd, Avahi, or ports 80/443.

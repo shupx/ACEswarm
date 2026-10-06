@@ -133,22 +133,40 @@ class LocalServices {
     });
   }
 
-  startPackageMcps() {
+  async startPackageMcps() {
+    const osMcpPort = validateFixedPort(Number(process.env.AIVUDAOS_MCP_PORT || 28794), 'AIVUDAOS_MCP_PORT');
+    const storeMcpPort = validateFixedPort(Number(process.env.AIVUDAAPPSTORE_MCP_PORT || 28795), 'AIVUDAAPPSTORE_MCP_PORT');
+    if (osMcpPort === storeMcpPort) throw new Error('Package MCP ports must be different');
     const common = this.runtime.packaged ? {} : { PYTHONPATH: this.runtime.pythonPath };
-    this.startMcpPackage('aivudaos-mcp', 'aivudaos.mcp_server', {
+    const osChild = this.startMcpPackage('aivudaos-mcp', 'aivudaos.mcp_server', {
       ...common,
-      AIVUDAOS_MCP_BASE_URL: this.endpoints.osApi.replace(/\/$/, ''),
+      AIVUDAOS_MCP_HOST: '127.0.0.1',
+      AIVUDAOS_MCP_PORT: String(osMcpPort),
+      AIVUDAOS_WS_ROOT: this.paths.os,
+      AIVUDAOS_EMBEDDED_MODE: '1',
+      AIVUDAOS_MCP_BASE_URL: this.endpoints.os.replace(/\/$/, '') + '/aivuda_os',
       ...(process.env.AIVUDAOS_MCP_TOKEN ? { AIVUDAOS_MCP_TOKEN: process.env.AIVUDAOS_MCP_TOKEN } : {}),
     });
-    this.startMcpPackage('aivudaappstore-mcp', 'aivudaappstore.mcp_server', {
+    const storeChild = this.startMcpPackage('aivudaappstore-mcp', 'aivudaappstore.mcp_server', {
       ...common,
-      AIVUDAAPPSTORE_MCP_BASE_URL: this.endpoints.store.replace(/\/$/, '').replace(/\/$/, '') + '/aivuda_app_store',
+      AIVUDAAPPSTORE_MCP_HOST: '127.0.0.1',
+      AIVUDAAPPSTORE_MCP_PORT: String(storeMcpPort),
+      AIVUDAAPPSTORE_WS_ROOT: this.paths.store,
+      AIVUDAAPPSTORE_MCP_BASE_URL: this.endpoints.store.replace(/\/$/, '') + '/aivuda_app_store',
       ...(process.env.AIVUDAAPPSTORE_MCP_TOKEN ? { AIVUDAAPPSTORE_MCP_TOKEN: process.env.AIVUDAAPPSTORE_MCP_TOKEN } : {}),
     });
+    await Promise.all([
+      waitFor(`http://127.0.0.1:${osMcpPort}/health`, osChild),
+      waitFor(`http://127.0.0.1:${storeMcpPort}/health`, storeChild),
+    ]);
+    this.endpoints.osMcp = `http://127.0.0.1:${osMcpPort}/mcp`;
+    this.endpoints.storeMcp = `http://127.0.0.1:${storeMcpPort}/mcp`;
+    console.log(`AivudaOS MCP: ${this.endpoints.osMcp}`);
+    console.log(`AivudaAppStore MCP: ${this.endpoints.storeMcp}`);
   }
 
   startMcpPackage(name, moduleName, environment) {
-    return this.launch(name, this.runtime.python, pythonModuleArgs(this.runtime, moduleName), environment, true);
+    return this.launch(name, this.runtime.python, pythonModuleArgs(this.runtime, moduleName), environment);
   }
 
   stop() {

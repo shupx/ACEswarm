@@ -256,7 +256,7 @@ app.whenReady().then(async () => {
       broadcastAppearance();
       return currentAppearance();
     });
-    services.startPackageMcps();
+    await services.startPackageMcps();
     createApplicationMenu();
     ipcMain.on('aivuda-shell:get-default-appstore-url', (event) => {
       let storeUrl = null;

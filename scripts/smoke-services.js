@@ -6,6 +6,7 @@ const { workspace } = require('../electron/services/workspace');
 const { resolveRuntime } = require('../electron/services/runtime');
 const { LocalServices } = require('../electron/services/local-services');
 const { discoverSeeds } = require('../electron/services/seed');
+const { smokePackageMcps } = require('./test-package-mcp');
 
 async function run() {
   const sourceRoot = path.resolve(__dirname, '..');
@@ -23,6 +24,8 @@ async function run() {
     const manager = new LocalServices(paths, runtime);
     try {
       const endpoints = await manager.start();
+      await manager.startPackageMcps();
+      await smokePackageMcps(endpoints);
       for (const url of [endpoints.os, endpoints.store, `${endpoints.gateway}/`]) {
         const response = await fetch(url);
         assert.equal(response.status, 200, url);

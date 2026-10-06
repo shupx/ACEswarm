@@ -10,8 +10,10 @@ ACEswarm binds only to `127.0.0.1`. The two browser-facing Gateway ports are fix
 | AivudaAppStore Uvicorn API | `127.0.0.1:<random>` | Random per launch | Internal AppStore FastAPI service |
 | Caddy Admin API | `127.0.0.1:<random>` | Random per launch | Internal Caddy configuration reload API |
 | Electron browser CDP | `127.0.0.1:28793` by default | Fixed/configurable | Playwright MCP attaches directly to the running desktop |
+| AivudaOS MCP | `127.0.0.1:28794/mcp` by default | Fixed/configurable | Streamable HTTP, all OS API operations |
+| AivudaAppStore MCP | `127.0.0.1:28795/mcp` by default | Fixed/configurable | Streamable HTTP, all Store API operations |
 
-There are therefore **six TCP listeners** during a normal Electron session: two fixed Gateway listeners, one fixed CDP listener, and three random listeners. The AivudaOS and AivudaAppStore MCP services started by ACEswarm use stdio and do not add TCP ports. Playwright MCP runs on the agent side over stdio. See [agent-browser.md](agent-browser.md) for attachment and `ACESWARM_CDP_PORT` configuration (0 requests a random port).
+There are **eight TCP listeners** during a normal Electron session: two fixed Gateway listeners, one fixed CDP listener, two fixed package MCP listeners, and three random listeners. Override package MCP ports with `AIVUDAOS_MCP_PORT` and `AIVUDAAPPSTORE_MCP_PORT` (1024–65535). Occupied ports fail startup. Playwright MCP runs on the agent side over stdio. See [agent-browser.md](agent-browser.md) for attachment and `ACESWARM_CDP_PORT` configuration (0 requests a random port), and [package-mcp.md](package-mcp.md) for package MCP clients.
 
 If `28790` or `28791` is already occupied, ACEswarm fails startup instead of silently changing the UI origin. Override them when needed:
 
