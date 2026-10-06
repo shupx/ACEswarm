@@ -177,9 +177,9 @@ home/projects/simulation/... → ACEswarm pages
 ## IPC and package MCP boundary
 
 The renderer uses the `aivudaShell` preload bridge and Electron IPC for desktop
-operations. Electron also enables a random loopback CDP listener and hosts an
-MCP Streamable HTTP endpoint for agents. Its `get_browser_connection` tool
-provides the live Playwright attachment address and page targets. See
+operations. Electron also enables a loopback CDP listener on port 28793 by default
+(configurable with `ACESWARM_CDP_PORT`). Agent-side Playwright MCP attaches directly
+to the existing desktop and WebViews. See
 [agent-browser.md](agent-browser.md) for the connection contract and lifecycle.
 
 After starting the local backends and Gateway, Electron launches two separate

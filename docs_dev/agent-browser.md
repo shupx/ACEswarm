@@ -1,93 +1,77 @@
 # Agent browser connection
 
-ACEswarm automatically exposes its running Electron browser through a loopback
-Chrome DevTools Protocol (CDP) listener. Agents attach with Playwright's
-`chromium.connectOverCDP` (Python: `chromium.connect_over_cdp`). The agent's
-Playwright installation supplies the client; ACEswarm does not launch another
-browser or require Playwright in the packaged runtime.
+ACEswarm exposes the existing Electron desktop through CDP at
+`http://127.0.0.1:28793`. Agents use Microsoft's Playwright MCP directly to
+attach and access browser tools, including snapshots, clicks and tab switching.
+ACEswarm does not host a browser discovery MCP server or launch another browser.
+Playwright MCP runs on the agent side; it is not bundled in the AppImage.
 
-An MCP server starts inside Electron at `http://127.0.0.1:28792/mcp` and uses
-Streamable HTTP. Configure this URL in an MCP client, then call
-`get_browser_connection` with `{}`. The tool returns:
-
-- `cdpEndpoint`: HTTP endpoint accepted by Playwright.
-- `browserWSEndpoint`: browser-level CDP WebSocket URL.
-- `mcpUrl`, `pid`, and `transport`: discovery metadata.
-- `targets`: current Chromium targets with IDs, types, titles, and URLs.
-- `javascript`, `python`, and `notes`: connection examples and attachment guidance.
-
-A client configuration that supports remote Streamable HTTP servers can use:
+Start ACEswarm first, then configure the MCP client:
 
 ```json
 {
   "mcpServers": {
-    "aceswarm-browser": {
-      "url": "http://127.0.0.1:28792/mcp"
+    "aceswarm": {
+      "command": "npx",
+      "args": [
+        "-y", "@playwright/mcp@0.0.83",
+        "--cdp-endpoint", "http://127.0.0.1:28793"
+      ]
     }
   }
 }
 ```
 
-Client configuration formats vary. Set the transport to Streamable HTTP when
-the client asks for it. The MCP endpoint supports POST requests and requires the
-usual MCP `Accept: application/json, text/event-stream` header; use an MCP client
-to handle initialization and protocol negotiation.
+This uses stdio between the agent and Playwright MCP, and CDP between
+Playwright MCP and Electron. Client configuration formats vary. Node.js and
+access to the npm package are required on the agent machine.
 
-The CDP port is allocated by Chromium on each launch. ACEswarm logs both
-endpoints and writes discovery metadata to:
+## Port and connection lifecycle
 
-```text
-~/ACEswarm_ws/state/agent-connection.json
-```
-
-For a custom workspace, use `$ACESWARM_WS_ROOT/state/agent-connection.json`.
-The file is removed on normal shutdown. After a forced kill it may be stale;
-connect to the live MCP server to obtain the current connection.
-
-Override the MCP port when it is occupied (startup otherwise fails):
+The default CDP port is 28793 (not Chromium's usual 9222). Override it with:
 
 ```bash
-ACESWARM_MCP_PORT=29792 ./ACEswarm-x86_64.AppImage
+ACESWARM_CDP_PORT=29793 ./ACEswarm-x86_64.AppImage
 ```
 
-Use `ACESWARM_MCP_PORT=0` to allocate a random port and discover it from the file.
-Ports must be integers between 0 and 65535.
+Update `--cdp-endpoint` in the client configuration to match. Values must be
+integers between 0 and 65535. `0` requests a random port for isolated tests;
+read its address from `$ACESWARM_WS_ROOT/state/agent-connection.json`
+(default: `~/ACEswarm_ws/state/agent-connection.json`). The file contains
+`pid`, `cdpEndpoint`, `browserWSEndpoint`, and `transport: "cdp"`.
+It is removed on normal exit but can remain stale after a forced kill.
+Playwright's Electron launcher may supply its own CDP port, which takes precedence.
 
-## Attach to the existing desktop
+An occupied fixed CDP port fails startup with an error directing the user to
+`ACESWARM_CDP_PORT`. ACEswarm does not silently change the port.
+`ACESWARM_MCP_PORT` and the former `get_browser_connection` tool are no longer used.
 
-Use the `cdpEndpoint` returned by the tool:
+## Existing pages and WebViews
 
-```javascript
-const { chromium } = require('playwright');
-const browser = await chromium.connectOverCDP(connection.cdpEndpoint);
-try {
-  const pages = browser.contexts().flatMap(context => context.pages());
-  const desktop = pages.find(page => page.url().endsWith('/shell.html'));
-  await desktop.locator('#applications-button').click();
-} finally {
-  await browser.close();
-}
-```
+Use `browser_tabs` to list existing pages and select the desktop `shell.html`
+or an application's WebView. WebViews appear as separate pages. Use
+`browser_snapshot`, `browser_click`, and the other browser tools on the selected
+page. Do not navigate the shell away from its local file URL or close user tabs.
+CDP controls renderer pages, not Electron main-process APIs.
 
-`browser.close()` on this attached Playwright browser disconnects the client.
-Reuse the existing pages and contexts. Closing user pages or sending CDP
-`Browser.close` would close the user's UI or browser. CDP provides renderer
-automation, not Electron main-process APIs. Webviews may be separate targets;
-enumerate pages and frames to locate the desired application.
+Direct Playwright clients can also use `chromium.connectOverCDP` (Python:
+`chromium.connect_over_cdp`). Disconnecting an attached client leaves the
+desktop running. Sending CDP `Browser.close` closes Electron.
 
-The CDP and MCP listeners bind to loopback and provide local desktop control
-without authentication. Any process on the same machine able to reach them can
-control the UI and access its session data. The MCP server rejects browser
-Origin headers and unexpected Host headers. Keep these endpoints local.
+CDP is bound to loopback and allows local processes to control the desktop and
+access session data. Keep the endpoint local.
 
 ## Verification
 
 ```bash
-npm test
+npm run check
 npm run test:agent
+ACESWARM_CDP_PORT=29793 npm run test:agent
+npm run test:cleanup
 ```
 
-The live test requires the development Python environment, built frontends,
-Caddy, and a graphical display (or `xvfb-run`). It launches an isolated Electron
-profile and workspace, obtains discovery through a real MCP SDK client,
-interacts with the existing desktop through CDP, reconnects, and checks shutdown.
+The live tests require the development Python environment, built frontends,
+Caddy, and a graphical display (or `xvfb-run`). The agent test launches an isolated
+workspace/profile, starts the real Playwright MCP over stdio, operates the existing
+desktop, lists/selects a WebView and takes its snapshot, reconnects, and checks
+shutdown cleanup. MCP and its SDK are development dependencies only.

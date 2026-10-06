@@ -6,10 +6,12 @@ if (process.platform === 'linux') app.commandLine.appendSwitch('disable-accelera
 const { workspace } = require('./services/workspace');
 const { resolveRuntime } = require('./services/runtime');
 const { LocalServices } = require('./services/local-services');
-const { configureBrowserConnection, startAgentConnection } = require('./services/agent-connection');
+const { configureBrowserConnection, checkBrowserPort, startAgentConnection } = require('./services/agent-connection');
 const primaryInstance = app.requestSingleInstanceLock();
 if (!primaryInstance) app.quit();
 const browserConfiguration = primaryInstance ? configureBrowserConnection(app) : null;
+// Probe before Chromium starts CDP; retain errors for startup reporting.
+const browserPortCheck = primaryInstance ? checkBrowserPort(browserConfiguration).then(() => null, error => error) : Promise.resolve(null);
 const { provisionOnce, prepareBootstrap } = require('./services/seed');
 const { installedApplications, runningApplications, controlApplication } = require('./services/applications');
 const recording = require('./services/recording')(() => window, (failure) => sendToShell('aivuda-shell:recording-error', failure), (child) => services?.trackRecording(child));
@@ -225,6 +227,8 @@ process.on('SIGINT', handleTerminationSignal);
 app.whenReady().then(async () => {
   if (!primaryInstance) return;
   try {
+    const portError = await browserPortCheck;
+    if (portError) throw portError;
     installCertificateValidationBypass(session.defaultSession);
     installCertificateValidationBypass(session.fromPartition('persist:aivuda-shell'));
     paths = workspace();
