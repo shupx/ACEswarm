@@ -98,7 +98,7 @@ To repeat first-launch provisioning, close ACEswarm, back up the workspace, and 
 
 ACEswarm exposes the running desktop through CDP at `http://127.0.0.1:28793`
 (override with `ACESWARM_CDP_PORT`). Agents attach directly using Playwright MCP. See
-[agent connection instructions](docs_dev/agent-browser.md).
+[MCP service connection instructions](docs_dev/mcp-server.md).
 
 Configure Codex with one command (requires Node.js/npm):
 

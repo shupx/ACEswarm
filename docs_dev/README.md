@@ -16,8 +16,7 @@ Use these documents to understand the system and its runtime behavior:
 - [Architecture and project layout](architecture.md)
 - [Runtime and workspace](runtime.md)
 - [Ports and local listeners](ports.md)
-- [Agent Playwright MCP connection over CDP](agent-browser.md)
-- [AivudaOS and AppStore Streamable HTTP MCP](package-mcp.md)
+- [MCP services and client connections](mcp-server.md)
 - [Config export and bundled application bootstrap](bootstrap.md)
 
 User-facing download, run, data, and uninstall instructions are in the repository root [`README.md`](../README.md).

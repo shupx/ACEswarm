@@ -180,7 +180,7 @@ The renderer uses the `aivudaShell` preload bridge and Electron IPC for desktop
 operations. Electron also enables a loopback CDP listener on port 28793 by default
 (configurable with `ACESWARM_CDP_PORT`). Agent-side Playwright MCP attaches directly
 to the existing desktop and WebViews. See
-[agent-browser.md](agent-browser.md) for the connection contract and lifecycle.
+[mcp-server.md](mcp-server.md) for the connection contract and lifecycle.
 
 After starting the local backends and Gateway, Electron launches two separate
 Streamable HTTP MCP processes with the private Python runtime:
@@ -191,6 +191,6 @@ Streamable HTTP MCP processes with the private Python runtime:
 These servers expose `/mcp` on loopback ports 28794 and 28795 by default and
 wrap every backend API route with each service's normal authentication. The
 service manager waits for `/health`, logs stdout/stderr, and publishes `osMcp`
-and `storeMcp` in its endpoints. See [package-mcp.md](package-mcp.md) for clients.
+and `storeMcp` in its endpoints. See [mcp-server.md](mcp-server.md) for clients.
 They are tracked by the process guardian and stopped with the other services.
 ACEswarm integrations do not access either service's databases.
