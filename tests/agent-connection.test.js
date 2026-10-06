@@ -6,7 +6,7 @@ const path = require('node:path');
 const http = require('node:http');
 const { configureBrowserConnection, checkBrowserPort, readBrowserConnection, startAgentConnection } = require('../electron/services/agent-connection');
 
-test('CDP defaults to 28793, supports overrides and validates input', () => {
+test('CDP defaults to a random port, supports overrides and validates input', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'aceswarm-cdp-config-'));
   const switches = new Map();
   const app = { getPath: () => root, commandLine: {
@@ -14,7 +14,9 @@ test('CDP defaults to 28793, supports overrides and validates input', () => {
     hasSwitch: name => switches.has(name), getSwitchValue: name => switches.get(name),
   } };
   try {
-    assert.equal(configureBrowserConnection(app, {}).port, 28793);
+    fs.writeFileSync(path.join(root, 'DevToolsActivePort'), 'stale');
+    assert.equal(configureBrowserConnection(app, {}).port, 0);
+    assert.equal(fs.existsSync(path.join(root, 'DevToolsActivePort')), false);
     assert.equal(switches.get('remote-debugging-address'), '127.0.0.1');
     switches.clear();
     assert.equal(configureBrowserConnection(app, { ACESWARM_CDP_PORT: '29793' }).port, 29793);
@@ -29,7 +31,7 @@ test('CDP defaults to 28793, supports overrides and validates input', () => {
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
-test('CDP discovery handles conflicts, session identity and file ownership cleanup without hosting MCP', async () => {
+test('discovery publishes the managed HTTP MCP after validating CDP session identity', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'aceswarm-agent-'));
   const cdp = http.createServer((request, response) => {
     response.setHeader('Content-Type', 'application/json');
@@ -43,9 +45,13 @@ test('CDP discovery handles conflicts, session identity and file ownership clean
   try {
     await assert.rejects(checkBrowserPort({ port: cdp.address().port }), /unavailable.*ACESWARM_CDP_PORT/);
     await checkBrowserPort(configuration);
-    service = await startAgentConnection({ configuration, stateDirectory: root });
-    assert.equal(service.connection.transport, 'cdp');
-    assert.equal(service.connection.mcpUrl, undefined);
+    let attached;
+    service = await startAgentConnection({ configuration, stateDirectory: root, services: {
+      startBrowserMcp: async browser => { attached = browser; return 'http://127.0.0.1:28792/mcp'; },
+    } });
+    assert.equal(service.connection.transport, 'streamable-http');
+    assert.equal(service.connection.mcpUrl, 'http://127.0.0.1:28792/mcp');
+    assert.equal(attached.browserWSEndpoint, service.connection.browserWSEndpoint);
     const discoveryFile = path.join(root, 'agent-connection.json');
     assert.deepEqual(JSON.parse(fs.readFileSync(discoveryFile)), service.connection);
     fs.writeFileSync(discoveryFile, JSON.stringify({ pid: process.pid + 1 }));

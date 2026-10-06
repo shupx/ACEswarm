@@ -169,6 +169,48 @@ class LocalServices {
     return this.launch(name, this.runtime.python, pythonModuleArgs(this.runtime, moduleName), environment);
   }
 
+  async startBrowserMcp(browser) {
+    const port = validateFixedPort(Number(process.env.ACESWARM_MCP_PORT || 28792), 'ACESWARM_MCP_PORT');
+    await new Promise((resolve, reject) => {
+      const probe = net.createServer();
+      probe.once('error', error => reject(new Error(`ACEswarm browser MCP port ${port} is unavailable: ${error.message}. Set ACESWARM_MCP_PORT to another port.`)));
+      probe.listen(port, '127.0.0.1', () => probe.close(resolve));
+    });
+    const url = `http://127.0.0.1:${port}/mcp`;
+    const child = this.launch('playwright-mcp', process.execPath, [
+      path.join(__dirname, 'browser-mcp.js'),
+      '--host', '127.0.0.1', '--port', String(port),
+      '--allowed-hosts', `127.0.0.1:${port},localhost:${port}`,
+      '--cdp-endpoint', browser.browserWSEndpoint,
+      '--output-dir', path.join(this.paths.logs, 'playwright-mcp-output'),
+    ], { ELECTRON_RUN_AS_NODE: '1' });
+    const deadline = Date.now() + 30000;
+    while (Date.now() < deadline) {
+      if (child.spawnError || child.exitCode !== null || child.signalCode !== null || !child.pid) {
+        throw new Error(`Playwright MCP exited during startup; see ${path.join(this.paths.logs, 'playwright-mcp.log')}`);
+      }
+      try {
+        const headers = { Accept: 'application/json, text/event-stream', 'Content-Type': 'application/json' };
+        const initialized = await fetch(url, { method: 'POST', headers, signal: AbortSignal.timeout(1200),
+          body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {
+            protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'aceswarm-startup', version: '1.0' },
+          } }) });
+        const session = initialized.headers.get('mcp-session-id');
+        await initialized.text();
+        if (initialized.ok && session) {
+          // Dispose the readiness session; each external client gets its own session.
+          await fetch(url, { method: 'DELETE', headers: { ...headers, 'Mcp-Session-Id': session },
+            signal: AbortSignal.timeout(1200) });
+          this.endpoints.browserMcp = url;
+          console.log(`ACEswarm Playwright MCP: ${url}`);
+          return url;
+        }
+      } catch (_) { /* HTTP transport is still initializing. */ }
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    throw new Error(`Timed out waiting for Playwright MCP at ${url}; see ${path.join(this.paths.logs, 'playwright-mcp.log')}`);
+  }
+
   stop() {
     if (!this.stopPromise) this.stopPromise = this.stopChildren();
     return this.stopPromise;

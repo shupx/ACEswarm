@@ -340,7 +340,7 @@ app.whenReady().then(async () => {
       try { return await recording[method](); } catch (error) { return { ok: false, error: error.message }; }
     });
     createWindow();
-    agentConnection = await startAgentConnection({ configuration: browserConfiguration, stateDirectory: paths.state });
+    agentConnection = await startAgentConnection({ configuration: browserConfiguration, stateDirectory: paths.state, services });
     provisionOnce({ stateDirectory: paths.state, existingOsWorkspace, osUrl: endpoints.osApi, storeUrl: endpoints.store, storeApiUrl: endpoints.storeApi, configPath: path.join(app.isPackaged ? process.resourcesPath : path.resolve(__dirname, '..', 'resources'), 'seed-apps', 'aceswarm-config-export.json') })
       .then((result) => console.log(result.skipped ? `ACEswarm seed provisioning skipped: ${result.reason}` : 'ACEswarm seed provisioning completed'))
       .catch((error) => { services.failures.push(`Seed provisioning: ${error.message}`); console.error(error); });

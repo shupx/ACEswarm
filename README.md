@@ -74,39 +74,23 @@ rm -rf ~/ACEswarm_ws
 
 This permanently removes projects, experiments, installed applications, logs, and local service data.
 
-## Troubleshooting
 
-If double-clicking does nothing, make the file executable:
+## MCP Servers
 
-```bash
-chmod +x ACEswarm-x86_64.AppImage
+Start ACEswarm, then configure your agent to connect to its three Streamable HTTP MCP servers:
+
+```json
+{
+  "mcpServers": {
+    "aceswarm": {"url": "http://127.0.0.1:28792/mcp"},
+    "aivudaos": {"url": "http://127.0.0.1:28794/mcp"},
+    "aivudaappstore": {"url": "http://127.0.0.1:28795/mcp"}
+  }
+}
 ```
 
-Service logs are stored in:
-
-```text
-~/ACEswarm_ws/logs/
-```
-
-To repeat first-launch provisioning, close ACEswarm, back up the workspace, and remove only:
-
-```text
-~/ACEswarm_ws/state/
-```
+[Connection details](docs_dev/mcp-server.md).
 
 ## Developer documentation
-
-ACEswarm exposes the running desktop through CDP at `http://127.0.0.1:28793`
-(override with `ACESWARM_CDP_PORT`). Agents attach directly using Playwright MCP. See
-[MCP service connection instructions](docs_dev/mcp-server.md).
-
-Configure Codex with one command (requires Node.js/npm):
-
-```bash
-codex mcp add aceswarm -- npx -y @playwright/mcp@0.0.83 --cdp-endpoint http://127.0.0.1:28793
-```
-
-Start ACEswarm before using the browser tools in Codex. If you set
-`ACESWARM_CDP_PORT`, replace `28793` in the command with that port.
 
 Development, architecture, runtime, bootstrap, build, and release documentation is in [`docs_dev/`](docs_dev/).

@@ -127,8 +127,9 @@ using the private Python runtime. Their logs are `aivudaos-mcp.log` and
 `aivudaappstore-mcp.log` in the workspace logs directory. Their `/mcp` endpoints
 default to ports 28794 and 28795; startup waits for readiness. See
 [mcp-server.md](mcp-server.md) for authentication and configuration. ACEswarm exposes
-a configurable fixed CDP listener for direct Playwright MCP desktop agent
-connections; see [mcp-server.md](mcp-server.md).
+a bundled Playwright MCP listener at `http://127.0.0.1:28792/mcp`
+(override with `ACESWARM_MCP_PORT`), attached to the existing desktop through CDP.
+Its log is `playwright-mcp.log`; see [mcp-server.md](mcp-server.md).
 ACEswarm does not call standalone installation scripts, systemd, Avahi, or ports 80/443.
 
 ## Tests
@@ -170,8 +171,8 @@ through Electron frame capture and browser MediaRecorder, without OS title bars.
 
 Run `xvfb-run -a npm run test:cleanup` to verify real Electron window close,
 System-menu quit, SIGTERM, and SIGKILL during FFmpeg recording. The test checks that subprocesses
-exit, gateway ports are released, both package MCP servers are running before exit,
-and no ACEswarm control backend or MCP process is launched.
+exit, Gateway/CDP/MCP ports are released, and all three MCP servers are running
+before exit. No separate ACEswarm control backend is launched.
 Services run in separate process groups. An independent Node guardian monitors
 Electron's pipe and stops those groups and active FFmpeg recordings if Electron
 crashes. Normal shutdown sends SIGTERM, escalates to SIGKILL after five seconds,

@@ -29,18 +29,25 @@ async function run() {
       const store = await freePort();
       const osMcp = await freePort();
       const storeMcp = await freePort();
+      const browserMcp = await freePort();
+      const startupErrorFile = path.join(temp, mode, 'startup-error.txt');
       const application = await electron.launch({
         args: [path.join(root, 'tests/fixtures/desktop-electron.cjs'), '--no-sandbox'],
         env: { ...process.env, ELECTRON_RUN_AS_NODE: '', ACESWARM_UI_TEST_PROFILE: path.join(temp, mode, 'profile'),
           ACESWARM_WS_ROOT: path.join(temp, mode, 'workspace'), ACESWARM_GATEWAY_PORT: String(gateway),
+          ACESWARM_UI_TEST_STARTUP_ERROR: startupErrorFile,
           ACESWARM_STORE_GATEWAY_PORT: String(store), ACESWARM_CDP_PORT: '0', ACESWARM_PYTHON: path.join(root, '.venv/bin/python'),
-          AIVUDAOS_MCP_PORT: String(osMcp), AIVUDAAPPSTORE_MCP_PORT: String(storeMcp) },
+          AIVUDAOS_MCP_PORT: String(osMcp), AIVUDAAPPSTORE_MCP_PORT: String(storeMcp),
+          ACESWARM_MCP_PORT: String(browserMcp) },
         timeout: 90000,
       });
       const owner = application.process();
       let children = [];
       try {
-        const page = await application.firstWindow();
+        const page = await application.firstWindow().catch(error => {
+          if (fs.existsSync(startupErrorFile)) throw new Error(fs.readFileSync(startupErrorFile, 'utf8'));
+          throw error;
+        });
         await page.waitForFunction(() => document.querySelector('#dock') &&
           typeof isRestoringShellState !== 'undefined' && !isRestoringShellState, { timeout: 30000 });
         const discoveryFile = path.join(temp, mode, 'workspace/state/agent-connection.json');
@@ -57,6 +64,9 @@ async function run() {
         if (mode === 'SIGKILL') assert.ok(children.some((child) => /(?:^|\/)ffmpeg\s/.test(child.command)), 'FFmpeg is running during forced exit');
         const mcps = children.filter((child) => / -m (aivudaos|aivudaappstore)\.mcp_server$/.test(child.command));
         assert.equal(mcps.length, 2, 'Both package MCP servers are running');
+        assert.equal(children.filter(child => /electron\/services\/browser-mcp\.js/.test(child.command)).length, 1,
+          'Bundled Playwright HTTP MCP is running');
+        assert.equal(discovery.mcpUrl, `http://127.0.0.1:${browserMcp}/mcp`);
         for (const port of [osMcp, storeMcp]) {
           const health = await (await fetch(`http://127.0.0.1:${port}/health`)).json();
           assert.equal(health.transport, 'streamable-http');
@@ -75,7 +85,7 @@ async function run() {
         const deadline = Date.now() + 12000;
         while (children.some((child) => running(child.pid)) && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 100));
         assert.deepEqual(children.filter((child) => running(child.pid)), [], `${mode} left running processes`);
-        for (const port of [gateway, store, osMcp, storeMcp]) await assert.rejects(fetch(`http://127.0.0.1:${port}/`, { signal: AbortSignal.timeout(1000) }));
+        for (const port of [gateway, store, osMcp, storeMcp, browserMcp]) await assert.rejects(fetch(`http://127.0.0.1:${port}/`, { signal: AbortSignal.timeout(1000) }));
         await assert.rejects(fetch(`${discovery.cdpEndpoint}/json/version`, { signal: AbortSignal.timeout(1000) }));
         if (mode !== 'SIGKILL') assert.equal(fs.existsSync(discoveryFile), false);
         console.log(`PASS: ${mode} releases all ${children.length} subprocesses, gateway and CDP ports`);

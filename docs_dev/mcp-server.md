@@ -1,18 +1,18 @@
 # MCP Services
 
-ACEswarm provides two Streamable HTTP MCP servers for AivudaOS and AppStore,
-and exposes its existing Electron desktop through CDP for agent-side Playwright MCP.
+ACEswarm provides three Streamable HTTP MCP servers: AivudaOS, AppStore and
+bundled Playwright MCP attached to the existing Electron desktop over CDP.
 All ACEswarm listeners bind to loopback.
 
 | Service | Connection | Transport | Purpose |
 |---|---|---|---|
 | AivudaOS MCP | `http://127.0.0.1:28794/mcp` | Streamable HTTP | System configuration, app management, logs, operation events and interactive input |
 | AppStore MCP | `http://127.0.0.1:28795/mcp` | Streamable HTTP | Store queries, package uploads/downloads, publishing, members and data import/export |
-| Playwright MCP | Electron CDP: `http://127.0.0.1:28793` | Agent-side stdio MCP, attached over CDP | Desktop and WebView snapshots, clicks, navigation and tab switching |
+| Playwright MCP | `http://127.0.0.1:28792/mcp` | Streamable HTTP | Desktop and WebView snapshots, clicks, navigation and tab switching |
 
-ACEswarm hosts the two package MCP servers. Playwright MCP runs on the agent
-machine and attaches to the existing desktop; it is not bundled in the AppImage
-and does not launch another browser.
+All three MCP servers start with ACEswarm and are stopped by its process guardian.
+Playwright MCP is included in the AppImage and runs using Electron's Node mode;
+no agent-side Node.js/npm or additional browser installation is required.
 
 ## Client Configuration
 
@@ -23,20 +23,13 @@ Start ACEswarm, then configure the MCP client:
   "mcpServers": {
     "aivudaos": {"url": "http://127.0.0.1:28794/mcp"},
     "aivudaappstore": {"url": "http://127.0.0.1:28795/mcp"},
-    "aceswarm": {
-      "command": "npx",
-      "args": [
-        "-y", "@playwright/mcp@0.0.83",
-        "--cdp-endpoint", "http://127.0.0.1:28793"
-      ]
-    }
+    "aceswarm": {"url": "http://127.0.0.1:28792/mcp"}
   }
 }
 ```
 
-Client configuration syntax varies. Playwright MCP requires Node.js and access
-to the npm package on the agent machine. The `28793` address is a CDP endpoint,
-not an HTTP MCP endpoint.
+Client configuration syntax varies. Internal CDP uses a random port by default;
+Playwright MCP attaches automatically, and clients use `28792/mcp` for browser tools.
 
 ## AivudaOS And AppStore MCP
 
@@ -74,6 +67,14 @@ account, allowing clients to use different backend accounts.
 
 ## Playwright MCP
 
+After Electron CDP is ready, ACEswarm launches the bundled official Playwright
+MCP CLI with `--port`, `--host 127.0.0.1` and this session's CDP WebSocket URL.
+Its `/mcp` endpoint uses the official Streamable HTTP transport with a separate
+session per client. Startup checks an MCP handshake before publishing discovery.
+An occupied port fails startup; change it with `ACESWARM_MCP_PORT`.
+Logs are stored as `playwright-mcp.log`, with tool output under
+`playwright-mcp-output/` in the workspace logs directory.
+
 Use `browser_tabs` to list existing pages and select the desktop `shell.html`
 or an application's WebView. WebViews appear as separate pages. Use
 `browser_snapshot`, `browser_click`, and other browser tools on the selected page.
@@ -89,19 +90,20 @@ to control the desktop and access session data, so keep the endpoint local.
 
 | Setting | Default | Allowed Values |
 |---|---|---|
+| `ACESWARM_MCP_PORT` | 28792 | 1024–65535 |
 | `AIVUDAOS_MCP_PORT` | 28794 | 1024–65535 |
 | `AIVUDAAPPSTORE_MCP_PORT` | 28795 | 1024–65535 |
-| `ACESWARM_CDP_PORT` | 28793 | 0–65535; 0 requests a random port |
+| `ACESWARM_CDP_PORT` | 0 (random) | 0–65535; nonzero selects a specific port |
 
-Update client URLs and `--cdp-endpoint` to match overridden ports. Occupied fixed
+Update MCP client URLs to match overridden MCP ports. Occupied fixed
 ports fail startup rather than silently changing. Playwright's Electron launcher
 may supply its own CDP port, which takes precedence.
 
 CDP discovery is written to `$ACESWARM_WS_ROOT/state/agent-connection.json`
 (default: `~/ACEswarm_ws/state/agent-connection.json`). It contains `pid`,
-`cdpEndpoint`, `browserWSEndpoint`, and `transport: "cdp"`. The file is removed
-on normal exit but can remain stale after a forced kill. `ACESWARM_MCP_PORT`
-and the former `get_browser_connection` tool are no longer used.
+`mcpUrl`, `cdpEndpoint`, `browserWSEndpoint`, and `transport: "streamable-http"`.
+The file is removed on normal exit but can remain stale after a forced kill.
+The former `get_browser_connection` tool is no longer used.
 
 See [ports.md](ports.md) for all ACEswarm listeners.
 
@@ -121,8 +123,8 @@ official SDK to both package servers and verifies backend login, published packa
 upload/download and two startup/shutdown cycles.
 
 Live desktop tests require the development Python environment, built frontends,
-Caddy and a graphical display (or `xvfb-run`). The agent test starts real Playwright
-MCP in an isolated workspace/profile, operates the desktop and a WebView, reconnects
+Caddy and a graphical display (or `xvfb-run`). The agent test connects over HTTP
+to bundled Playwright MCP in an isolated workspace/profile, operates the desktop and a WebView, reconnects
 and checks cleanup. `npm run test:cleanup` checks package MCP, Gateway and CDP
-listeners are released across desktop exit modes. Playwright MCP and its SDK are
-development dependencies only.
+listeners are released across desktop exit modes. Playwright MCP is a production
+dependency; the client SDK and desktop test Playwright remain development dependencies.

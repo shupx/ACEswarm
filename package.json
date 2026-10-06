@@ -26,7 +26,6 @@
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",
-    "@playwright/mcp": "0.0.83",
     "electron": "40.10.2",
     "electron-builder": "26.0.12",
     "playwright": "1.63.0"
@@ -74,6 +73,7 @@
     "electron@40.10.2": true
   },
   "dependencies": {
+    "@playwright/mcp": "0.0.83",
     "dockview-core": "8.4.0",
     "lucide": "1.52.0"
   }

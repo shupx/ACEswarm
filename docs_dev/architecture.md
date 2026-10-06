@@ -177,9 +177,11 @@ home/projects/simulation/... → ACEswarm pages
 ## IPC and package MCP boundary
 
 The renderer uses the `aivudaShell` preload bridge and Electron IPC for desktop
-operations. Electron also enables a loopback CDP listener on port 28793 by default
-(configurable with `ACESWARM_CDP_PORT`). Agent-side Playwright MCP attaches directly
-to the existing desktop and WebViews. See
+operations. Electron also enables a loopback CDP listener on a random port by default
+(override with `ACESWARM_CDP_PORT`). Bundled Playwright MCP attaches directly
+to the existing desktop and WebViews and exposes Streamable HTTP on port 28792
+(configurable with `ACESWARM_MCP_PORT`). It runs in a managed Electron Node-mode
+process without an extra browser or Node installation. See
 [mcp-server.md](mcp-server.md) for the connection contract and lifecycle.
 
 After starting the local backends and Gateway, Electron launches two separate
@@ -193,4 +195,6 @@ wrap every backend API route with each service's normal authentication. The
 service manager waits for `/health`, logs stdout/stderr, and publishes `osMcp`
 and `storeMcp` in its endpoints. See [mcp-server.md](mcp-server.md) for clients.
 They are tracked by the process guardian and stopped with the other services.
+The browser MCP process is tracked by the same guardian; discovery publishes its
+`mcpUrl` alongside the internal CDP connection, after a successful HTTP handshake.
 ACEswarm integrations do not access either service's databases.

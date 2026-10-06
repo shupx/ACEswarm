@@ -3,7 +3,7 @@ const path = require('node:path');
 const net = require('node:net');
 
 function configureBrowserConnection(app, env = process.env) {
-  const configuredPort = env.ACESWARM_CDP_PORT ?? '28793';
+  const configuredPort = env.ACESWARM_CDP_PORT ?? '0';
   if (!/^\d+$/.test(configuredPort) || Number(configuredPort) > 65535) {
     throw new Error('ACESWARM_CDP_PORT must be an integer between 0 and 65535');
   }
@@ -47,9 +47,10 @@ async function readBrowserConnection(configuration, timeout = 10000) {
   throw new Error('Timed out waiting for ACEswarm browser CDP endpoint');
 }
 
-async function startAgentConnection({ configuration, stateDirectory }) {
+async function startAgentConnection({ configuration, stateDirectory, services }) {
   const browser = await readBrowserConnection(configuration);
-  const connection = { pid: process.pid, ...browser, transport: 'cdp' };
+  const mcpUrl = await services.startBrowserMcp(browser);
+  const connection = { pid: process.pid, ...browser, mcpUrl, transport: 'streamable-http' };
   const discoveryFile = path.join(stateDirectory, 'agent-connection.json');
   const stop = async () => {
     try {

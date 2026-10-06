@@ -6,7 +6,7 @@ const http = require('node:http');
 const { spawn } = require('node:child_process');
 const { chromium } = require('playwright');
 const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
-const { StdioClientTransport } = require('@modelcontextprotocol/sdk/client/stdio.js');
+const { StreamableHTTPClientTransport } = require('@modelcontextprotocol/sdk/client/streamableHttp.js');
 const { freePort } = require('../electron/services/local-services');
 
 const root = path.resolve(__dirname, '..');
@@ -35,11 +35,19 @@ async function run() {
   }
   const discovery = JSON.parse(fs.readFileSync(discoveryFile));
   client = new Client({ name: 'aceswarm-live-test', version: '1.0' });
-  assert.equal(discovery.cdpEndpoint, `http://127.0.0.1:${process.env.ACESWARM_CDP_PORT || '28793'}`);
-  assert.equal(discovery.mcpUrl, undefined);
-  await client.connect(new StdioClientTransport({ command: process.execPath,
-    args: [path.join(root, 'node_modules/@playwright/mcp/cli.js'), '--cdp-endpoint', discovery.cdpEndpoint,
-      '--output-dir', path.join(temporary, 'mcp-output')], cwd: root }));
+  const cdpUrl = new URL(discovery.cdpEndpoint);
+  assert.equal(cdpUrl.hostname, '127.0.0.1');
+  assert.ok(Number(cdpUrl.port) > 0);
+  if (Number(process.env.ACESWARM_CDP_PORT || '0') !== 0) {
+    assert.equal(cdpUrl.port, process.env.ACESWARM_CDP_PORT);
+  } else {
+    const [port, browserPath] = fs.readFileSync(path.join(temporary, 'profile/DevToolsActivePort'), 'utf8').trim().split('\n');
+    assert.equal(cdpUrl.port, port);
+    assert.equal(new URL(discovery.browserWSEndpoint).pathname, browserPath);
+  }
+  assert.equal(discovery.transport, 'streamable-http');
+  assert.equal(discovery.mcpUrl, `http://127.0.0.1:${process.env.ACESWARM_MCP_PORT || '28792'}/mcp`);
+  await client.connect(new StreamableHTTPClientTransport(new URL(discovery.mcpUrl)));
   const tool = async (name, args = {}) => {
     const result = await client.callTool({ name, arguments: args });
     assert.notEqual(result.isError, true, JSON.stringify(result));
@@ -73,6 +81,10 @@ async function run() {
   assert.match(snapshot, /textbox|button|link/, 'WebView accessibility content is available');
   await client.close(); client = null;
   assert.equal(child.exitCode, null, 'MCP disconnect leaves ACEswarm running');
+  client = new Client({ name: 'aceswarm-live-reconnect', version: '1.0' });
+  await client.connect(new StreamableHTTPClientTransport(new URL(discovery.mcpUrl)));
+  assert.match(await tool('browser_tabs', { action: 'list' }), /shell\.html/);
+  await client.close(); client = null;
   browser = await chromium.connectOverCDP(discovery.cdpEndpoint);
   const shell = browser.contexts().flatMap(context => context.pages()).find(page => page.url().endsWith('/shell.html'));
   assert.ok(shell, 'Existing ACEswarm shell is visible through CDP');
@@ -90,7 +102,8 @@ async function run() {
   await exited;
   assert.equal(fs.existsSync(discoveryFile), false, 'Discovery file removed on shutdown');
   await assert.rejects(fetch(`${discovery.cdpEndpoint}/json/version`));
-  console.log('PASS: fixed/configured CDP, Playwright MCP desktop and WebView tools, reconnect, and shutdown');
+  await assert.rejects(fetch(discovery.mcpUrl));
+  console.log('PASS: random/configured CDP, Playwright MCP desktop and WebView tools, reconnect, and shutdown');
 
   const occupied = http.createServer((request, response) => response.end('unrelated service'));
   await new Promise(resolve => occupied.listen(Number(new URL(discovery.cdpEndpoint).port), '127.0.0.1', resolve));
@@ -101,6 +114,7 @@ async function run() {
         ACESWARM_UI_TEST_PROFILE: path.join(temporary, 'conflict-profile'),
         ACESWARM_WS_ROOT: path.join(temporary, 'conflict-workspace'),
         ACESWARM_UI_TEST_STARTUP_ERROR: startupErrorFile,
+        ACESWARM_CDP_PORT: cdpUrl.port,
       }, stdio: ['ignore', 'pipe', 'pipe'],
     });
     child.stdout.on('data', data => { output += data; });
