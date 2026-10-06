@@ -82,9 +82,9 @@ Start ACEswarm, then configure your agent to connect to its three Streamable HTT
 ```json
 {
   "mcpServers": {
-    "aceswarm": {"url": "http://127.0.0.1:28792/mcp"},
-    "aivudaos": {"url": "http://127.0.0.1:28794/mcp"},
-    "aivudaappstore": {"url": "http://127.0.0.1:28795/mcp"}
+    "aceswarm-playwright": {"url": "http://127.0.0.1:28792/mcp"},
+    "aceswarm-aivudaos": {"url": "http://127.0.0.1:28794/mcp"},
+    "aceswarm-aivudaappstore": {"url": "http://127.0.0.1:28795/mcp"}
   }
 }
 ```
