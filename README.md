@@ -1,6 +1,9 @@
 # ACEswarm
 
-ACEswarm is a ground-station workbench for distributed drone and robot swarms.
+ACEswarm is a ground-station workbench for **A**gentic and **C**ontinuous **E**volution of distributed robot swarms. 
+It provides a local application gateway, a local AppStore, and a runtime environment for bundled applications, suitable for both development and deployment. 
+
+![img](misc/img1.png)
 
 ## Download
 
