@@ -36,9 +36,11 @@
    On rejection, select a guest; do not bypass the guard with arbitrary scripts.
 
 An iframe inside a guest differs from the guest itself: inspect the selected
-page's snapshot/frame structure before frame-specific interactions. Refresh
-snapshots after navigation or UI changes; use screenshots for geometry, dragging
-or visual content absent from the accessibility tree.
+page's snapshot/frame structure before frame-specific interactions. Prefer text
+snapshots (`browser_snapshot`) to save tokens and time; refresh them after
+navigation or UI changes. Avoid image screenshots unless geometry, dragging,
+canvas content or other visual information absent from the accessibility tree
+is needed to complete the task.
 
 ## Desktop capabilities
 

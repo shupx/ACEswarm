@@ -21,6 +21,9 @@ assume an installed app set, fixed ports or initial window layout.
 - List `browser_tabs`, select the correct Page, then snapshot. Shell `shell.html`
   contains desktop controls; application WebViews are separate CDP Pages. Their
   content normally does not appear in the Shell's accessibility snapshot.
+- Prefer text snapshots (`browser_snapshot`) to save tokens and time. Use image
+  screenshots only when layout, coordinates, canvas content or other visual
+  information absent from the text snapshot is needed to complete the task.
 - Open pages through desktop controls. Navigate guests only: Shell navigation,
   history changes and closing are guarded. Do not bypass the guard with scripts.
 - A selected MCP Page need not be the visible desktop window. Closing a UI tab
