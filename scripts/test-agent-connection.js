@@ -59,6 +59,16 @@ async function run() {
   const shellIndex = tabs.match(/- (\d+):.*shell\.html/);
   assert.ok(shellIndex, tabs);
   await tool('browser_tabs', { action: 'select', index: Number(shellIndex[1]) });
+  for (const [name, arguments_] of [
+    ['browser_navigate', { url: 'https://example.com/' }],
+    ['browser_navigate', { url: 'about:blank' }],
+    ['browser_navigate_back', {}],
+    ['browser_tabs', { action: 'close', index: Number(shellIndex[1]) }],
+  ]) {
+    const blocked = await client.callTool({ name, arguments: arguments_ });
+    assert.equal(blocked.isError, true, `${name} must preserve the desktop shell`);
+    assert.match(JSON.stringify(blocked.content), /ACEswarm desktop shell cannot be navigated or closed/);
+  }
   const desktopSnapshot = await tool('browser_snapshot');
   const applicationsRef = desktopSnapshot.match(/button "Applications"[^\n]*\[ref=([^\]]+)\]/);
   assert.ok(applicationsRef, desktopSnapshot);
@@ -79,6 +89,9 @@ async function run() {
   const snapshot = await tool('browser_snapshot');
   assert.match(snapshot, /Page URL: http:\/\/127\.0\.0\.1:/);
   assert.match(snapshot, /textbox|button|link/, 'WebView accessibility content is available');
+  const guestUrl = snapshot.match(/Page URL: (http:\/\/127\.0\.0\.1:[^\s]+)/)[1];
+  await tool('browser_navigate', { url: guestUrl });
+  assert.match(await tool('browser_snapshot'), /textbox|button|link/);
   await client.close(); client = null;
   assert.equal(child.exitCode, null, 'MCP disconnect leaves ACEswarm running');
   client = new Client({ name: 'aceswarm-live-reconnect', version: '1.0' });
@@ -103,7 +116,7 @@ async function run() {
   assert.equal(fs.existsSync(discoveryFile), false, 'Discovery file removed on shutdown');
   await assert.rejects(fetch(`${discovery.cdpEndpoint}/json/version`));
   await assert.rejects(fetch(discovery.mcpUrl));
-  console.log('PASS: random/configured CDP, Playwright MCP desktop and WebView tools, reconnect, and shutdown');
+  console.log('PASS: random/configured CDP, protected desktop shell, WebView navigation, reconnect, and shutdown');
 
   const occupied = http.createServer((request, response) => response.end('unrelated service'));
   await new Promise(resolve => occupied.listen(Number(new URL(discovery.cdpEndpoint).port), '127.0.0.1', resolve));

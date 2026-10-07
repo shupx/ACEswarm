@@ -182,6 +182,7 @@ class LocalServices {
       '--host', '127.0.0.1', '--port', String(port),
       '--allowed-hosts', `127.0.0.1:${port},localhost:${port}`,
       '--cdp-endpoint', browser.browserWSEndpoint,
+      '--init-page', path.join(__dirname, 'browser-mcp-page.js'),
       '--output-dir', path.join(this.paths.logs, 'playwright-mcp-output'),
     ], { ELECTRON_RUN_AS_NODE: '1' });
     const deadline = Date.now() + 30000;

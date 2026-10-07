@@ -123,6 +123,13 @@ function allowedUrl(rawUrl) {
   } catch (_) { return false; }
 }
 
+function isShellUrl(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    return url.protocol === 'file:' && url.pathname === path.join(__dirname, 'shell.html');
+  } catch (_) { return false; }
+}
+
 function createWindow() {
   const windowStatePath = path.join(app.getPath('userData'), 'window-state.json');
   let savedWindow = {};
@@ -150,6 +157,15 @@ function createWindow() {
   window.loadFile(path.join(__dirname, 'shell.html'));
   window.setMenuBarVisibility(false);
   window.webContents.on('before-input-event', handleDesktopShortcut);
+  // Protect ordinary renderer navigation; MCP navigation is guarded by its init-page hook.
+  const blockShellNavigation = (event, url) => {
+    if (!isShellUrl(url)) {
+      event.preventDefault();
+      console.warn(`Blocked navigation away from ACEswarm shell: ${url}`);
+    }
+  };
+  window.webContents.on('will-navigate', blockShellNavigation);
+  window.webContents.on('will-redirect', blockShellNavigation);
   let finalizingClose = false;
   window.on('close', (event) => {
     if (quitting) return;

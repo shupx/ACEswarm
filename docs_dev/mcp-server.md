@@ -78,7 +78,11 @@ Logs are stored as `playwright-mcp.log`, with tool output under
 Use `browser_tabs` to list existing pages and select the desktop `shell.html`
 or an application's WebView. WebViews appear as separate pages. Use
 `browser_snapshot`, `browser_click`, and other browser tools on the selected page.
-Do not navigate the shell away from its local file URL or close user tabs.
+The bundled MCP's `--init-page` hook rejects navigation, history navigation and
+closing of `shell.html` before the operation reaches CDP. Select an application's
+WebView before navigating, or use the desktop address input to open a page.
+This protects ordinary MCP tools; direct CDP or arbitrary script execution can
+still alter the desktop.
 CDP controls renderer pages, not Electron main-process APIs.
 
 Direct Playwright clients can also use `chromium.connectOverCDP` (Python:
