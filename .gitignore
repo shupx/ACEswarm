@@ -10,3 +10,4 @@ resources/release-manifest.json
 resources/wheels.lock.generated
 *.log
 .smoke/
+.vscode
