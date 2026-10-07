@@ -66,7 +66,7 @@ From the ACEswarm repository:
 npm run build:release
 ```
 
-The release script initializes submodules, builds the private runtime from checked-out submodule source, verifies the bundle, and produces the AppImage under `dist/`.
+The release script initializes missing submodules, preserves already checked-out revisions, builds the private runtime from those sources, verifies the bundle, and produces the AppImage under `dist/`. Commit updated submodule pointers in the parent repository when shipping newer revisions so a fresh clone builds the same code.
 
 ## Build requirements
 

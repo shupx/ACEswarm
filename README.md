@@ -100,6 +100,19 @@ Start ACEswarm, then configure your agent to connect to its three Streamable HTT
 }
 ```
 
+or add in `.codex/config.toml`:
+
+```toml
+[mcp_servers.aceswarm-playwright]
+url = "http://127.0.0.1:28792/mcp"
+
+[mcp_servers.aceswarm-aivudaos]
+url = "http://127.0.0.1:28794/mcp"
+
+[mcp_servers.aceswarm-aivudaappstore]
+url = "http://127.0.0.1:28795/mcp"
+```
+
 [MCP server details](docs_dev/mcp-server.md).
 
 Skills are in [aceswarm-skills](aceswarm-skills/). You can clone the repository and link the skills to your agent's skills directory:
