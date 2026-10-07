@@ -15,7 +15,7 @@ available.
 
 | Skill | Description |
 |-------|------|
-| [`aceswarm-app-development`](aceswarm-skills/aceswarm-app-development/SKILL.md) | App package development, manifest and runtime configuration, built-in UI and Panel Hub integration, packaging and MCP verification |
+| [`aceswarm-app-development`](aceswarm-skills/aceswarm-app-development/SKILL.md) | App package development, manifest and runtime configuration, Docker helpers, built-in UI and Panel Hub integration, packaging and MCP verification |
 | [`aceswarm-overview`](aceswarm-skills/aceswarm-overview/SKILL.md) | Platform and tool roles, Shell/WebView snapshots and navigation, app discovery, remote devices, window layouts, recording and desktop settings |
 | [`aceswarm-appstore-mcp`](aceswarm-skills/aceswarm-appstore-mcp/SKILL.md) | Store queries and downloads, authentication, publishing and versions, members and accounts, data import/export |
 | [`aceswarm-aivudaos-mcp`](aceswarm-skills/aceswarm-aivudaos-mcp/SKILL.md) | App installation, upgrades and lifecycle, logs, configuration and magnets, system management, asynchronous operations and interactive input |

@@ -50,6 +50,11 @@ Use environment-provided installation/configuration/runtime paths. Declare and
 prepare actual app dependencies; the desktop's private Python runtime does not
 guarantee an app can import arbitrary packages with the host `python3`.
 
+Read [Docker helpers](references/docker-helpers.md) when an app supports host /
+container execution or installs dependencies into a container. Docker helpers
+are normally packaged by the app, not supplied by `AIVUDA_APP_HELPERS_ENTRY_PATH`;
+inspect their actual API and stop/cleanup behavior before reuse.
+
 ## Verify and deliver
 
 Read [MCP development loop](references/mcp-development-loop.md) for installation,

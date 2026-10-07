@@ -134,6 +134,10 @@ repeatable and surface dependency failures. Do not assume Electron's embedded
 Python is the app's host interpreter or that a ROS/Docker/Zenoh setup exists.
 Check the relevant example and target environment when these are requested.
 
+For host/container dispatch, read [Docker helpers](docker-helpers.md). App-local
+Docker helpers and AivudaOS's configuration helper are separate; packaging one
+does not imply the other is available inside a container.
+
 ## Packaging
 
 Build into a staging directory containing only runtime files and the manifest.

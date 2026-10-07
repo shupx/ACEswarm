@@ -19,6 +19,10 @@ skill files and logs. Browser login and MCP/backend authentication are separate.
   rather than writing a local file. Decode the returned bytes into a scratch
   archive using its filename/content type. Do not assume tool-server paths are
   accessible from the agent's filesystem.
+- For Docker development, the updated standard sample includes
+  `scripts/docker_helpers.sh`. Copy it into the new app package and follow
+  [Docker helper guidance](docker-helpers.md). Check archive contents because
+  an older running AppStore may still serve a sample without that file.
 - For a specialized example, call `store_index`, select a relevant app from the
   actual catalog, and use `store_app_detail` to discover versions. Read metadata
   with `store_manifest` and obtain the archive with `store_download_file` for
