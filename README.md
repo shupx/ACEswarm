@@ -102,7 +102,13 @@ Start ACEswarm, then configure your agent to connect to its three Streamable HTT
 
 [MCP server details](docs_dev/mcp-server.md).
 
-Skills are in [aceswarm-skills](aceswarm-skills/). 
+Skills are in [aceswarm-skills](aceswarm-skills/). You can clone the repository and link the skills to your agent's skills directory:
+
+```bash
+git clone https://github.com/shupx/ACEswarm.git
+mkdir -p ~/.agents/skills
+ln -sfn "$PWD"/ACEswarm/aceswarm-skills/aceswarm-skills/* ~/.agents/skills/
+```
 
 ## Developer documentation
 
