@@ -5,71 +5,31 @@ description: Understand ACEswarm and operate its Electron desktop with Playwrigh
 
 # ACEswarm desktop
 
-ACEswarm hosts local AivudaOS, an AppStore, installed application UIs, and remote
-device pages in an Electron desktop. AivudaOS manages apps and device configuration;
-AppStore distributes packages. Robot capabilities come from installed apps: discover
-their manifests, settings and live UI rather than assuming apps, transports or robots.
+ACEswarm hosts AivudaOS, AppStore, application WebViews and remote device pages.
+Discover apps, URLs, accounts and capabilities from live tools and UI; do not
+assume an installed app set, fixed ports or initial window layout.
 
-## Discover and choose an interface
+## Choose the interface
 
-- Inspect available MCP tools and schemas. Client server names may vary;
-  `aceswarm-playwright`, `aceswarm-aivudaos` and `aceswarm-aivudaappstore` are naming
-  conventions. Use configured endpoints; ports and addresses may be overridden.
-- Use AivudaOS MCP for app lifecycle, logs, config and system management, and
-  AppStore MCP for catalog/package/developer operations. Read
-  [AivudaOS workflows](../aceswarm-aivudaos-mcp/SKILL.md) or
-  [AppStore workflows](../aceswarm-appstore-mcp/SKILL.md) when needed.
-  Use Playwright MCP for desktop layout and UI interaction.
-- Discover installed apps, versions, running state and UI entrypoints through live
-  tools or Applications. Console and AppStore Admin open the two services;
-  labels can vary with language/version. Do not assume initial tabs or window layout.
-- Confirm the target device and account. Opening a remote robot page does not
-  retarget the local AivudaOS MCP. Check page URLs and MCP service identity before
-  commands, especially robot motion or bulk operations.
+- Playwright MCP: desktop/app UI, windows/tabs/splits, favorites, remote pages,
+  theme/language/fullscreen, recording, performance overlay, browser data and exit.
+- [AivudaOS MCP](../aceswarm-aivudaos-mcp/SKILL.md): app lifecycle, logs, config and device administration.
+- [AppStore MCP](../aceswarm-appstore-mcp/SKILL.md): catalog, packages, publication and developer administration.
 
-## Shell and WebView pages
+## Essential rules
 
-1. Call `browser_tabs` with `action: "list"`. Identify desktop `shell.html` and
-   application guest pages by URL/title; do not reuse stale indices.
-2. Select the Shell for desktop controls, or the application's WebView for its
-   content, then take `browser_snapshot` on that page.
-3. The Shell snapshot shows the taskbar/window controls but normally does not
-   expand cross-process `<webview>` content. Select the guest's separate CDP Page
-   to snapshot its buttons, forms and links. Cross-origin hosting does not prevent
-   this; a missing guest in the Shell snapshot does not imply an empty UI.
-4. Open a service, app or remote URL through Shell Applications, shortcuts, Open
-   page or the desktop address input. Re-list pages afterward. This creates/manages
-   a WebView and authorizes the origin through the desktop.
-5. Use `browser_navigate` only after selecting a guest. It navigates the selected
-   CDP Page, not the active desktop window. Navigation, history changes and closing
-   `shell.html` are rejected by the bundled MCP guard to preserve the taskbar.
-   On rejection, select a guest; do not bypass the guard with arbitrary scripts.
+- List `browser_tabs`, select the correct Page, then snapshot. Shell `shell.html`
+  contains desktop controls; application WebViews are separate CDP Pages. Their
+  content normally does not appear in the Shell's accessibility snapshot.
+- Open pages through desktop controls. Navigate guests only: Shell navigation,
+  history changes and closing are guarded. Do not bypass the guard with scripts.
+- A selected MCP Page need not be the visible desktop window. Closing a UI tab
+  does not stop its backend app; opening a remote page does not retarget local OS MCP.
+- OS/AppStore MCP automatically log in. Ask for current credentials only after
+  login is rejected; browser, backend and MCP endpoint authentication are separate.
+- Follow the user's target/scope and existing authorization; keep credentials out of files/logs.
 
-An iframe inside a guest differs from the guest itself: inspect the selected
-page's snapshot/frame structure before frame-specific interactions. Refresh
-snapshots after navigation or UI changes; use screenshots for geometry, dragging
-or visual content absent from the accessibility tree.
+## Read when needed
 
-## Desktop capabilities
-
-| Task | Interface and behavior |
-|---|---|
-| Launch/favorite/reopen apps | Applications, shortcuts and context menus; discover live entries |
-| Arrange pages | Tab menus, split groups, dragging and window controls; moving a tab preserves its WebView |
-| Manage windows | Taskbar selects/restores/minimizes; controls resize/maximize/place halves; Show desktop temporarily hides windows |
-| Navigate pages | Guest navigation or desktop address input; page menu provides reload, zoom and developer tools |
-| Background apps | Running-app controls in the taskbar; OS MCP provides authoritative status/logs and lifecycle changes |
-| Appearance | System theme, language and fullscreen controls |
-| Recording/performance | System recording and FPS/GPU overlay; recording bar selects mode, pauses/resumes and stops/saves; FFmpeg modes require FFmpeg |
-| Reset/exit | System browser-data clearing and Quit; clearing can remove login state, quitting stops managed local services |
-
-Closing a UI tab differs from stopping its backend process. Hiding the recording
-bar does not stop recording. Hidden/minimized guests may remain in CDP; selecting
-a MCP Page does not prove its desktop window is visible.
-
-## Credentials and scope
-
-Browser login, backend API tokens and MCP endpoint access tokens are separate.
-Use credentials supplied at runtime; never embed instance credentials in skills.
-Keep operations within the user's target and scope; existing explicit authorization
-covers requested changes without repeated approval prompts.
+- For UI navigation, snapshots, app discovery or window layout, read [desktop.md](references/desktop.md).
+- For recording, performance, appearance, clearing data or exit, read [recording-and-system.md](references/recording-and-system.md).

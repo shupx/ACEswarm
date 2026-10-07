@@ -18,6 +18,10 @@ async function smokePackageMcps(endpoints) {
       await client.ping();
       const { tools } = await client.listTools();
       assert.equal(tools.length, expected, `${name} API coverage`);
+      const automaticMe = await client.callTool({ name: meTool, arguments: {} });
+      assert.ok(!automaticMe.isError, automaticMe.content?.[0]?.text);
+      const automaticIdentity = JSON.parse(automaticMe.content[0].text);
+      assert.equal((name === 'os' ? automaticIdentity : automaticIdentity.user).username, 'admin', `${name} automatic default login`);
       const login = await client.callTool({ name: loginTool, arguments: loginArguments });
       assert.ok(!login.isError, login.content?.[0]?.text);
       const token = JSON.parse(login.content[0].text)[tokenKey];

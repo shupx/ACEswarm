@@ -60,10 +60,15 @@ Set `AIVUDAOS_MCP_ACCESS_TOKEN` or `AIVUDAAPPSTORE_MCP_ACCESS_TOKEN` to protect
 the corresponding MCP endpoint. Clients then send `Authorization: Bearer <access-token>`
 in their HTTP headers.
 
-Backend API credentials are separate: set `AIVUDAOS_MCP_TOKEN` or
-`AIVUDAAPPSTORE_MCP_TOKEN`, or pass `token` / `authorization` in individual tool
-calls. Login tools return credentials without changing the server's default
-account, allowing clients to use different backend accounts.
+Backend API credentials are separate. Protected calls automatically log in with
+the default account (`admin / admin123`), cache the temporary token in memory,
+and log in again on token expiry before retrying once. Public Store queries do
+not trigger login. Only a rejected login prompts for the current username/password.
+Set the corresponding `*_MCP_USERNAME` / `*_MCP_PASSWORD` for a changed account,
+or use the login tool and pass its token in subsequent calls. Explicit
+`AIVUDAOS_MCP_TOKEN`, `AIVUDAAPPSTORE_MCP_TOKEN`, or per-call `token` / `authorization`
+override automatic login and are never silently replaced. Login tools return
+credentials without changing the shared server default account.
 
 ## Playwright MCP
 

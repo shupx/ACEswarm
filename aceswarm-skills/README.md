@@ -1,28 +1,32 @@
-# aceswarm skills
+# ACEswarm Skills
 
-ACEswarm 操作 skills：覆盖桌面/WebView、AivudaOS 和 AppStore，按运行时工具 schema、页面和服务状态发现能力，不预设应用名单、账号或部署地址。
+Skills for operating the ACEswarm desktop, WebViews, AivudaOS and AppStore. Capabilities are discovered from live tool schemas, pages and service state, without assuming specific apps, accounts or deployment addresses.
 
-每个 skill 是一个独立目录，内含 `SKILL.md`（YAML frontmatter 需包含 `name` 与 `description`），可直接被 goose 的 Skills 扩展发现。
+Each skill has its own directory containing a `SKILL.md` with `name` and `description` in its YAML frontmatter. Goose's Skills extension can discover these directories directly.
 
-| Skill | 说明 |
+`SKILL.md` contains the capability overview and essential rules. Detailed workflows
+live in each skill's `references/` directory; read only the references needed for
+the current task. Copy the entire skill directory when installing.
+
+| Skill | Description |
 |-------|------|
-| [`aceswarm-overview`](aceswarm-overview/SKILL.md) | 平台与工具分工、Shell/WebView 快照和导航、应用发现、远程设备、窗口布局、录屏及桌面设置 |
-| [`aceswarm-appstore-mcp`](aceswarm-appstore-mcp/SKILL.md) | 商店查询下载、认证、发布与版本管理、成员账号、数据导入导出 |
-| [`aceswarm-aivudaos-mcp`](aceswarm-aivudaos-mcp/SKILL.md) | 应用安装升级与运行、日志、配置与 magnet、系统管理、异步操作和交互输入 |
+| [`aceswarm-overview`](aceswarm-overview/SKILL.md) | Platform and tool roles, Shell/WebView snapshots and navigation, app discovery, remote devices, window layouts, recording and desktop settings |
+| [`aceswarm-appstore-mcp`](aceswarm-appstore-mcp/SKILL.md) | Store queries and downloads, authentication, publishing and versions, members and accounts, data import/export |
+| [`aceswarm-aivudaos-mcp`](aceswarm-aivudaos-mcp/SKILL.md) | App installation, upgrades and lifecycle, logs, configuration and magnets, system management, asynchronous operations and interactive input |
 
-## 安装
+## Installation
 
-将需要的 skill 目录复制到 goose 的全局 skills 目录：
+From this directory, copy the desired skills into Goose's global skills directory:
 
 ```bash
 mkdir -p ~/.agents/skills
 cp -r aceswarm-overview aceswarm-appstore-mcp aceswarm-aivudaos-mcp ~/.agents/skills/
 ```
 
-或按项目放到 `<project>/.agents/skills/`。
+Alternatively, place them in `<project>/.agents/skills/` for project-specific use.
 
-## 约定
+## Conventions
 
-- 凭据（用户名/密码/token）一律运行时提供，不写入文件、不写入 skill。
-- 先确认目标实例/设备和操作范围；按用户已有授权执行，不重复请求已授权操作的确认。
-- MCP 名称是客户端约定；地址、工具、应用、版本及页面均从当前连接和运行状态发现。
+- Supply credentials (usernames, passwords and tokens) at runtime; do not store them in files or skills.
+- Identify the target instance/device and scope. Follow existing user authorization without requesting repeated confirmation for authorized actions.
+- MCP names are client conventions. Discover addresses, tools, apps, versions and pages from the current connections and live state.
