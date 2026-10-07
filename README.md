@@ -86,7 +86,7 @@ rm -rf ~/ACEswarm_ws
 This permanently removes projects, experiments, installed applications, logs, and local service data.
 
 
-## MCP Servers
+## MCP Servers and skills
 
 Start ACEswarm, then configure your agent to connect to its three Streamable HTTP MCP servers:
 
@@ -100,7 +100,9 @@ Start ACEswarm, then configure your agent to connect to its three Streamable HTT
 }
 ```
 
-[Connection details](docs_dev/mcp-server.md).
+[MCP server details](docs_dev/mcp-server.md).
+
+Skills are in [aceswarm-skills](aceswarm-skills/). 
 
 ## Developer documentation
 
