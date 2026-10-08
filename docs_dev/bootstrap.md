@@ -87,8 +87,8 @@ AivudaOS restores parameters and autostart
 
 ## Updating bundled applications
 
-The current prepkg set contains Comm Status Viewer 0.2.3, Swarm Controlpad
-0.2.2, Swarm Dashboard 0.2.2, Panel Hub 0.1.0 and Hello World 1.1.0.
+The current prepkg set contains Comm Status Viewer 0.2.4, Swarm Controlpad
+0.2.3, Swarm Dashboard 0.2.3, Panel Hub 0.1.0 and Hello World 1.1.0.
 Zenoh is not bundled. Refresh the approved Store archives and their hashes with:
 
 ```sh

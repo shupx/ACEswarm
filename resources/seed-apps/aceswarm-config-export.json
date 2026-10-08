@@ -13,16 +13,16 @@
   "aceswarm": {
     "packages": [
       {
-        "artifact": "packages/app_comm_status_viewer_2026042816_bc6b-0.2.3.tar.gz",
-        "sha256": "f2cf59275c2b3a34c9be8a42699d2c35ea9698c541c508f76416ba2419013bbf"
+        "artifact": "packages/app_comm_status_viewer_2026042816_bc6b-0.2.4.tar.gz",
+        "sha256": "4d9ae4a419d4c959daf8c9fe3b76564630ad34eda3e9441c74adc9f4a2f1ad0e"
       },
       {
-        "artifact": "packages/app_swarm_controlpad_2026043022_d04b-0.2.2.tar.gz",
-        "sha256": "d901525e2310c5f1264418714e09bf5ca10695af3809386d6ebd14428805c025"
+        "artifact": "packages/app_swarm_controlpad_2026043022_d04b-0.2.3.tar.gz",
+        "sha256": "088db206ee99f629cf747d33b7269eeed5deac6f1c5b1ed30fbdedc92016cae4"
       },
       {
-        "artifact": "packages/app_swarm_dashboard_2026042621_5e65-0.2.2.tar.gz",
-        "sha256": "4723af1158959b6f91b75240f6518f9b90d96e9e744d8a731318663d58c6c8f0"
+        "artifact": "packages/app_swarm_dashboard_2026042621_5e65-0.2.3.tar.gz",
+        "sha256": "db10324a18301c3a38ec153a72d654aff6ebc8484d49ca0aa13cb32121dec29e"
       },
       {
         "artifact": "packages/app_panel_hub_2026042422_9ec8-0.1.0.zip",
@@ -40,7 +40,7 @@
       {
         "app_id": "app_comm_status_viewer_2026042816_bc6b",
         "name": "app_comm_status_viewer_2026042816_bc6b",
-        "version": "0.2.3",
+        "version": "0.2.4",
         "autostart": false,
         "running": false,
         "parameters": {}
@@ -48,7 +48,7 @@
       {
         "app_id": "app_swarm_controlpad_2026043022_d04b",
         "name": "app_swarm_controlpad_2026043022_d04b",
-        "version": "0.2.2",
+        "version": "0.2.3",
         "autostart": false,
         "running": false,
         "parameters": {}
@@ -56,7 +56,7 @@
       {
         "app_id": "app_swarm_dashboard_2026042621_5e65",
         "name": "app_swarm_dashboard_2026042621_5e65",
-        "version": "0.2.2",
+        "version": "0.2.3",
         "autostart": false,
         "running": false,
         "parameters": {}
