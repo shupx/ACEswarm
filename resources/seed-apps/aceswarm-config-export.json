@@ -7,24 +7,56 @@
     "exported_at": 0,
     "selected": {
       "system_parameters": true,
-      "app_count": 4
+      "app_count": 5
     }
   },
   "aceswarm": {
     "packages": [
-      {"artifact": "packages/app_hello_world_examle_2026040813_429c-1.1.0.tar.gz", "sha256": "6d05132d5ef60032b54174219b5517ca849b2e503f6aad9dba00bcae81bf61ee"},
-      {"artifact": "packages/app_panel_hub_2026042422_9ec8-0.1.0.zip", "sha256": "e4f415b1fad16dd4f12206c010ca3020abb6fd02aaf2faf2c126c746d1944157"},
-      {"artifact": "packages/app_swarm_controlpad_2026043022_d04b-0.1.0.zip", "sha256": "552a6c4bc4c04aaf32ab8bc4197126e1ee7b61b6f025ab3acaa963469a88c6d1"},
-      {"artifact": "packages/app_swarm_dashboard_2026042621_5e65-0.1.0.zip", "sha256": "e118ace92c4cdc5234d622f117e57e80bd9ccedaa8000f7b98db53d9d331caad"}
+      {
+        "artifact": "packages/app_comm_status_viewer_2026042816_bc6b-0.2.2.tar.gz",
+        "sha256": "b634d3983aa551ab4fdbe0c0cff66564759760cd9a2a6a4b0bf8c700fbf3b3d9"
+      },
+      {
+        "artifact": "packages/app_swarm_controlpad_2026043022_d04b-0.2.1.tar.gz",
+        "sha256": "db366f23724531edd72b4877f5b888fa8a2399068c50758d53dfadde1690e641"
+      },
+      {
+        "artifact": "packages/app_swarm_dashboard_2026042621_5e65-0.2.1.tar.gz",
+        "sha256": "7d3381c33ca6c3013f153f26af5fbb1a0aed6a57278952b076691ffbe108d25e"
+      },
+      {
+        "artifact": "packages/app_panel_hub_2026042422_9ec8-0.1.0.zip",
+        "sha256": "b2121cb8ce169f4ca294dea88abfa54d20376161e383c5058b166b3501d5aa5d"
+      },
+      {
+        "artifact": "packages/app_hello_world_examle_2026040813_429c-1.1.0.tar.gz",
+        "sha256": "c68fb63be55de1cfda290f7e59cae6a5bad1d7a9b3fe65dd60d546633f5adf9a"
+      }
     ]
   },
   "payload": {
     "system_parameters": {},
     "apps": [
       {
-        "app_id": "app_hello_world_examle_2026040813_429c",
-        "name": "app_hello_world_examle_2026040813_429c",
-        "version": "1.1.0",
+        "app_id": "app_comm_status_viewer_2026042816_bc6b",
+        "name": "app_comm_status_viewer_2026042816_bc6b",
+        "version": "0.2.2",
+        "autostart": false,
+        "running": false,
+        "parameters": {}
+      },
+      {
+        "app_id": "app_swarm_controlpad_2026043022_d04b",
+        "name": "app_swarm_controlpad_2026043022_d04b",
+        "version": "0.2.1",
+        "autostart": false,
+        "running": false,
+        "parameters": {}
+      },
+      {
+        "app_id": "app_swarm_dashboard_2026042621_5e65",
+        "name": "app_swarm_dashboard_2026042621_5e65",
+        "version": "0.2.1",
         "autostart": false,
         "running": false,
         "parameters": {}
@@ -38,17 +70,9 @@
         "parameters": {}
       },
       {
-        "app_id": "app_swarm_controlpad_2026043022_d04b",
-        "name": "app_swarm_controlpad_2026043022_d04b",
-        "version": "0.1.0",
-        "autostart": false,
-        "running": false,
-        "parameters": {}
-      },
-      {
-        "app_id": "app_swarm_dashboard_2026042621_5e65",
-        "name": "app_swarm_dashboard_2026042621_5e65",
-        "version": "0.1.0",
+        "app_id": "app_hello_world_examle_2026040813_429c",
+        "name": "app_hello_world_examle_2026040813_429c",
+        "version": "1.1.0",
         "autostart": false,
         "running": false,
         "parameters": {}

@@ -87,6 +87,23 @@ AivudaOS restores parameters and autostart
 
 ## Updating bundled applications
 
+The current prepkg set contains Comm Status Viewer 0.2.2, Swarm Controlpad
+0.2.1, Swarm Dashboard 0.2.1, Panel Hub 0.1.0 and Hello World 1.1.0.
+Zenoh is not bundled. Refresh the approved Store archives and their hashes with:
+
+```sh
+python3 scripts/refresh-seed-apps.py --store-url http://127.0.0.1:28791
+```
+
+This command downloads packages during development. First-workspace bootstrap
+publishes the bundled archives to the local Store and installs from that local
+service; these five installation hooks do not fetch external dependencies.
+They use the host shell and AivudaOS app helpers. The three swarm app startup
+scripts require host `python3` and `PyYAML`; ACEswarm's private service runtime
+does not automatically expose its Python modules to app scripts.
+The three swarm panels still require a reachable Zenoh remote API for live data
+and commands; installing their static UI does not supply a Zenoh service.
+
 1. Place approved archives in `resources/seed-apps/packages/`;
 2. read each archive's `manifest.yaml`;
 3. update `payload.apps`;
