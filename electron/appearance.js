@@ -6,7 +6,7 @@ const shellTranslations = {
   'Open page': '打开页面', 'Show desktop': '显示桌面', 'FPS / GPU Overlay': 'FPS / GPU 浮层',
   'Screen Record': '录屏', 'Fullscreen': '全屏', 'Clear Browser Data': '清除浏览器数据', 'Quit ACEswarm': '退出 ACEswarm',
   'Search applications': '搜索应用', 'Search all applications': '搜索所有应用', 'Favorite apps': '收藏应用',
-  'No matching applications': '没有匹配的应用', 'No installed app UIs': '没有已安装的应用界面',
+  'No matching applications': '没有匹配的应用', 'No installed applications': '没有已安装的应用',
   'Close applications': '关闭应用菜单', 'Close': '关闭', 'Open': '打开', 'Address': '地址',
   'Address bar': '地址栏', 'Reload page': '重新加载页面', 'Developer tools': '开发者工具',
   'Window controls': '窗口控制', 'Add to Favorites': '添加到收藏', 'Add to favorites': '添加到收藏',

@@ -22,13 +22,15 @@ async function applicationCatalog(osApi) {
 function applicationEntry(app, gateway) {
   return {
     title: app.name || app.app_id,
-    url: new URL(`/${encodeURIComponent(app.app_id)}/ui/`, gateway).href,
+    url: new URL(app.has_builtin_ui
+      ? `/${encodeURIComponent(app.app_id)}/ui/`
+      : `/dashboard/apps/${encodeURIComponent(app.app_id)}`, gateway).href,
     favicon: new URL(`/aivuda_os/api/apps/${encodeURIComponent(app.app_id)}/icon`, gateway).href,
   };
 }
 
 async function installedApplications(osApi, gateway) {
-  return (await applicationCatalog(osApi)).filter(app => app.has_builtin_ui).map(app => applicationEntry(app, gateway));
+  return (await applicationCatalog(osApi)).map(app => applicationEntry(app, gateway));
 }
 
 async function runningApplications(osApi, gateway) {

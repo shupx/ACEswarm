@@ -398,7 +398,7 @@ function renderApplicationsMenu() {
       if (!row.hidden) count++;
     }
     message.hidden = count > 0;
-    message.textContent = installedApplications.length ? 'No matching applications' : 'No installed app UIs';
+    message.textContent = installedApplications.length ? 'No matching applications' : 'No installed applications';
     list.scrollTop = 0;
   };
   search.oninput = filter; filter();

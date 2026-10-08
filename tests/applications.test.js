@@ -3,7 +3,7 @@ const http = require('node:http');
 const test = require('node:test');
 const { installedApplications, runningApplications, controlApplication } = require('../electron/services/applications');
 
-test('installed UI catalog uses authenticated API and gateway URLs, excluding backend-only apps', async () => {
+test('installed catalog includes UI and backend apps with appropriate gateway URLs', async () => {
   let authorized = false;
   const server = http.createServer((request, response) => {
     response.setHeader('Content-Type', 'application/json');
@@ -22,6 +22,9 @@ test('installed UI catalog uses authenticated API and gateway URLs, excluding ba
     assert.deepEqual(await installedApplications(base, 'http://127.0.0.1:28790'), [{
       title: 'Navigation', url: 'http://127.0.0.1:28790/navigation/ui/',
       favicon: 'http://127.0.0.1:28790/aivuda_os/api/apps/navigation/icon',
+    }, {
+      title: 'backend', url: 'http://127.0.0.1:28790/dashboard/apps/backend',
+      favicon: 'http://127.0.0.1:28790/aivuda_os/api/apps/backend/icon',
     }]);
     assert.equal(authorized, true);
   } finally { await new Promise(resolve => server.close(resolve)); }
