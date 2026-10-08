@@ -8,9 +8,9 @@ import tempfile
 import urllib.request
 
 APPS = [
-    ("app_comm_status_viewer_2026042816_bc6b", "0.2.2"),
-    ("app_swarm_controlpad_2026043022_d04b", "0.2.1"),
-    ("app_swarm_dashboard_2026042621_5e65", "0.2.1"),
+    ("app_comm_status_viewer_2026042816_bc6b", "0.2.3"),
+    ("app_swarm_controlpad_2026043022_d04b", "0.2.2"),
+    ("app_swarm_dashboard_2026042621_5e65", "0.2.2"),
     ("app_panel_hub_2026042422_9ec8", "0.1.0"),
     ("app_hello_world_examle_2026040813_429c", "1.1.0"),
 ]
