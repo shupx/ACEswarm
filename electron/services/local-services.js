@@ -77,6 +77,7 @@ class LocalServices {
       log.end();
       if (!this.stopping) this.failures.push(`${name} exited (${code ?? signal}); see ${path.join(this.paths.logs, `${name}.log`)}`);
     });
+    child.serviceName = name;
     this.children.push(child);
     if (child.pid) this.guardian.stdin.write(`${child.pid}\n`);
     return child;
@@ -220,6 +221,16 @@ class LocalServices {
   async stopChildren() {
     this.stopping = true;
     const children = [...this.children].reverse();
+    // The OS gateway owns detached application sessions. Let its shutdown
+    // hook finish before tearing down the remaining infrastructure.
+    const osChild = children.find(child => child.serviceName === 'aivudaos');
+    if (osChild) {
+      this.signalGroup(osChild, 'SIGTERM');
+      const osDeadline = Date.now() + 12000;
+      while (this.groupAlive(osChild) && Date.now() < osDeadline) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+    }
     for (const child of children) this.signalGroup(child, 'SIGTERM');
     const deadline = Date.now() + 5000;
     while (children.some((child) => this.groupAlive(child)) && Date.now() < deadline) {

@@ -60,7 +60,54 @@ async function run() {
           await page.locator('[data-start-screen-record]').click();
           await page.waitForFunction(() => screenRecordStatus === 'recording', { timeout: 15000 });
         }
+        // Exercise an actual Popen app, including a child that escapes its
+        // parent's session. Service-only cleanup previously missed both.
+        const packageDir = path.join(temp, mode, 'fixture-app');
+        fs.mkdirSync(packageDir, { recursive: true });
+        fs.writeFileSync(path.join(packageDir, 'manifest.yaml'), `app_id: cleanup_fixture
+name: Cleanup fixture
+version: 1.0.0
+run:
+  entrypoint: start.sh
+default_config_path: config.yaml
+config_schema_path: schema.yaml
+`);
+        fs.writeFileSync(path.join(packageDir, 'config.yaml'), '{}\n');
+        fs.writeFileSync(path.join(packageDir, 'schema.yaml'), 'type: object\n');
+        fs.writeFileSync(path.join(packageDir, 'start.sh'), `#!/usr/bin/env bash
+exec python3 -c 'import subprocess,sys,time; subprocess.Popen([sys.executable,"-c","import signal,time; signal.signal(signal.SIGTERM,signal.SIG_IGN); time.sleep(300)"],start_new_session=True); time.sleep(300)'
+`, { mode: 0o755 });
+        const archive = path.join(temp, mode, 'fixture.tar.gz');
+        execFileSync('tar', ['-czf', archive, '-C', packageDir, '.']);
+        const base = `http://127.0.0.1:${gateway}/aivuda_os/api`;
+        const login = await (await fetch(`${base}/auth/login`, { method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: 'admin', password: 'admin123' }) })).json();
+        async function request(route, options = {}) {
+          const response = await fetch(`${base}${route}?token=${encodeURIComponent(login.access_token)}`, options);
+          const result = await response.json();
+          assert.ok(response.ok, JSON.stringify(result));
+          return result;
+        }
+        async function operation(job) {
+          const deadline = Date.now() + 15000;
+          while (Date.now() < deadline) {
+            const result = await request(`/apps/operations/${job.operation_id}`);
+            if (result.done) { assert.equal(result.status, 'completed', JSON.stringify(result)); return; }
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+          assert.fail('Fixture operation timed out');
+        }
+        const form = new FormData();
+        form.append('file', new Blob([fs.readFileSync(archive)], { type: 'application/gzip' }), 'fixture.tar.gz');
+        await operation(await request('/apps/upload', { method: 'POST', body: form }));
+        await operation(await request('/apps/cleanup_fixture/start', { method: 'POST' }));
+        await new Promise(resolve => setTimeout(resolve, 500));
         children = descendants(owner.pid);
+        const fixtureStatus = await request('/apps/cleanup_fixture/status');
+        assert.ok(fixtureStatus.runtime.running, 'Installed Popen fixture is running');
+        assert.ok(children.some(child => child.pid === fixtureStatus.runtime.pid), 'Popen fixture is included in cleanup verification');
+        assert.ok(children.some(child => /SIG_IGN.*time.sleep\(300\)/.test(child.command)), 'Detached stubborn fixture child is running');
         if (mode === 'SIGKILL') assert.ok(children.some((child) => /(?:^|\/)ffmpeg\s/.test(child.command)), 'FFmpeg is running during forced exit');
         const mcps = children.filter((child) => / -m (aivudaos|aivudaappstore)\.mcp_server$/.test(child.command));
         assert.equal(mcps.length, 2, 'Both package MCP servers are running');
