@@ -5,7 +5,12 @@
 Use configured MCP connections and inspect live schemas. Names such as
 `aceswarm-aivudaos`, `aceswarm-aivudaappstore` and `aceswarm-playwright` are client
 conventions. Discover installed apps, active versions, status and URLs. Confirm
-that the connected device is the user's intended installation target.
+that the connected device is the user's intended installation target. With the
+OS forwarding gateway, use `list_devices` and pass the selected `device_id` on
+installation, configuration, runtime verification, login and operation follow-ups.
+Direct device OS MCP connections do not use `device_id`. Remote registration and
+CA configuration are described in
+[device and gateway guidance](../../aceswarm-aivudaos-mcp/references/devices-and-gateway.md).
 
 OS/Store MCP automatically log in. Try tools without tokens first; ask for
 current credentials only if default/configured login is rejected. Explicit tool

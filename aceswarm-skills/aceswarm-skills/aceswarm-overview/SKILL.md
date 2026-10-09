@@ -28,6 +28,9 @@ assume an installed app set, fixed ports or initial window layout.
   history changes and closing are guarded. Do not bypass the guard with scripts.
 - A selected MCP Page need not be the visible desktop window. Closing a UI tab
   does not stop its backend app; opening a remote page does not retarget local OS MCP.
+- The OS forwarding gateway uses `device_id` (default `local`); opening a remote
+  UI does not select the MCP target. Discover devices and explicitly select the
+  requested one. Direct OS MCP has no `device_id`.
 - OS/Store MCP automatically log in. Try tools first; ask for current credentials
   only after default/configured login is rejected. Explicit tokens override the
   automatic identity. Browser login does not authenticate MCP calls.

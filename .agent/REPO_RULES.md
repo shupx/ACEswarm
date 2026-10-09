@@ -5,3 +5,4 @@
 - AivudaOS owns installed-app Caddy imports/reloads; ACEswarm owns the loopback gateway process and its initial config.
 - Release builds ship a private Python executable, wheels/packages, UIs and Caddy. Never install dependencies at user launch.
 - Linux x86_64 is the initial release target. Document runtime changes and validate source and packaged modes.
+- Update aceswarm-skills if necessary, but keep them not complicated.

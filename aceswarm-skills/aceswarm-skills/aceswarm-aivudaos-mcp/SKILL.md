@@ -1,6 +1,6 @@
 ---
 name: aceswarm-aivudaos-mcp
-description: Operate AivudaOS through MCP to install and manage apps, inspect logs, edit configuration, manage system settings, and follow asynchronous operations.
+description: Operate local or remote AivudaOS through MCP to register devices, install and manage apps, inspect logs, edit configuration, manage system settings, and follow asynchronous operations.
 ---
 
 # AivudaOS MCP
@@ -16,6 +16,11 @@ system services/users, sudo, APT sources/backups, Avahi and CA downloads.
 
 ## Essential rules
 
+- ACEswarm's forwarding gateway exposes discovered OS tools with optional
+  `device_id` (default `local`). Use `list_devices` to identify the target; pass
+  its ID consistently for business calls, login and operation follow-ups.
+  Direct device MCP connections do not take `device_id`.
+
 - Built-in OS MCP shares `/aivuda_os/mcp` with the HTTP/HTTPS gateway. Try tools
   without a token first: MCP automatically logs in and refreshes managed tokens.
   Ask for current username/password only after default/configured login is rejected.
@@ -27,6 +32,9 @@ system services/users, sudo, APT sources/backups, Avahi and CA downloads.
   the user's target/scope, and keep credentials out of files/logs.
 
 ## Read when needed
+
+- For gateway connections, remote registration, certificates or device selection,
+  read [devices-and-gateway.md](references/devices-and-gateway.md).
 
 - For login failures, explicit credentials, uploads/downloads or request formats,
   read [authentication-and-files.md](references/authentication-and-files.md).

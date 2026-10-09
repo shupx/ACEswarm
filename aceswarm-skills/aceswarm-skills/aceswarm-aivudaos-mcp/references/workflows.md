@@ -17,7 +17,8 @@ install alone proves an app is running successfully.
 
 ## Asynchronous operations
 
-Capture any returned `operation_id`. Poll `get_operation` or read bounded
+Capture any returned `operation_id` and its target `device_id` when using the
+forwarding gateway. Pass that same device ID on all follow-up calls. Poll `get_operation` or read bounded
 `stream_operation_events` batches until a terminal state. Batches can time out
 and repeat events: deduplicate by `seq` and check status, not just end-of-batch.
 

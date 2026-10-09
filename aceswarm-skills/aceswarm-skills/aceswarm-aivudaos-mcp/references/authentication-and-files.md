@@ -6,6 +6,9 @@
   caches the managed token and refreshes it on expiry before retrying once.
   Ask for current username/password only when that login is rejected; network
   and service failures are not evidence of changed credentials.
+- Through the forwarding gateway, keep `device_id` on login and later calls.
+  HTTP Bearer credentials apply only to `local`; remote API tokens must be tool
+  arguments for that device. Never reuse another device's token.
 - On rejected login, call `login` with `body: {"username": "...", "password": "..."}`;
   pass its `access_token` as tool `token` or MCP HTTP Bearer header and verify `me`.
   Browser login does not authenticate tools. Manual login does not change the
