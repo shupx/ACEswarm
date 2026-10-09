@@ -53,7 +53,10 @@ Remote registrations persist in `state/aivudaos-mcp-devices.json`; credentials
 are not saved. Add/update validates the handshake and tool list before saving.
 Remote addresses must use HTTP(S) without URL credentials, queries or fragments.
 Optional `ca_file` is an absolute PEM CA path on the ACEswarm machine; HTTPS
-certificate and hostname verification remain enabled. `timeout_seconds` defaults
+certificate and hostname verification remain enabled by default. Set `insecure: true`
+on `add_device` / `update_device` to skip both checks for that device, without
+changing Caddy. The setting persists and appears in device status; use
+`insecure: false` to restore verification. `timeout_seconds` defaults
 to 90 (range 1–120), covering bounded operation-event reads.
 
 Remote tools are checked against the selected device's discovered tool list;

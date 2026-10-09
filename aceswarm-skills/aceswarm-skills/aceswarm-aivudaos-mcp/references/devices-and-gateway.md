@@ -21,8 +21,11 @@ timeout or CA; `local` cannot be changed or removed. Registrations survive resta
 in `state/aivudaos-mcp-devices.json`; removing one does not stop remote apps or OS.
 
 Use `ca_file` for an absolute PEM CA path on the ACEswarm host when a remote
-uses a private/self-signed CA. HTTPS certificate and hostname checks remain enabled;
-do not disable TLS verification. Default `timeout_seconds` is 90, range 1–120.
+uses a private/self-signed CA. HTTPS verification is enabled by default. When the
+user requests skipping certificate checks, set `insecure: true` on `add_device`
+or `update_device`. This skips certificate and hostname verification for that
+device and persists across restart; `insecure: false` restores verification.
+No Caddy change is needed. Default `timeout_seconds` is 90, range 1–120.
 URLs accept HTTP(S) without embedded credentials, queries or fragments.
 
 For example, after registration, call

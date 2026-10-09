@@ -59,8 +59,11 @@ test('SDK discovers generated tools, routes local/remote and persists devices wi
     assert.equal((await call('add_device', { device_id: 'robot-a', mcp_url: remote.url })).isError, true);
     assert.ok(!fs.readFileSync(file, 'utf8').includes('remote-token'));
     assert.equal(new Gateway({ localUrl: local.url, registryFile: file }).devices.get('robot-a').mcp_url, remote.url);
-    assert.ok(!(await call('update_device', { device_id: 'robot-a', timeout_seconds: 2 })).isError);
+    assert.ok(!(await call('update_device', { device_id: 'robot-a', timeout_seconds: 2, insecure: true })).isError);
     assert.equal(gateway.devices.get('robot-a').timeout_seconds, 2);
+    assert.equal(new Gateway({ localUrl: local.url, registryFile: file }).devices.get('robot-a').insecure, true);
+    assert.ok(!(await call('update_device', { device_id: 'robot-a', insecure: false })).isError);
+    assert.equal(gateway.devices.get('robot-a').insecure, false);
     assert.ok(!(await call('reconnect_device', { device_id: 'robot-a' })).isError);
     assert.ok(!(await call('remove_device', { device_id: 'robot-a' })).isError);
     assert.equal(JSON.parse(fs.readFileSync(file)).devices.length, 0);
@@ -96,6 +99,8 @@ test('remote failures are identified, writes never retry, and header tokens cann
 });
 
 test('invalid endpoint and timeout settings are rejected', () => {
+  assert.throws(() => settings({ device_id: 'robot', mcp_url: 'https://robot/mcp', insecure: 'true' }));
+  assert.equal(settings({ device_id: 'robot', mcp_url: 'https://robot/mcp' }).insecure, false);
   for (const mcp_url of ['file:///tmp/x', 'https://u:p@robot.local/mcp', 'http://robot/mcp?token=secret']) {
     assert.throws(() => settings({ device_id: 'robot', mcp_url }));
   }
@@ -137,6 +142,9 @@ test('HTTPS preserves certificate validation and supports explicitly trusted CA'
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
     const device = settings({ device_id: 'tls', mcp_url: `https://localhost:${server.address().port}/mcp` });
     await assert.rejects(upstream(device, 'ping'));
+    assert.deepEqual(await upstream({ ...device, insecure: true }, 'ping'), {});
+    assert.deepEqual(await upstream({ ...device, insecure: true, mcp_url: `https://127.0.0.1:${server.address().port}/mcp` }, 'ping'), {});
+    await assert.rejects(upstream({ ...device, insecure: false }, 'ping'));
     assert.deepEqual(await upstream({ ...device, ca_file: cert }, 'ping'), {});
     await assert.rejects(upstream({ ...device, ca_file: cert, mcp_url: `https://127.0.0.1:${server.address().port}/mcp` }, 'ping'));
   } finally { if (server) await close(server); fs.rmSync(directory, { recursive: true, force: true }); }

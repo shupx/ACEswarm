@@ -7,8 +7,8 @@ const VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 const LIMIT = 64 * 1024 * 1024;
 const management = {
   list_devices: {},
-  add_device: { device_id: { type: 'string' }, mcp_url: { type: 'string' }, timeout_seconds: { type: 'number', minimum: 1, maximum: 120 }, ca_file: { type: 'string' } },
-  update_device: { device_id: { type: 'string' }, mcp_url: { type: 'string' }, timeout_seconds: { type: 'number', minimum: 1, maximum: 120 }, ca_file: { type: 'string' } },
+  add_device: { device_id: { type: 'string' }, mcp_url: { type: 'string' }, timeout_seconds: { type: 'number', minimum: 1, maximum: 120 }, ca_file: { type: 'string' }, insecure: { type: 'boolean', default: false, description: 'Skip HTTPS certificate and hostname verification for this device.' } },
+  update_device: { device_id: { type: 'string' }, mcp_url: { type: 'string' }, timeout_seconds: { type: 'number', minimum: 1, maximum: 120 }, ca_file: { type: 'string' }, insecure: { type: 'boolean', default: false, description: 'Skip HTTPS certificate and hostname verification for this device.' } },
   remove_device: { device_id: { type: 'string' } },
   get_device_status: { device_id: { type: 'string' } },
   reconnect_device: { device_id: { type: 'string' } },
@@ -24,7 +24,9 @@ function settings(input) {
   if (typeof timeout !== 'number' || !Number.isFinite(timeout) || timeout < 1 || timeout > 120) throw new Error('timeout_seconds must be between 1 and 120');
   const ca = input.ca_file || '';
   if (typeof ca !== 'string' || (ca && !path.isAbsolute(ca))) throw new Error('ca_file must be an absolute certificate path');
-  return { device_id: input.device_id, mcp_url: url.href, timeout_seconds: timeout, ca_file: ca };
+  const insecure = input.insecure ?? false;
+  if (typeof insecure !== 'boolean') throw new Error('insecure must be a boolean');
+  return { insecure, device_id: input.device_id, mcp_url: url.href, timeout_seconds: timeout, ca_file: ca };
 }
 
 function upstream(device, method, params = {}, authorization = '') {
@@ -40,6 +42,7 @@ function upstream(device, method, params = {}, authorization = '') {
     try {
       request = (url.protocol === 'https:' ? https : http).request(url, {
         method: 'POST', headers,
+        rejectUnauthorized: !device.insecure,
         ...(device.ca_file ? { ca: fs.readFileSync(device.ca_file) } : {}),
       }, response => {
         const chunks = [];
@@ -90,7 +93,7 @@ class Gateway {
     fs.mkdirSync(path.dirname(this.registryFile), { recursive: true });
     const temporary = this.registryFile + '.tmp';
     fs.writeFileSync(temporary, JSON.stringify({ version: 1, devices: [...this.devices.values()]
-      .filter(device => device.device_id !== 'local').map(({ device_id, mcp_url, timeout_seconds, ca_file }) => ({ device_id, mcp_url, timeout_seconds, ca_file })) }, null, 2) + '\n', { mode: 0o600 });
+      .filter(device => device.device_id !== 'local').map(({ device_id, mcp_url, timeout_seconds, ca_file, insecure }) => ({ device_id, mcp_url, timeout_seconds, ca_file, insecure })) }, null, 2) + '\n', { mode: 0o600 });
     fs.renameSync(temporary, this.registryFile);
   }
 
@@ -130,7 +133,7 @@ class Gateway {
 
   info(device) {
     return { device_id: device.device_id, mcp_url: device.mcp_url, timeout_seconds: device.timeout_seconds,
-      ca_file: device.ca_file, status: device.status || 'not_connected', server_info: device.server_info,
+      ca_file: device.ca_file, insecure: device.insecure, status: device.status || 'not_connected', server_info: device.server_info,
       tool_count: device.tools?.length || 0, error: device.error };
   }
 
