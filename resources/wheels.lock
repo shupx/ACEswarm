@@ -11,8 +11,8 @@ bd249d0b3f7972f7432f0a6b6ff3b3ee2d129f70cd1ff6c09a9dd9e29a2b88e3  gunicorn-26.2.
 ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c  idna-3.20-py3-none-any.whl
 fbadb6f8b144a8f8cf9f0b89ba94501d143e50411a1278633f56a7acf7fd5566  jsonschema-4.23.0-py3-none-any.whl
 98802fee3a11ee76ecaca44429fda8a41bff98b00a0f2838151b113f210cc6fe  jsonschema_specifications-2025.9.1-py3-none-any.whl
-346a034f080da3755d8e9cb5e00e8b07de1d39e4f6e2c87d8ab7cafa0b269a73  pydantic-2.13.5-py3-none-any.whl
-49776eab08766a08dfff7012f8b422dcd7e25e43b316eedf0477c24fcfa84b7c  pydantic_core-2.46.5-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+15fab1bea6f1dc5003b54fc2ecab230c1fd1dbade2acd4addc52d81e32416d4b  pydantic-2.14.0-py3-none-any.whl
+ac223ea031905319a64d0df116979ae438b42d6265862a3d63c9f9808c2905a7  pydantic_core-2.50.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
 42269a8a5b3fd54ffa6f3d84b18abed50064717576b4ecf03dc4a55d8aa04fdc  python_dotenv-1.2.4-py3-none-any.whl
 97ca7b8ea7b05f977dc3849c3ba99d51689822fab725c3703af7c866a0c2b215  python_multipart-0.0.9-py3-none-any.whl
 b8bb0864c5a28024fac8a632c443c87c5aa6f215c0b126c449ae1a150412f31d  pyyaml-6.0.3-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
