@@ -184,17 +184,16 @@ to the existing desktop and WebViews and exposes Streamable HTTP on port 28792
 process without an extra browser or Node installation. See
 [mcp-server.md](mcp-server.md) for the connection contract and lifecycle.
 
-After starting the local backends and Gateway, Electron launches two separate
-Streamable HTTP MCP processes with the private Python runtime:
+AivudaOS provides built-in Streamable HTTP at `/aivuda_os/mcp`, forwarded by the
+main Caddy gateway alongside OS APIs. It shares the backend lifecycle and uses
+an in-process ASGI transport to call authenticated API routes. OS defaults to automatic backend login,
+with a cached managed token and request-isolated explicit identities. Electron checks MCP `ping` through the gateway
+and publishes `osMcp`; no separate OS MCP process or listener exists.
 
-- `python -m aivudaos.mcp_server`
-- `python -m aivudaappstore.mcp_server`
-
-These servers expose `/mcp` on loopback ports 28794 and 28795 by default and
-wrap every backend API route with each service's normal authentication. The
-service manager waits for `/health`, logs stdout/stderr, and publishes `osMcp`
-and `storeMcp` in its endpoints. See [mcp-server.md](mcp-server.md) for clients.
-They are tracked by the process guardian and stopped with the other services.
+AppStore retains `python -m aivudaappstore.mcp_server`, exposing `/mcp` on loopback
+28795 by default. The service manager waits for `/health`, logs stdout/stderr,
+and publishes `storeMcp`. Its process is tracked by the guardian. See
+[mcp-server.md](mcp-server.md) for clients and authentication.
 The browser MCP process is tracked by the same guardian; discovery publishes its
 `mcpUrl` alongside the internal CDP connection, after a successful HTTP handshake.
 ACEswarm integrations do not access either service's databases.

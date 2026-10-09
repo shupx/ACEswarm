@@ -16,8 +16,10 @@ system services/users, sudo, APT sources/backups, Avahi and CA downloads.
 
 ## Essential rules
 
-- Try protected tools without a token first: MCP logs in automatically and refreshes
-  temporary tokens. Ask for current username/password only after login is rejected.
+- Built-in OS MCP shares `/aivuda_os/mcp` with the HTTP/HTTPS gateway. Try tools
+  without a token first: MCP automatically logs in and refreshes managed tokens.
+  Ask for current username/password only after default/configured login is rejected.
+  Explicit tokens and manual login never change the shared automatic account.
 - Store publication, device installation and a healthy running process are separate results.
 - Follow returned operation IDs to a terminal state. A completed start job still
   requires checking status/logs; event batch completion does not mean job completion.

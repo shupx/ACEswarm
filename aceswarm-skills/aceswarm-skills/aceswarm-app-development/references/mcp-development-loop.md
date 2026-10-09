@@ -7,10 +7,11 @@ Use configured MCP connections and inspect live schemas. Names such as
 conventions. Discover installed apps, active versions, status and URLs. Confirm
 that the connected device is the user's intended installation target.
 
-Try protected OS/Store tools without tokens first: these MCP servers support
-automatic backend login. Ask for current credentials only if login is rejected;
-network failures are not credential failures. Keep credentials out of packages,
-skill files and logs. Browser login and MCP/backend authentication are separate.
+OS/Store MCP automatically log in. Try tools without tokens first; ask for
+current credentials only if default/configured login is rejected. Explicit tool
+tokens or HTTP credentials override the automatic identity.
+Network failures are not credential failures. Keep credentials out of packages,
+skill files and logs. Browser login does not authenticate MCP tools.
 
 ## Obtain examples without platform sources
 

@@ -28,8 +28,9 @@ assume an installed app set, fixed ports or initial window layout.
   history changes and closing are guarded. Do not bypass the guard with scripts.
 - A selected MCP Page need not be the visible desktop window. Closing a UI tab
   does not stop its backend app; opening a remote page does not retarget local OS MCP.
-- OS/AppStore MCP automatically log in. Ask for current credentials only after
-  login is rejected; browser, backend and MCP endpoint authentication are separate.
+- OS/Store MCP automatically log in. Try tools first; ask for current credentials
+  only after default/configured login is rejected. Explicit tokens override the
+  automatic identity. Browser login does not authenticate MCP calls.
 - Follow the user's target/scope and existing authorization; keep credentials out of files/logs.
 
 ## Read when needed

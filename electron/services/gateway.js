@@ -32,7 +32,7 @@ http://127.0.0.1:${storeGatewayPort} {
 }
 ` : '';
   return `{\n  admin 127.0.0.1:${adminPort}\n}\n(aivudaos_common_route) {
-  @api path /aivuda_os/api*
+  @api path /aivuda_os/api* /aivuda_os/mcp
   route {
     handle @api {
       reverse_proxy 127.0.0.1:${osPort}

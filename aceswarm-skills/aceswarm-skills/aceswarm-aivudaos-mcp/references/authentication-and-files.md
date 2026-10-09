@@ -1,17 +1,20 @@
 # Authentication and request formats
 
-- First call the requested tool without a token: MCP automatically logs in with
-  the default account, caches the temporary token and refreshes it on expiry.
-  Do not ask the user for a token or credentials before trying this flow.
-- Only if automatic login rejects the account, ask for the current username and
-  password. `login` takes `body: {"username": "...", "password": "..."}`;
-  use the returned token and verify with `me`. Login does not change the MCP
-  server's default account; browser login does not authenticate tools.
-- `AIVUDAOS_MCP_USERNAME`/`AIVUDAOS_MCP_PASSWORD` configure the login account.
-  `AIVUDAOS_MCP_TOKEN` or per-call `token` explicitly override automatic login.
-  Network/service errors and permission failures are not evidence of changed credentials.
-- `AIVUDAOS_MCP_ACCESS_TOKEN` protects the MCP endpoint separately via the client's
-  HTTP `Authorization: Bearer ...` header. It is not the backend token.
+- Built-in MCP is `/aivuda_os/mcp` on the same HTTP/HTTPS entry as OS APIs.
+  It has no separate MCP listener.
+- Try tools without a token first: MCP automatically logs in as `admin / admin123`,
+  caches the managed token and refreshes it on expiry before retrying once.
+  Ask for current username/password only when that login is rejected; network
+  and service failures are not evidence of changed credentials.
+- On rejected login, call `login` with `body: {"username": "...", "password": "..."}`;
+  pass its `access_token` as tool `token` or MCP HTTP Bearer header and verify `me`.
+  Browser login does not authenticate tools. Manual login does not change the
+  shared automatic account; explicit tool token overrides HTTP Bearer credentials.
+  Explicit tokens are never silently replaced with default-account credentials.
+- `AIVUDAOS_MCP_USERNAME` / `PASSWORD` configure automatic login;
+  `AIVUDAOS_MCP_TOKEN` overrides it with an explicit API token. `MCP_MAX_BYTES`
+  remains. Old HOST/PORT/BASE_URL/ACCESS_TOKEN settings do not configure the
+  built-in endpoint.
 - JSON payloads use `body`; path/query/form fields use their schema names. Upload
   fields contain `filename`, `content_base64` and optional `content_type`, not a
   server-local file path. Downloads return base64 with metadata; respect the

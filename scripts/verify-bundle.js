@@ -23,10 +23,11 @@ delete environment.PYTHONPATH;
 const importCheck = `import sys, subprocess
 sys.path.insert(0, ${JSON.stringify(packages)})
 import uvicorn, fastapi, yaml, aivudaos.gateway.main, aivudaappstore.backend.app.app, aivudaos, aivudaappstore
-from aivudaos.mcp_server import APIClient as OSClient
+from aivudaos.mcp_server import EmbeddedAPIClient
 from aivudaappstore.mcp_server import APIClient as StoreClient
-for client in (OSClient, StoreClient):
-    assert callable(getattr(client, 'ensure_token', None)), 'Bundled MCP lacks automatic login; rebuild from updated submodules'
+assert any(getattr(route, 'path', '') == '/aivuda_os/mcp' for route in aivudaos.gateway.main.app.routes), 'Bundled OS lacks built-in MCP; rebuild from updated submodules'
+assert callable(getattr(EmbeddedAPIClient, 'websocket_input', None))
+assert callable(getattr(StoreClient, 'ensure_token', None)), 'Bundled Store MCP lacks automatic login'
 from pathlib import Path
 root = Path(${JSON.stringify(packages)}).resolve()
 for module in (aivudaos, aivudaappstore):

@@ -6,11 +6,13 @@ All ACEswarm listeners bind to loopback.
 
 | Service | Connection | Transport | Purpose |
 |---|---|---|---|
-| AivudaOS MCP | `http://127.0.0.1:28794/mcp` | Streamable HTTP | System configuration, app management, logs, operation events and interactive input |
+| AivudaOS MCP | `http://127.0.0.1:28790/aivuda_os/mcp` | Streamable HTTP | System configuration, app management, logs, operation events and interactive input |
 | AppStore MCP | `http://127.0.0.1:28795/mcp` | Streamable HTTP | Store queries, package uploads/downloads, publishing, members and data import/export |
 | Playwright MCP | `http://127.0.0.1:28792/mcp` | Streamable HTTP | Desktop and WebView snapshots, clicks, navigation and tab switching |
 
-All three MCP servers start with ACEswarm and are stopped by its process guardian.
+All three MCP endpoints become available with ACEswarm. OS MCP lives in the OS
+backend; AppStore and Playwright MCP run as managed processes. The process guardian
+stops these services on desktop exit.
 Playwright MCP is included in the AppImage and runs using Electron's Node mode;
 no agent-side Node.js/npm or additional browser installation is required.
 
@@ -22,7 +24,7 @@ Start ACEswarm, then configure the MCP client:
 {
   "mcpServers": {
     "aceswarm-playwright": {"url": "http://127.0.0.1:28792/mcp"},
-    "aceswarm-aivudaos": {"url": "http://127.0.0.1:28794/mcp"},
+    "aceswarm-aivudaos": {"url": "http://127.0.0.1:28790/aivuda_os/mcp"},
     "aceswarm-aivudaappstore": {"url": "http://127.0.0.1:28795/mcp"}
   }
 }
@@ -33,16 +35,17 @@ Playwright MCP attaches automatically, and clients use `28792/mcp` for browser t
 
 ## AivudaOS And AppStore MCP
 
-ACEswarm starts both Python MCP processes after the local APIs and Caddy Gateway
-are ready, and waits for their `/health` endpoints. Each exposes stateless
-Streamable HTTP at `/mcp`. Startup fails if a port is occupied or either server
-cannot become ready. The process guardian stops both servers and releases their
-ports on desktop exit.
+AivudaOS MCP is built into its FastAPI backend at `/aivuda_os/mcp`. Caddy forwards
+it alongside `/aivuda_os/api/*`, on the same gateway origin (28790 by default).
+There is no OS MCP child process, extra listener or `aivudaos-mcp.log`; OS and MCP
+logs belong to `aivudaos.log`. Internal HTTP, event and WebSocket requests use
+ASGI to preserve the existing API routing and authorization without a network
+round trip. Startup checks MCP `ping` through Caddy before publishing `osMcp`.
 
-ACEswarm supplies each server with its Caddy Gateway URL, including the service
-prefix: `/aivuda_os` on port 28790 and `/aivuda_app_store` on port 28791 by default.
-AppStore package redirects therefore reach Caddy's static file server.
-Logs are `aivudaos-mcp.log` and `aivudaappstore-mcp.log` in the workspace logs directory.
+AppStore still uses a separate Python MCP process, with `/mcp` on 28795 and
+`/health` readiness checks. Its API base URL is the Store Caddy entry including
+`/aivuda_app_store`, so package redirects reach Caddy's static file server.
+Its log is `aivudaappstore-mcp.log`; the process guardian stops it on desktop exit.
 
 Tools are generated from backend route definitions, including file endpoints
 and HEAD. OS also exposes interactive WebSocket input and bounded batches of
@@ -56,19 +59,30 @@ return base64 content. Complete tool lists and parameters are documented in:
 
 ### Authentication
 
-Set `AIVUDAOS_MCP_ACCESS_TOKEN` or `AIVUDAAPPSTORE_MCP_ACCESS_TOKEN` to protect
-the corresponding MCP endpoint. Clients then send `Authorization: Bearer <access-token>`
-in their HTTP headers.
+OS MCP automatically logs in with `admin / admin123` when the agent does not
+supply an API token. The managed token is cached in the backend process; concurrent
+calls share a login. On an API 401 it refreshes the managed token and retries once.
+Only a rejected default/configured login asks the agent for current credentials;
+network/service failures do not prompt for a different password.
 
-Backend API credentials are separate. Protected calls automatically log in with
-the default account (`admin / admin123`), cache the temporary token in memory,
-and log in again on token expiry before retrying once. Public Store queries do
-not trigger login. Only a rejected login prompts for the current username/password.
-Set the corresponding `*_MCP_USERNAME` / `*_MCP_PASSWORD` for a changed account,
-or use the login tool and pass its token in subsequent calls. Explicit
-`AIVUDAOS_MCP_TOKEN`, `AIVUDAAPPSTORE_MCP_TOKEN`, or per-call `token` / `authorization`
-override automatic login and are never silently replaced. Login tools return
-credentials without changing the shared server default account.
+Call `login` with a JSON `body` containing username/password when that fallback is
+needed, then pass `access_token` as tool argument `token` or the MCP HTTP header
+`Authorization: Bearer <access_token>`. Explicit tool tokens override the header.
+Explicit tokens are never replaced with default-account credentials. Manual login
+and HTTP Bearer identities do not change the shared automatic login account.
+Origin headers must match the gateway origin.
+
+`AIVUDAOS_MCP_USERNAME` / `AIVUDAOS_MCP_PASSWORD` configure automatic login;
+`AIVUDAOS_MCP_TOKEN` configures an explicit API token. `AIVUDAOS_MCP_MAX_BYTES`
+still sets the size limit (64 MiB). OS no longer uses separate MCP HOST/PORT/
+BASE_URL/ACCESS_TOKEN settings. Change `ACESWARM_GATEWAY_PORT` to change its entry.
+
+AppStore retains its standalone authentication: `AIVUDAAPPSTORE_MCP_ACCESS_TOKEN`
+protects inbound requests, separately from backend API tokens. Protected Store
+calls automatically log in as `admin / admin123`, refresh expired managed tokens,
+and retry once. Set `AIVUDAAPPSTORE_MCP_USERNAME` / `PASSWORD` for another account,
+or supply `AIVUDAAPPSTORE_MCP_TOKEN` / per-call `authorization`. Explicit API tokens
+are never replaced. Public Store queries do not trigger login.
 
 ## Playwright MCP
 
@@ -100,7 +114,7 @@ to control the desktop and access session data, so keep the endpoint local.
 | Setting | Default | Allowed Values |
 |---|---|---|
 | `ACESWARM_MCP_PORT` | 28792 | 1024–65535 |
-| `AIVUDAOS_MCP_PORT` | 28794 | 1024–65535 |
+| `ACESWARM_GATEWAY_PORT` | 28790 | 1024–65535; OS UI/API/MCP share this port |
 | `AIVUDAAPPSTORE_MCP_PORT` | 28795 | 1024–65535 |
 | `ACESWARM_CDP_PORT` | 0 (random) | 0–65535; nonzero selects a specific port |
 
@@ -126,14 +140,20 @@ ACESWARM_CDP_PORT=29793 npm run test:agent
 npm run test:cleanup
 ```
 
-Package `tests/test_mcp_server.py` verifies API coverage, forwarding, HTTP protocol
-handling, authentication, file encoding and limits. `npm run smoke` connects the
-official SDK to both package servers and verifies backend login, published package
-upload/download and two startup/shutdown cycles.
+Package `tests/test_mcp*.py` verifies API coverage, forwarding, HTTP protocol
+handling, ASGI middleware dispatch, authentication isolation, file encoding and limits,
+bounded SSE, WebSocket input and old Caddyfile migration. `test_mcp_gateway.py`
+uses the shipped Caddy template to verify real HTTP and CA-verified HTTPS without
+installing trust into the system. `npm run smoke` connects the official SDK to both
+package MCP endpoints and verifies automatic OS login, explicit login, Bearer authentication,
+identity isolation, app upload/install/start/restart/logs/stop/uninstall, config
+revision conflicts, SSE, Store automatic login and published package downloads,
+across two startup/shutdown cycles. Use `ACESWARM_RESOURCES` with the packaged
+resource layout to run the same smoke checks against bundled Python packages.
 
 Live desktop tests require the development Python environment, built frontends,
 Caddy and a graphical display (or `xvfb-run`). The agent test connects over HTTP
 to bundled Playwright MCP in an isolated workspace/profile, operates the desktop and a WebView, reconnects
-and checks cleanup. `npm run test:cleanup` checks package MCP, Gateway and CDP
+and checks cleanup. `npm run test:cleanup` checks the single Store MCP process, built-in OS MCP, Gateway and CDP
 listeners are released across desktop exit modes. Playwright MCP is a production
 dependency; the client SDK and desktop test Playwright remain development dependencies.

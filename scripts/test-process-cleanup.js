@@ -27,7 +27,6 @@ async function run() {
     for (const mode of ['close', 'system-quit', 'SIGTERM', 'SIGKILL']) {
       const gateway = await freePort();
       const store = await freePort();
-      const osMcp = await freePort();
       const storeMcp = await freePort();
       const browserMcp = await freePort();
       const startupErrorFile = path.join(temp, mode, 'startup-error.txt');
@@ -37,7 +36,7 @@ async function run() {
           ACESWARM_WS_ROOT: path.join(temp, mode, 'workspace'), ACESWARM_GATEWAY_PORT: String(gateway),
           ACESWARM_UI_TEST_STARTUP_ERROR: startupErrorFile,
           ACESWARM_STORE_GATEWAY_PORT: String(store), ACESWARM_CDP_PORT: '0', ACESWARM_PYTHON: path.join(root, '.venv/bin/python'),
-          AIVUDAOS_MCP_PORT: String(osMcp), AIVUDAAPPSTORE_MCP_PORT: String(storeMcp),
+          AIVUDAAPPSTORE_MCP_PORT: String(storeMcp),
           ACESWARM_MCP_PORT: String(browserMcp) },
         timeout: 90000,
       });
@@ -110,11 +109,18 @@ exec python3 -c 'import subprocess,sys,time; subprocess.Popen([sys.executable,"-
         assert.ok(children.some(child => /SIG_IGN.*time.sleep\(300\)/.test(child.command)), 'Detached stubborn fixture child is running');
         if (mode === 'SIGKILL') assert.ok(children.some((child) => /(?:^|\/)ffmpeg\s/.test(child.command)), 'FFmpeg is running during forced exit');
         const mcps = children.filter((child) => / -m (aivudaos|aivudaappstore)\.mcp_server$/.test(child.command));
-        assert.equal(mcps.length, 2, 'Both package MCP servers are running');
+        assert.equal(mcps.length, 1, 'Only AppStore needs a standalone MCP process');
+        assert.ok(/aivudaappstore\.mcp_server$/.test(mcps[0].command));
+        const osPing = await fetch(`http://127.0.0.1:${gateway}/aivuda_os/mcp`, {
+          method: 'POST', headers: { Accept: 'application/json, text/event-stream', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping' }),
+        });
+        assert.equal(osPing.status, 200);
+        assert.deepEqual((await osPing.json()).result, {});
         assert.equal(children.filter(child => /electron\/services\/browser-mcp\.js/.test(child.command)).length, 1,
           'Bundled Playwright HTTP MCP is running');
         assert.equal(discovery.mcpUrl, `http://127.0.0.1:${browserMcp}/mcp`);
-        for (const port of [osMcp, storeMcp]) {
+        for (const port of [storeMcp]) {
           const health = await (await fetch(`http://127.0.0.1:${port}/health`)).json();
           assert.equal(health.transport, 'streamable-http');
         }
@@ -132,7 +138,7 @@ exec python3 -c 'import subprocess,sys,time; subprocess.Popen([sys.executable,"-
         const deadline = Date.now() + 12000;
         while (children.some((child) => running(child.pid)) && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 100));
         assert.deepEqual(children.filter((child) => running(child.pid)), [], `${mode} left running processes`);
-        for (const port of [gateway, store, osMcp, storeMcp, browserMcp]) await assert.rejects(fetch(`http://127.0.0.1:${port}/`, { signal: AbortSignal.timeout(1000) }));
+        for (const port of [gateway, store, storeMcp, browserMcp]) await assert.rejects(fetch(`http://127.0.0.1:${port}/`, { signal: AbortSignal.timeout(1000) }));
         await assert.rejects(fetch(`${discovery.cdpEndpoint}/json/version`, { signal: AbortSignal.timeout(1000) }));
         if (mode !== 'SIGKILL') assert.equal(fs.existsSync(discoveryFile), false);
         console.log(`PASS: ${mode} releases all ${children.length} subprocesses, gateway and CDP ports`);

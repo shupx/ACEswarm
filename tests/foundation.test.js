@@ -38,6 +38,7 @@ test('gateway only binds loopback and preserves import markers', () => {
   assert.match(config, /reverse_proxy 127\.0\.0\.1:12346/);
   assert.match(config, /bind 127\.0\.0\.1/);
   assert.match(config, /BEGIN AIVUDA APP IMPORTS/);
+  assert.match(config, /@api path \/aivuda_os\/api\* \/aivuda_os\/mcp/);
   assert.doesNotMatch(config, /https:|:443|:80\s/);
 });
 test('public store downloads support cross-origin reads and preflight', () => {

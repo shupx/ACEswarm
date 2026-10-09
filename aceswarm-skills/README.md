@@ -35,4 +35,5 @@ Alternatively, place them in `<project>/.agents/skills/` for project-specific us
 
 - Supply credentials (usernames, passwords and tokens) at runtime; do not store them in files or skills.
 - Identify the target instance/device and scope. Follow existing user authorization without requesting repeated confirmation for authorized actions.
+- Built-in OS MCP uses `/aivuda_os/mcp` on the OS web gateway and defaults to automatic backend login with explicit API token overrides. Store MCP retains its standalone endpoint and automatic login.
 - MCP names are client conventions. Discover addresses, tools, apps, versions and pages from the current connections and live state.
