@@ -146,13 +146,20 @@ class LocalServices {
       ...(process.env.AIVUDAAPPSTORE_MCP_TOKEN ? { AIVUDAAPPSTORE_MCP_TOKEN: process.env.AIVUDAAPPSTORE_MCP_TOKEN } : {}),
     });
     await waitFor(`http://127.0.0.1:${storeMcpPort}/health`, storeChild);
-    this.endpoints.osMcp = this.endpoints.os.replace(/\/$/, '') + '/aivuda_os/mcp';
-    const ready = await fetch(this.endpoints.osMcp, {
+    this.endpoints.osDirectMcp = this.endpoints.os.replace(/\/$/, '') + '/aivuda_os/mcp';
+    const ready = await fetch(this.endpoints.osDirectMcp, {
       method: 'POST', signal: AbortSignal.timeout(5000),
       headers: { Accept: 'application/json, text/event-stream', 'Content-Type': 'application/json' },
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping' }),
     });
     if (!ready.ok || !(await ready.json()).result) throw new Error('Built-in AivudaOS MCP is not ready');
+    const osGatewayPort = validateFixedPort(Number(process.env.ACESWARM_AIVUDAOS_MCP_PORT || 28794), 'ACESWARM_AIVUDAOS_MCP_PORT');
+    const gatewayChild = this.launch('aivudaos-mcp-gateway', process.execPath, [
+      path.join(__dirname, 'aivudaos-mcp-gateway.js'), String(osGatewayPort),
+      this.endpoints.osDirectMcp, path.join(this.paths.state, 'aivudaos-mcp-devices.json'),
+    ], { ELECTRON_RUN_AS_NODE: '1' });
+    await waitFor(`http://127.0.0.1:${osGatewayPort}/health`, gatewayChild);
+    this.endpoints.osMcp = `http://127.0.0.1:${osGatewayPort}/mcp`;
     this.endpoints.storeMcp = `http://127.0.0.1:${storeMcpPort}/mcp`;
     console.log(`AivudaOS MCP: ${this.endpoints.osMcp}`);
     console.log(`AivudaAppStore MCP: ${this.endpoints.storeMcp}`);

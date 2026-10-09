@@ -22,6 +22,7 @@ async function run() {
       ACESWARM_UI_TEST_PROFILE: path.join(temporary, 'profile'), ACESWARM_WS_ROOT: path.join(temporary, 'workspace'),
       ACESWARM_GATEWAY_PORT: String(await freePort()), ACESWARM_STORE_GATEWAY_PORT: String(await freePort()),
       ACESWARM_PYTHON: path.join(root, '.venv/bin/python'),
+      ACESWARM_AIVUDAOS_MCP_PORT: String(await freePort()),
       ACESWARM_CADDY: path.join(root, 'resources/app-gateway/caddy'),
     }, stdio: ['ignore', 'pipe', 'pipe'],
   });

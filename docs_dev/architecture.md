@@ -188,7 +188,7 @@ AivudaOS provides built-in Streamable HTTP at `/aivuda_os/mcp`, forwarded by the
 main Caddy gateway alongside OS APIs. It shares the backend lifecycle and uses
 an in-process ASGI transport to call authenticated API routes. OS defaults to automatic backend login,
 with a cached managed token and request-isolated explicit identities. Electron checks MCP `ping` through the gateway
-and publishes `osMcp`; no separate OS MCP process or listener exists.
+and publishes `osDirectMcp`; the OS itself needs no separate MCP process.
 
 AppStore retains `python -m aivudaappstore.mcp_server`, exposing `/mcp` on loopback
 28795 by default. The service manager waits for `/health`, logs stdout/stderr,
@@ -197,3 +197,9 @@ and publishes `storeMcp`. Its process is tracked by the guardian. See
 The browser MCP process is tracked by the same guardian; discovery publishes its
 `mcpUrl` alongside the internal CDP connection, after a successful HTTP handshake.
 ACEswarm integrations do not access either service's databases.
+
+ACEswarm also starts a loopback AivudaOS MCP forwarding gateway on 28794
+(`ACESWARM_AIVUDAOS_MCP_PORT`), exposing auto-discovered OS tools with `device_id`
+and six device-management tools. `osMcp` is this agent entry; `osDirectMcp` is the
+local built-in OS endpoint. Its process and listener are cleaned up by the guardian.
+See [mcp-server.md](mcp-server.md) for remote registration and certificate trust.

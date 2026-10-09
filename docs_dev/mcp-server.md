@@ -6,12 +6,12 @@ All ACEswarm listeners bind to loopback.
 
 | Service | Connection | Transport | Purpose |
 |---|---|---|---|
-| AivudaOS MCP | `http://127.0.0.1:28790/aivuda_os/mcp` | Streamable HTTP | System configuration, app management, logs, operation events and interactive input |
+| AivudaOS MCP Gateway | `http://127.0.0.1:28794/mcp` | Streamable HTTP | System configuration, app management, logs, operation events and interactive input |
 | AppStore MCP | `http://127.0.0.1:28795/mcp` | Streamable HTTP | Store queries, package uploads/downloads, publishing, members and data import/export |
 | Playwright MCP | `http://127.0.0.1:28792/mcp` | Streamable HTTP | Desktop and WebView snapshots, clicks, navigation and tab switching |
 
 All three MCP endpoints become available with ACEswarm. OS MCP lives in the OS
-backend; AppStore and Playwright MCP run as managed processes. The process guardian
+backend, with an ACEswarm forwarding gateway; AppStore and Playwright MCP run as managed processes. The process guardian
 stops these services on desktop exit.
 Playwright MCP is included in the AppImage and runs using Electron's Node mode;
 no agent-side Node.js/npm or additional browser installation is required.
@@ -24,7 +24,7 @@ Start ACEswarm, then configure the MCP client:
 {
   "mcpServers": {
     "aceswarm-playwright": {"url": "http://127.0.0.1:28792/mcp"},
-    "aceswarm-aivudaos": {"url": "http://127.0.0.1:28790/aivuda_os/mcp"},
+    "aceswarm-aivudaos": {"url": "http://127.0.0.1:28794/mcp"},
     "aceswarm-aivudaappstore": {"url": "http://127.0.0.1:28795/mcp"}
   }
 }
@@ -33,6 +33,45 @@ Start ACEswarm, then configure the MCP client:
 Client configuration syntax varies. Internal CDP uses a random port by default;
 Playwright MCP attaches automatically, and clients use `28792/mcp` for browser tools.
 
+## AivudaOS MCP Gateway
+
+Agents connect to `http://127.0.0.1:28794/mcp`, configurable with
+`ACESWARM_AIVUDAOS_MCP_PORT`. ACEswarm starts a managed Electron Node-mode
+`aivudaos-mcp-gateway.js` process, checks `/health`, and logs to
+`aivudaos-mcp-gateway.log`. No agent-side Node installation is needed.
+
+The gateway discovers all tools via `tools/list` from the local built-in OS MCP
+at `http://127.0.0.1:28790/aivuda_os/mcp`, adds optional `device_id` (default
+`local`) to each schema, and forwards the name/arguments without copying business
+logic. It also provides `list_devices`, `add_device`, `update_device`,
+`remove_device`, `get_device_status` and `reconnect_device`.
+
+For example, call `add_device` with `device_id: "robot-a"` and
+`mcp_url: "https://robot-a.local/aivuda_os/mcp"`, then call `start_app` with
+`device_id: "robot-a"` and `app_id`. `local` cannot be edited or removed.
+Remote registrations persist in `state/aivudaos-mcp-devices.json`; credentials
+are not saved. Add/update validates the handshake and tool list before saving.
+Remote addresses must use HTTP(S) without URL credentials, queries or fragments.
+Optional `ca_file` is an absolute PEM CA path on the ACEswarm machine; HTTPS
+certificate and hostname verification remain enabled. `timeout_seconds` defaults
+to 90 (range 1–120), covering bounded operation-event reads.
+
+Remote tools are checked against the selected device's discovered tool list;
+unsupported tools return an error. The published catalog follows the local OS
+version; reconnect refreshes a target's capabilities. Registrations do not change
+the public catalog. Different parameter versions are validated by the target.
+The gateway uses stateless Streamable HTTP requests, supports JSON responses and
+never automatically retries business calls. It targets AivudaOS built-in MCP,
+not arbitrary session/SSE MCP servers. To follow jobs, pass the same `device_id`
+with the returned `operation_id` for events, status, cancellation and input.
+
+Default-account auto-login remains at each target OS. If rejected, call `login`
+on that device and explicitly supply its token on subsequent calls. Gateway HTTP
+Bearer headers apply only to `local`; remote calls with a gateway Bearer header
+require an explicit tool token to prevent cross-device credential forwarding.
+The listener binds loopback and validates Host/Origin. Local processes can use
+its registry and tools. Removing a device never stops the remote OS or its apps.
+
 ## AivudaOS And AppStore MCP
 
 AivudaOS MCP is built into its FastAPI backend at `/aivuda_os/mcp`. Caddy forwards
@@ -40,7 +79,7 @@ it alongside `/aivuda_os/api/*`, on the same gateway origin (28790 by default).
 There is no OS MCP child process, extra listener or `aivudaos-mcp.log`; OS and MCP
 logs belong to `aivudaos.log`. Internal HTTP, event and WebSocket requests use
 ASGI to preserve the existing API routing and authorization without a network
-round trip. Startup checks MCP `ping` through Caddy before publishing `osMcp`.
+round trip. Startup checks MCP `ping` through Caddy before publishing `osDirectMcp`.
 
 AppStore still uses a separate Python MCP process, with `/mcp` on 28795 and
 `/health` readiness checks. Its API base URL is the Store Caddy entry including
@@ -114,6 +153,7 @@ to control the desktop and access session data, so keep the endpoint local.
 | Setting | Default | Allowed Values |
 |---|---|---|
 | `ACESWARM_MCP_PORT` | 28792 | 1024–65535 |
+| `ACESWARM_AIVUDAOS_MCP_PORT` | 28794 | 1024–65535; forwarding gateway |
 | `ACESWARM_GATEWAY_PORT` | 28790 | 1024–65535; OS UI/API/MCP share this port |
 | `AIVUDAAPPSTORE_MCP_PORT` | 28795 | 1024–65535 |
 | `ACESWARM_CDP_PORT` | 0 (random) | 0–65535; nonzero selects a specific port |
@@ -157,3 +197,9 @@ to bundled Playwright MCP in an isolated workspace/profile, operates the desktop
 and checks cleanup. `npm run test:cleanup` checks the single Store MCP process, built-in OS MCP, Gateway and CDP
 listeners are released across desktop exit modes. Playwright MCP is a production
 dependency; the client SDK and desktop test Playwright remain development dependencies.
+
+Gateway tests (`tests/aivudaos-mcp-gateway.test.js`) exercise SDK discovery, local
+and remote routing, registry persistence, capability differences, credential
+isolation, upstream deadlines, non-retry behavior and HTTPS CA/hostname checks.
+The smoke test registers an additional target and calls it through `device_id`;
+the lifecycle test also verifies the gateway process and port across exit modes.

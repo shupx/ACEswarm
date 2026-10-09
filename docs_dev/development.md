@@ -195,3 +195,9 @@ Console and AppStore Admin default to Follow System for both settings. Their ups
 ACEswarm adapts the browser environment: Electron nativeTheme.themeSource supplies the desktop theme to hosted pages. For local built-in pages, the guest preload sets navigator.language/languages and adapts the standard dark/light matchMedia queries before page scripts run, avoiding inconsistent Electron guest theme reports. Updates dispatch standard languagechange and MediaQueryList change events. No upstream package depends on ACEswarm names, storage keys, IPC or custom events for appearance. Individual page overrides still take precedence. Rebuild both submodule frontends and the AppImage to ship changes.
 
 Address bar, Reload, Window controls and Developer tools remain in window menus; they are no longer duplicated in System.
+
+ACEswarm also starts a loopback AivudaOS MCP forwarding gateway on 28794
+(`ACESWARM_AIVUDAOS_MCP_PORT`), exposing auto-discovered OS tools with `device_id`
+and six device-management tools. `osMcp` is this agent entry; `osDirectMcp` is the
+local built-in OS endpoint. Its process and listener are cleaned up by the guardian.
+See [mcp-server.md](mcp-server.md) for remote registration and certificate trust.

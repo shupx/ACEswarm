@@ -83,7 +83,7 @@ config_schema_path: schema.yaml
 
 async function smokePackageMcps(endpoints) {
   for (const [name, url, expected, loginTool, loginArguments, tokenKey, meTool] of [
-    ['os', endpoints.osMcp, 47, 'login', { body: { username: 'admin', password: 'admin123' } }, 'access_token', 'me'],
+    ['os', endpoints.osMcp, 53, 'login', { body: { username: 'admin', password: 'admin123' } }, 'access_token', 'me'],
     ['store', endpoints.storeMcp, 33, 'dev_login', { username: 'admin', password: 'admin123' }, 'access_token', 'dev_me'],
   ]) {
     const accessToken = name === 'store' ? process.env.AIVUDAAPPSTORE_MCP_ACCESS_TOKEN : undefined;
@@ -109,7 +109,9 @@ async function smokePackageMcps(endpoints) {
       const me = await client.callTool({ name: meTool, arguments: authorization });
       assert.ok(!me.isError, me.content?.[0]?.text);
       if (name === 'os') {
-        assert.equal(url, new URL('aivuda_os/mcp', endpoints.os).href, 'OS MCP shares gateway origin');
+        assert.equal(endpoints.osDirectMcp, new URL('aivuda_os/mcp', endpoints.os).href);
+        const devices = await client.callTool({ name: 'list_devices', arguments: {} });
+        assert.equal(JSON.parse(devices.content[0].text).devices[0].device_id, 'local');
         const installed = await client.callTool({ name: 'list_installed_apps', arguments: authorization });
         assert.ok(!installed.isError, installed.content?.[0]?.text);
         const headerClient = new Client({ name: 'aceswarm-os-bearer-smoke', version: '1.0' });
@@ -124,6 +126,18 @@ async function smokePackageMcps(endpoints) {
         const defaultIdentity = await client.callTool({ name: 'me', arguments: {} });
         assert.ok(!defaultIdentity.isError, defaultIdentity.content?.[0]?.text);
         assert.equal(JSON.parse(defaultIdentity.content[0].text).username, 'admin');
+        const registered = await client.callTool({ name: 'add_device', arguments: {
+          device_id: 'smoke-remote', mcp_url: endpoints.osDirectMcp,
+        } });
+        assert.ok(!registered.isError, registered.content?.[0]?.text);
+        try {
+          const remoteIdentity = await client.callTool({ name: 'me', arguments: { device_id: 'smoke-remote' } });
+          assert.ok(!remoteIdentity.isError, remoteIdentity.content?.[0]?.text);
+          assert.equal(JSON.parse(remoteIdentity.content[0].text).username, 'admin');
+        } finally {
+          const removed = await client.callTool({ name: 'remove_device', arguments: { device_id: 'smoke-remote' } });
+          assert.ok(!removed.isError, removed.content?.[0]?.text);
+        }
         await smokeOsLifecycle(client, token);
       } else {
         const index = await client.callTool({ name: 'store_index', arguments: {} });

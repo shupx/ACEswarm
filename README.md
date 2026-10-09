@@ -1,6 +1,6 @@
 # ACEswarm
 
-ACEswarm is a ground-station workbench for **A**gentic and **C**ontinuous **E**volution of distributed robot swarms. 
+ACEswarm is a ground-station workbench for **A**gent-driven **C**ontinuous **E**volution of distributed robot swarms. 
 It provides a local application gateway, a local AppStore, and a runtime environment for bundled applications, suitable for both development and deployment. 
 
 ![img](misc/img1.png)
@@ -94,7 +94,7 @@ Start ACEswarm, then configure your agent to connect to its three Streamable HTT
 {
   "mcpServers": {
     "aceswarm-playwright": {"url": "http://127.0.0.1:28792/mcp"},
-    "aceswarm-aivudaos": {"url": "http://127.0.0.1:28790/aivuda_os/mcp"},
+    "aceswarm-aivudaos": {"url": "http://127.0.0.1:28794/mcp"},
     "aceswarm-aivudaappstore": {"url": "http://127.0.0.1:28795/mcp"}
   }
 }
@@ -107,7 +107,7 @@ or add in `.codex/config.toml`:
 url = "http://127.0.0.1:28792/mcp"
 
 [mcp_servers.aceswarm-aivudaos]
-url = "http://127.0.0.1:28790/aivuda_os/mcp"
+url = "http://127.0.0.1:28794/mcp"
 
 [mcp_servers.aceswarm-aivudaappstore]
 url = "http://127.0.0.1:28795/mcp"
