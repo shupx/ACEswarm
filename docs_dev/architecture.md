@@ -85,6 +85,8 @@ Each window's tab row contains one set of outer window controls. Each Dockview
 group retains a menu for address bar, pinning, page zoom, reload and developer
 tools. Zoom retains Chromium's shared browser
 session behavior. Main-process input handlers preserve shortcuts even in guests.
+The outer window's top-right Reload button refreshes that window's selected tab,
+including when the window was previously inactive.
 Applications are identified by their launch URL (ignoring the fragment), separately
 from a tab's current navigation URL. Applications menus and desktop shortcuts
 open apps as tabs in the current window. Favorite
@@ -122,6 +124,23 @@ canvas, and feeds `canvas.captureStream()` to `MediaRecorder` (VP8 preferred).
 It avoids `desktopCapturer` and desktop `getUserMedia`, whose driver capture path
 can crash on NVIDIA/X11. Frames are captured sequentially at up to 20 FPS, with
 fixed output dimensions and explicit timer/track cleanup. Native needs no FFmpeg.
+
+## Browser downloads
+
+`electron/services/downloads.js` listens to Electron `will-download`, `updated`
+and `done` events once per desktop/guest session. It tracks downloads owned by
+the workbench, including HTTP attachments and blob exports, preserves the native
+save-location dialog, throttles progress messages to 200 ms and updates the OS
+taskbar progress indicator. Only the desktop can read or manage records through
+IPC; file actions resolve a completed download ID to its recorded save path.
+
+`electron/downloads.js` displays the taskbar Downloads panel, automatically opens
+it on new downloads and completion/failure, and provides progress, cancellation,
+open-file and show-in-folder actions. Unknown totals use an indeterminate bar.
+The panel updates existing rows and stops rendering when hidden. History keeps
+up to 50 records in this application session, retaining all active downloads;
+clearing history removes finished records without deleting files. Labels follow
+desktop language and theme; filenames and paths are never translated.
 
 ## ACEswarm layout
 

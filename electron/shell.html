@@ -28,6 +28,7 @@
       <nav id="dock" class="dock" aria-label="Window taskbar"></nav>
       <span id="window-count">Desktop</span>
       <div class="desktop-actions">
+        <button id="downloads-button" class="icon-button" title="Downloads" aria-label="Downloads" aria-expanded="false" aria-controls="downloads-panel"><i data-lucide="download"></i><span id="downloads-count" hidden></span></button>
         <div id="background-apps" aria-label="Running applications" hidden>
           <button id="background-apps-toggle" class="icon-button" title="More running applications" aria-label="More running applications" aria-expanded="false" aria-controls="background-apps-overflow" hidden><i data-lucide="chevron-up"></i></button>
           <div id="background-apps-visible"></div>
@@ -39,6 +40,13 @@
       </div>
     </header>
     <section id="desktop-shortcuts" class="desktop-shortcuts" aria-label="Desktop applications"></section>
+    <section id="downloads-panel" aria-labelledby="downloads-title" hidden>
+      <div class="dialog-heading"><h2 id="downloads-title">Downloads</h2><button id="downloads-close" class="icon-button" title="Close" aria-label="Close"><i data-lucide="x"></i></button></div>
+      <p id="downloads-empty">No downloads yet</p>
+      <div id="downloads-list"></div>
+      <p id="downloads-notice" role="status" aria-live="polite" data-download-user-text></p>
+      <button id="downloads-clear">Clear finished downloads</button>
+    </section>
     <dialog id="application-launcher" aria-labelledby="launcher-title">
       <div class="dialog-heading"><h2 id="launcher-title">Applications</h2><button id="close-application-launcher" class="icon-button" title="Close" aria-label="Close applications"><i data-lucide="x"></i></button></div>
       <input id="launcher-search" type="search" placeholder="Search applications" aria-label="Search all applications" />
@@ -104,5 +112,6 @@
   <script src="./shell.js"></script>
   <script src="./background-apps.js"></script>
   <script src="./appearance.js"></script>
+  <script src="./downloads.js"></script>
 </body>
 </html>

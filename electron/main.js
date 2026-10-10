@@ -15,6 +15,7 @@ const browserPortCheck = primaryInstance ? checkBrowserPort(browserConfiguration
 const { provisionOnce, prepareBootstrap } = require('./services/seed');
 const { installedApplications, runningApplications, controlApplication } = require('./services/applications');
 const recording = require('./services/recording')(() => window, (failure) => sendToShell('aivuda-shell:recording-error', failure), (child) => services?.trackRecording(child));
+const downloads = require('./services/downloads')({ getWindow: () => window, onChange: value => sendToShell('aivuda-shell:downloads', value) });
 
 let services;
 let agentConnection;
@@ -201,6 +202,7 @@ function createWindow() {
   window.webContents.on('did-attach-webview', (_, contents) => {
     contents.on('before-input-event', handleDesktopShortcut);
     installCertificateValidationBypass(contents.session);
+    downloads.attach(contents.session);
     contents.on('will-navigate', (event, url) => { if (!allowedUrl(url)) event.preventDefault(); });
     contents.session.setPermissionRequestHandler((_, __, callback) => callback(false));
     contents.setWindowOpenHandler(({ url }) => {
@@ -324,6 +326,23 @@ app.whenReady().then(async () => {
       if (event.sender === window?.webContents && typeof url === 'string') routePagePopup(url);
     });
     ipcMain.handle('aivuda-shell:get-gpu-status', () => app.getGPUFeatureStatus());
+    ipcMain.handle('aivuda-shell:get-downloads', event => {
+      if (event.sender !== window?.webContents) throw new Error('Only the desktop can read downloads.');
+      return downloads.snapshot();
+    });
+    ipcMain.handle('aivuda-shell:download-action', async (event, id, action) => {
+      if (event.sender !== window?.webContents) return { ok: false, error: 'Only the desktop can manage downloads.' };
+      if (action === 'cancel') return downloads.cancel(id);
+      if (action === 'clear') return downloads.clearFinished();
+      const target = downloads.completedPath(id);
+      if (!target) return { ok: false, error: 'Download has not completed.' };
+      if (action === 'show') { shell.showItemInFolder(target); return { ok: true }; }
+      if (action === 'open') {
+        const error = await shell.openPath(target);
+        return error ? { ok: false, error } : { ok: true };
+      }
+      return { ok: false, error: 'Unknown download action.' };
+    });
     ipcMain.handle('aivuda-shell:save-shell-state', (_, state) => { try { saveShellState(state); return { ok: true }; } catch (error) { return { ok: false, error: error.message }; } });
     ipcMain.handle('aivuda-shell:clear-browser-data', async () => {
       await session.fromPartition('persist:aivuda-shell').clearStorageData();
@@ -356,6 +375,8 @@ app.whenReady().then(async () => {
       try { return await recording[method](); } catch (error) { return { ok: false, error: error.message }; }
     });
     createWindow();
+    downloads.attach(window.webContents.session);
+    downloads.attach(session.fromPartition('persist:aivuda-shell'));
     agentConnection = await startAgentConnection({ configuration: browserConfiguration, stateDirectory: paths.state, services });
     provisionOnce({ stateDirectory: paths.state, existingOsWorkspace, osUrl: endpoints.osApi, storeUrl: endpoints.store, storeApiUrl: endpoints.storeApi, configPath: path.join(app.isPackaged ? process.resourcesPath : path.resolve(__dirname, '..', 'resources'), 'seed-apps', 'aceswarm-config-export.json') })
       .then((result) => console.log(result.skipped ? `ACEswarm seed provisioning skipped: ${result.reason}` : 'ACEswarm seed provisioning completed'))

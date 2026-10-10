@@ -31,6 +31,7 @@ function createApplicationWindow(options = {}) {
   const controls = document.createElement('div'); controls.className = 'window-controls';
   const buttons = [
     ['plus', 'Open tab', () => showOpenPageDialog(owner.id), 'optional'],
+    ['rotate-cw', 'Reload page', () => reloadActiveTab()],
     ['minus', 'Minimize window', () => minimizeOuterWindow(owner), 'optional'],
     ['maximize-2', 'Maximize or restore window', () => toggleOuterWindowMaximized(owner), 'optional'],
     ['x', 'Close window', () => closeOuterWindow(owner)],

@@ -14,6 +14,7 @@ Use these documents to understand the system and its runtime behavior:
 
 - [Design philosophy](philosophy.md)
 - [Architecture and project layout](architecture.md)
+- [Browser download progress and history](architecture.md#browser-downloads)
 - [Runtime and workspace](runtime.md)
 - [Ports and local listeners](ports.md)
 - [MCP services and client connections](mcp-server.md)

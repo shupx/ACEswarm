@@ -16,6 +16,11 @@ const shellTranslations = {
   'Reset zoom': '重置缩放', 'Page zoom': '页面缩放', 'Left half': '左半屏', 'Right half': '右半屏',
   'Top half': '上半屏', 'Bottom half': '下半屏', 'Maximize window': '最大化窗口', 'Back': '后退', 'Forward': '前进',
   'Ready': '就绪', 'Hide address bar': '隐藏地址栏', 'Page address': '页面地址', 'Window taskbar': '窗口任务栏',
+  'Downloads': '下载', 'Download': '下载文件', 'No downloads yet': '暂无下载',
+  'Downloading': '正在下载', 'Completed': '已完成', 'Cancelled': '已取消', 'Paused': '已暂停',
+  'Download complete': '下载完成', 'Download failed': '下载失败', 'Download progress': '下载进度',
+  'Open file': '打开文件', 'Show in folder': '在文件夹中显示', 'Cancel download': '取消下载',
+  'Clear finished downloads': '清除已结束的下载记录', 'Download action failed': '下载操作失败',
 };
 const englishByChinese = Object.fromEntries(Object.entries(shellTranslations).map(([english, chinese]) => [chinese, english]));
 let shellAppearance = { theme: 'system', language: 'system', resolvedTheme: 'light', resolvedLanguage: 'en-US' };
@@ -28,12 +33,13 @@ function translateShell() {
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   while (walker.nextNode()) {
     const node = walker.currentNode;
-    if (node.parentElement.closest('script, style, [data-app-url], .dv-tab, .window-task')) continue;
+    if (node.parentElement.closest('script, style, [data-app-url], .dv-tab, .window-task, [data-download-user-text]')) continue;
     const text = node.textContent.trim();
     const next = translate(text);
     if (text !== next) node.textContent = node.textContent.replace(text, next);
   }
   for (const node of document.querySelectorAll('[title], [aria-label], [placeholder]')) {
+    if (node.closest('[data-download-user-text]')) continue;
     for (const attribute of ['title', 'aria-label', 'placeholder']) {
       const value = node.getAttribute(attribute);
       if (value && translate(value) !== value) node.setAttribute(attribute, translate(value));

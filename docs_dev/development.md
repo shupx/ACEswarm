@@ -140,6 +140,7 @@ npm test
 npm run check
 npm run bundle:verify
 npm run smoke
+npm run test:downloads
 ```
 
 The desktop integration test launches the actual Electron main process and local
@@ -166,6 +167,13 @@ ACESWARM_TEST_WINDOW_MANAGER=/usr/bin/openbox xvfb-run -a npm run test:desktop
 ```
 
 Screenshots and sample recordings are written to `.smoke/desktop/`.
+`npm run test:downloads` launches the real desktop in an isolated workspace and
+browser profile. It checks HTTP progress/completion, blob exports, cancellation,
+unknown totals, interrupted transfers, recorded file actions, language/theme and
+per-window Reload targeting. Linux requires X11 (use `xvfb-run -a npm run
+test:downloads` when headless), the development Python environment and Caddy.
+Downloads and file-action stubs stay in the temporary workspace; screenshots
+are written to `.smoke/downloads/`.
 Native is tested with desktop `getUserMedia` disabled, including three consecutive
 start/pause/resume/stop cycles. It records the application's content area as WebM
 through Electron frame capture and browser MediaRecorder, without OS title bars.
@@ -195,6 +203,9 @@ Console and AppStore Admin default to Follow System for both settings. Their ups
 ACEswarm adapts the browser environment: Electron nativeTheme.themeSource supplies the desktop theme to hosted pages. For local built-in pages, the guest preload sets navigator.language/languages and adapts the standard dark/light matchMedia queries before page scripts run, avoiding inconsistent Electron guest theme reports. Updates dispatch standard languagechange and MediaQueryList change events. No upstream package depends on ACEswarm names, storage keys, IPC or custom events for appearance. Individual page overrides still take precedence. Rebuild both submodule frontends and the AppImage to ship changes.
 
 Address bar, Reload, Window controls and Developer tools remain in window menus; they are no longer duplicated in System.
+Reload is also available directly in each outer window's top-right controls.
+The taskbar Downloads button opens the shared progress/history panel for browser
+downloads from all guest pages.
 
 ACEswarm also starts a loopback AivudaOS MCP forwarding gateway on 28794
 (`ACESWARM_AIVUDAOS_MCP_PORT`), exposing auto-discovered OS tools with `device_id`
