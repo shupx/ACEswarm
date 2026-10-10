@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('aivudaShell', {
   onHideBrowserChrome: (cb) => on('aivuda-shell:hide-browser-chrome', cb), onHidePerformanceOverlay: (cb) => on('aivuda-shell:hide-performance-overlay', cb),
   onNewTab: (cb) => on('aivuda-shell:new-tab', cb, true), onOpenUrlInNewTab: (cb) => on('aivuda-shell:open-url-in-new-tab', cb, true),
   onReloadCurrentTab: (cb) => on('aivuda-shell:reload-current-tab', cb), onResetZoom: (cb) => on('aivuda-shell:reset-zoom', cb),
+  onFindInPage: (cb) => on('aivuda-shell:find-in-page', cb),
   onShowPerformanceOverlay: (cb) => on('aivuda-shell:show-performance-overlay', cb), onShowBrowserChrome: (cb) => on('aivuda-shell:show-browser-chrome', cb),
   onToggleScreenRecordBar: (cb) => on('aivuda-shell:toggle-screen-record-bar', cb), onToggleBrowserChrome: (cb) => on('aivuda-shell:toggle-browser-chrome', cb),
   onToggleDevtools: (cb) => on('aivuda-shell:toggle-devtools', cb), onTogglePerformanceOverlay: (cb) => on('aivuda-shell:toggle-performance-overlay', cb),

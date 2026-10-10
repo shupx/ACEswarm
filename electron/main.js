@@ -88,7 +88,7 @@ function handleDesktopShortcut(event, input) {
   if (key === 'q' && !input.shift) { event.preventDefault(); app.quit(); return; }
   const commands = input.shift ? {
     i: 'toggle-devtools', p: 'toggle-performance-overlay', r: 'toggle-screen-record-bar', backspace: 'clear-browser-data',
-  } : { t: 'new-tab', w: 'close-current-tab', r: 'reload-current-tab', l: 'toggle-browser-chrome', '0': 'reset-zoom', '-': 'zoom-out' };
+  } : { t: 'new-tab', w: 'close-current-tab', r: 'reload-current-tab', f: 'find-in-page', l: 'toggle-browser-chrome', '0': 'reset-zoom', '-': 'zoom-out' };
   const command = key === '+' || key === '=' ? 'zoom-in' : commands[key];
   if (command) {
     event.preventDefault();

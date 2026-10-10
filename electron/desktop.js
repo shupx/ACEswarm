@@ -266,6 +266,81 @@ function toggleActiveDevtools() {
   if (tab) tab.webview.isDevToolsOpened() ? tab.webview.closeDevTools() : tab.webview.openDevTools();
 }
 
+function openPageFind(tab = getActiveTab()) {
+  if (!tab) return;
+  if (!tab.find) {
+    const bar = document.createElement('div');
+    bar.className = 'page-find';
+    bar.setAttribute('role', 'search');
+    bar.setAttribute('aria-label', 'Find in page');
+    bar.innerHTML = `<input type="search" aria-label="Find in page" placeholder="Find in page" autocomplete="off" spellcheck="false" />
+      <span class="page-find-count" role="status" aria-live="polite"></span>
+      <button class="icon-button page-find-previous" title="Previous match" aria-label="Previous match" disabled><i data-lucide="chevron-up"></i></button>
+      <button class="icon-button page-find-next" title="Next match" aria-label="Next match" disabled><i data-lucide="chevron-down"></i></button>
+      <button class="icon-button page-find-close" title="Close search" aria-label="Close search"><i data-lucide="x"></i></button>`;
+    const find = tab.find = {
+      bar, input: bar.querySelector('input'), count: bar.querySelector('.page-find-count'),
+      previous: bar.querySelector('.page-find-previous'), next: bar.querySelector('.page-find-next'), requestId: null,
+    };
+    bar.addEventListener('pointerdown', () => { if (activeTabId !== tab.id) activateTab(tab.id); });
+    find.input.addEventListener('input', () => searchPage(tab));
+    bar.addEventListener('keydown', event => {
+      if (event.key === 'Escape') {
+        event.preventDefault(); event.stopPropagation(); closePageFind(tab);
+      } else if (event.key === 'Enter') {
+        event.preventDefault(); searchPage(tab, true, !event.shiftKey);
+      }
+    });
+    find.previous.onclick = () => searchPage(tab, true, false);
+    find.next.onclick = () => searchPage(tab, true, true);
+    bar.querySelector('.page-find-close').onclick = () => closePageFind(tab);
+    tab.webview.addEventListener('found-in-page', event => {
+      const result = event.result;
+      if (bar.hidden || result.requestId !== find.requestId || !result.finalUpdate) return;
+      find.count.textContent = result.matches ? `${result.activeMatchOrdinal} / ${result.matches}` : 'No matches';
+      find.previous.disabled = find.next.disabled = !result.matches;
+    });
+    tab.webview.addEventListener('did-start-loading', () => resetPageFind(tab));
+    tab.webview.addEventListener('dom-ready', () => { if (!bar.hidden) searchPage(tab); });
+    tab.body.prepend(bar);
+    refreshDesktopIcons();
+  }
+  tab.find.bar.hidden = false;
+  tab.find.input.focus();
+  tab.find.input.select();
+  searchPage(tab);
+}
+
+function resetPageFind(tab) {
+  const find = tab.find;
+  if (!find) return;
+  find.requestId = null;
+  find.count.textContent = '';
+  find.previous.disabled = find.next.disabled = true;
+}
+
+function searchPage(tab, continueSearch = false, forward = true) {
+  const find = tab.find;
+  if (!find || find.bar.hidden) return;
+  resetPageFind(tab);
+  if (!tab.ready) return;
+  if (!find.input.value) {
+    tab.webview.stopFindInPage('clearSelection');
+    return;
+  }
+  if (!continueSearch) tab.webview.stopFindInPage('clearSelection');
+  // Electron uses findNext=true to begin a session, false to continue it.
+  find.requestId = tab.webview.findInPage(find.input.value, { findNext: !continueSearch, forward });
+}
+
+function closePageFind(tab) {
+  if (!tab?.find) return;
+  tab.find.bar.hidden = true;
+  resetPageFind(tab);
+  if (tab.ready) tab.webview.stopFindInPage('clearSelection');
+  tab.webview.focus();
+}
+
 function toggleActiveAddressBar() {
   const tab = getActiveTab();
   if (!tab) { showOpenPageDialog(); return; }
@@ -328,7 +403,7 @@ document.getElementById("window-zoom-reset").onclick = () => { resetActiveTabZoo
 for (const region of ['left', 'right', 'top', 'bottom', 'full']) {
   document.getElementById('workspace-' + region).onclick = () => { setWindowMenuOpen(false); setWorkspaceRegion(region); };
 }
-for (const [id, action] of [["window-reload", () => reloadActiveTab()], ["window-address", toggleActiveAddressBar], ["window-devtools", toggleActiveDevtools],
+for (const [id, action] of [["window-reload", () => reloadActiveTab()], ["window-find", openPageFind], ["window-address", toggleActiveAddressBar], ["window-devtools", toggleActiveDevtools],
   ["window-pin", tab => pinApplication({ url: tab.appUrl, title: tab.title, favicon: tab.favicon })], ["window-float", tab => floatOrDockPanel(tab)],
   ["window-max", togglePanelMaximized], ["window-min", tab => minimizeApplicationWindow(tab)], ["window-close", tab => closeOuterWindow(getApplicationWindow(tab))]]) {
   document.getElementById(id).onclick = () => { const tab = tabs.get(document.getElementById('window-menu').dataset.windowId); setWindowMenuOpen(false); if (tab) action(tab); };

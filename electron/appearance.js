@@ -9,6 +9,8 @@ const shellTranslations = {
   'No matching applications': '没有匹配的应用', 'No installed applications': '没有已安装的应用',
   'Close applications': '关闭应用菜单', 'Close': '关闭', 'Open': '打开', 'Address': '地址',
   'Address bar': '地址栏', 'Reload page': '重新加载页面', 'Developer tools': '开发者工具',
+  'Find in page': '页面搜索', 'Previous match': '上一个匹配', 'Next match': '下一个匹配',
+  'Close search': '关闭搜索', 'No matches': '没有匹配结果',
   'Window controls': '窗口控制', 'Add to Favorites': '添加到收藏', 'Add to favorites': '添加到收藏',
   'Remove from Favorites': '取消收藏', 'Remove from favorites': '取消收藏', 'Move tab to window': '移动标签页到窗口',
   'Restore floating window': '恢复浮动窗口', 'Maximize or restore': '最大化或恢复', 'Minimize': '最小化',

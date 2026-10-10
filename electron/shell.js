@@ -1743,6 +1743,7 @@ window.aivudaShell.onCloseCurrentTab(() => {
   }
 });
 window.aivudaShell.onReloadCurrentTab(reloadActiveTab);
+window.aivudaShell.onFindInPage(() => { setWindowMenuOpen(false); openPageFind(); });
 window.aivudaShell.onResetZoom(resetActiveTabZoom);
 window.aivudaShell.onShowBrowserChrome(() => {
   if (!getActiveTab()) { showOpenPageDialog(); return; }
