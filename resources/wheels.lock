@@ -7,7 +7,7 @@ c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309  attrs-26.1.0-p
 6d1e703698443ccb89e50abe4893f3c84d9d6689c0cf1ca4fad6d3c15cf69f15  fastapi-0.124.4-py3-none-any.whl
 bd249d0b3f7972f7432f0a6b6ff3b3ee2d129f70cd1ff6c09a9dd9e29a2b88e3  gunicorn-26.2.0-py3-none-any.whl
 63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86  h11-0.16.0-py3-none-any.whl
-57278e6fa0424c42a8a3e454828ab4f0aff27b40cddf9679579b98c6dce6a376  httptools-0.8.0-cp311-cp311-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl
+b68fb053b37c258a473ab67f4965c3b439500dc160fe364667035a6833eaf50a  httptools-0.9.0-cp311-cp311-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl
 ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c  idna-3.20-py3-none-any.whl
 fbadb6f8b144a8f8cf9f0b89ba94501d143e50411a1278633f56a7acf7fd5566  jsonschema-4.23.0-py3-none-any.whl
 98802fee3a11ee76ecaca44429fda8a41bff98b00a0f2838151b113f210cc6fe  jsonschema_specifications-2025.9.1-py3-none-any.whl
