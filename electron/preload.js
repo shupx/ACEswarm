@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('aivudaShell', {
   routePagePopup: (url) => ipcRenderer.invoke('aivuda-shell:route-page-popup', url),
   getStartup: () => ipcRenderer.invoke('aivuda-shell:get-startup'), getGpuStatus: () => ipcRenderer.invoke('aivuda-shell:get-gpu-status'),
   clearBrowserData: () => ipcRenderer.invoke('aivuda-shell:clear-browser-data'), saveShellState: (state) => ipcRenderer.invoke('aivuda-shell:save-shell-state', state),
+  clearPageCache: (id) => ipcRenderer.invoke('aivuda-shell:clear-page-cache', id),
   openPath: (p) => ipcRenderer.invoke('aivuda-shell:open-path', p), showItemInFolder: (p) => ipcRenderer.invoke('aivuda-shell:show-item-in-folder', p),
   prepareWindowRecording: () => ipcRenderer.invoke('aivuda-shell:prepare-window-recording'), saveRecordingFile: (p) => ipcRenderer.invoke('aivuda-shell:save-recording-file', p),
   captureRecordingFrame: () => ipcRenderer.invoke('aivuda-shell:capture-recording-frame'),

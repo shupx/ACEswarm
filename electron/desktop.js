@@ -403,7 +403,7 @@ document.getElementById("window-zoom-reset").onclick = () => { resetActiveTabZoo
 for (const region of ['left', 'right', 'top', 'bottom', 'full']) {
   document.getElementById('workspace-' + region).onclick = () => { setWindowMenuOpen(false); setWorkspaceRegion(region); };
 }
-for (const [id, action] of [["window-reload", () => reloadActiveTab()], ["window-find", openPageFind], ["window-address", toggleActiveAddressBar], ["window-devtools", toggleActiveDevtools],
+for (const [id, action] of [["window-reload", () => reloadActiveTab()], ["window-clear-cache", tab => clearTabCache(tab)], ["window-find", openPageFind], ["window-address", toggleActiveAddressBar], ["window-devtools", toggleActiveDevtools],
   ["window-pin", tab => pinApplication({ url: tab.appUrl, title: tab.title, favicon: tab.favicon })], ["window-float", tab => floatOrDockPanel(tab)],
   ["window-max", togglePanelMaximized], ["window-min", tab => minimizeApplicationWindow(tab)], ["window-close", tab => closeOuterWindow(getApplicationWindow(tab))]]) {
   document.getElementById(id).onclick = () => { const tab = tabs.get(document.getElementById('window-menu').dataset.windowId); setWindowMenuOpen(false); if (tab) action(tab); };

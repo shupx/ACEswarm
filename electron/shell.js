@@ -1609,6 +1609,16 @@ function reloadActiveTab() {
   }
 }
 
+async function clearTabCache(tab) {
+  if (!tab) return;
+  try {
+    const result = await window.aivudaShell.clearPageCache(tab.webview.getWebContentsId());
+    if (!result.ok) throw new Error(result.error);
+  } catch (error) {
+    setStatus(error.message);
+  }
+}
+
 async function navigateActiveTab(rawUrl) {
   const tab = getActiveTab();
   if (!tab) {

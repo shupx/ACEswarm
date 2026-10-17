@@ -2,6 +2,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { app, BrowserWindow, ipcMain, Menu, session, shell, screen, nativeTheme, webContents } = require('electron');
 const { normalizePreferences, resolveAppearance } = require('./services/appearance');
+const { clearPageCache } = require('./services/page-cache');
 if (process.platform === 'linux') app.commandLine.appendSwitch('disable-accelerated-video-encode');
 const { workspace } = require('./services/workspace');
 const { resolveRuntime } = require('./services/runtime');
@@ -344,6 +345,12 @@ app.whenReady().then(async () => {
       return { ok: false, error: 'Unknown download action.' };
     });
     ipcMain.handle('aivuda-shell:save-shell-state', (_, state) => { try { saveShellState(state); return { ok: true }; } catch (error) { return { ok: false, error: error.message }; } });
+    ipcMain.handle('aivuda-shell:clear-page-cache', async (event, id) => {
+      try {
+        return await clearPageCache({ sender: event.sender, desktop: window?.webContents,
+          target: Number.isInteger(id) ? webContents.fromId(id) : null });
+      } catch (error) { return { ok: false, error: error.message }; }
+    });
     ipcMain.handle('aivuda-shell:clear-browser-data', async () => {
       await session.fromPartition('persist:aivuda-shell').clearStorageData();
       await session.fromPartition('persist:aivuda-shell').clearCache();

@@ -167,6 +167,15 @@ ACESWARM_TEST_WINDOW_MANAGER=/usr/bin/openbox xvfb-run -a npm run test:desktop
 ```
 
 Screenshots and sample recordings are written to `.smoke/desktop/`.
+`npm run test:page-cache` launches an isolated desktop and exercises the page's
+**Clear page cache and reload** menu repeatedly. It verifies Cache Storage removal,
+preserved login/local storage, released pointer blocking, guest mouse clicks and
+keyboard input, working System menus, and no renderer initialization errors.
+It requires the development frontends, Python environment, Caddy and X11.
+Desktop handlers for functions declared in the later `shell.js` script must defer
+lookup until invoked; an eager reference can abort initialization and leave the
+`interacting` class blocking guest input.
+
 `npm run test:downloads` launches the real desktop in an isolated workspace and
 browser profile. It checks HTTP progress/completion, blob exports, cancellation,
 unknown totals, interrupted transfers, recorded file actions, language/theme and
