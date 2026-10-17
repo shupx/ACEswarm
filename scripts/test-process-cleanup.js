@@ -1,3 +1,4 @@
+const { desktopWindow } = require('./desktop-window');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -44,7 +45,7 @@ async function run() {
       const owner = application.process();
       let children = [];
       try {
-        const page = await application.firstWindow().catch(error => {
+        const page = await desktopWindow(application).catch(error => {
           if (fs.existsSync(startupErrorFile)) throw new Error(fs.readFileSync(startupErrorFile, 'utf8'));
           throw error;
         });

@@ -1,0 +1,19 @@
+:root { color-scheme: light; font-family: system-ui, sans-serif; color: #183d35; background: #f2f7f4; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { padding: 30px 34px 22px; -webkit-app-region: drag; }
+.brand { display: flex; align-items: center; gap: 16px; font-size: 25px; font-weight: 650; letter-spacing: -.8px; }
+.brand img { border-radius: 18px; }
+h1 { margin: 26px 0 8px; font-size: 22px; font-weight: 550; letter-spacing: -.4px; }
+.subtitle { margin: 0; color: #63786f; font-size: 13px; }
+.progress { margin-top: 27px; height: 3px; background: #dce7df; border-radius: 4px; overflow: hidden; }
+.progress span { display: block; width: 36%; height: 100%; background: #287960; border-radius: inherit; animation: loading 1.6s ease-in-out infinite; }
+#status { margin: 12px 0 0; font-size: 12px; color: #46685a; }
+footer { display: flex; align-items: center; justify-content: space-between; margin-top: 22px; color: #7b8b83; font-size: 11px; }
+button { -webkit-app-region: no-drag; border: 1px solid #d1ded6; border-radius: 5px; padding: 5px 12px; color: #46685a; background: transparent; font: inherit; cursor: pointer; }
+button:hover, button:focus-visible { background: #e0eae3; color: #183d35; }
+pre { -webkit-app-region: no-drag; white-space: pre-wrap; overflow-wrap: anywhere; overflow-y: auto; max-height: 100px; margin: 16px 0 0; font: 11px/1.5 system-ui, sans-serif; color: #9c3e32; user-select: text; }
+body.failed .progress span { animation: none; width: 100%; background: #b85b49; }
+body.failed h1 { color: #9c3e32; }
+@keyframes loading { from { transform: translateX(-110%); } to { transform: translateX(390%); } }
+@media (prefers-reduced-motion: reduce) { .progress span { animation: none; width: 100%; opacity: .65; } }

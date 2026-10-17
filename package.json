@@ -13,6 +13,7 @@
     "test:desktop": "node scripts/test-desktop-ui.js",
     "test:page-find": "node scripts/test-page-find.js",
     "test:page-cache": "node scripts/test-page-cache.js",
+    "test:startup": "node scripts/test-startup.js",
     "test:background-apps": "node scripts/test-background-apps.js",
     "test:downloads": "node scripts/test-downloads.js",
     "test:cleanup": "node scripts/test-process-cleanup.js",

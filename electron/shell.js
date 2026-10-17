@@ -1869,4 +1869,5 @@ window.aivudaShell.getStartup().then(startup => {
   }
   syncWindowToolbar(); updateAddressFromActiveTab(); updateNavigationState();
   renderDesktop(); renderScreenRecordBar(); layoutApplicationWindows(); finishShellStateRestore();
+  window.aivudaShell.desktopReady();
 });

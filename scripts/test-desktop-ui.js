@@ -1,3 +1,4 @@
+const { desktopWindow } = require('./desktop-window');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -48,7 +49,7 @@ async function launch(expectedWindow) {
     },
     timeout: 90000,
   });
-  const page = await application.firstWindow({ timeout: 90000 });
+  const page = await desktopWindow(application);
   if (expectedWindow) {
     const restored = await application.evaluate(({ BrowserWindow }) => {
       const window = BrowserWindow.getAllWindows()[0];

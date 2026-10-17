@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const { app, BrowserWindow, ipcMain, Menu, session, shell, screen, nativeTheme, webContents } = require('electron');
 const { normalizePreferences, resolveAppearance } = require('./services/appearance');
 const { clearPageCache } = require('./services/page-cache');
+const { createSplash } = require('./services/splash');
 if (process.platform === 'linux') app.commandLine.appendSwitch('disable-accelerated-video-encode');
 const { workspace } = require('./services/workspace');
 const { resolveRuntime } = require('./services/runtime');
@@ -21,6 +22,7 @@ const downloads = require('./services/downloads')({ getWindow: () => window, onC
 let services;
 let agentConnection;
 let window;
+let splash;
 let endpoints;
 const remoteOrigins = new Set();
 const certificateBypassSessions = new WeakSet();
@@ -141,10 +143,43 @@ function createWindow() {
   window = new BrowserWindow({
     width: restoreSize(savedWindow.width, 1280, 850, workArea.width),
     height: restoreSize(savedWindow.height, 820, 550, workArea.height),
-    minWidth: 850, minHeight: 550,
+    minWidth: 850, minHeight: 550, show: false,
     title: 'ACEswarm', backgroundColor: '#101828',
     icon: path.join(__dirname, 'assets', 'aivuda_icon.png'),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), webviewTag: true, contextIsolation: true, nodeIntegration: false, sandbox: true },
+  });
+  // Both the first paint and asynchronous desktop restoration must complete.
+  let painted = false;
+  let initialized = false;
+  let cleanupReady;
+  const ready = new Promise((resolve, reject) => {
+    const check = () => { if (painted && initialized) resolve(); };
+    const onPaint = () => { painted = true; check(); };
+    const onReady = event => {
+      if (event.sender !== window.webContents) return;
+      initialized = true; check();
+    };
+    const onFailure = (_event, code, description, _url, mainFrame) => {
+      if (mainFrame && code !== -3) reject(new Error(`Desktop failed to load: ${description}`));
+    };
+    const onCrash = (_event, details) => reject(new Error(`Desktop renderer stopped: ${details.reason}`));
+    const onClosed = () => reject(new Error('Desktop window closed during startup.'));
+    const timer = setTimeout(() => reject(new Error('The desktop did not become ready within 30 seconds.')), 30000);
+    ipcMain.on('aivuda-shell:desktop-ready', onReady);
+    window.once('ready-to-show', onPaint);
+    window.once('closed', onClosed);
+    window.webContents.on('did-fail-load', onFailure);
+    window.webContents.on('render-process-gone', onCrash);
+    cleanupReady = () => {
+      clearTimeout(timer);
+      ipcMain.removeListener('aivuda-shell:desktop-ready', onReady);
+      window.removeListener('ready-to-show', onPaint);
+      window.removeListener('closed', onClosed);
+      if (!window.isDestroyed()) {
+        window.webContents.removeListener('did-fail-load', onFailure);
+        window.webContents.removeListener('render-process-gone', onCrash);
+      }
+    };
   });
   const saveWindowSize = () => {
     if (window.isDestroyed() || window.isFullScreen()) return;
@@ -154,9 +189,9 @@ function createWindow() {
       fs.writeFileSync(windowStatePath, JSON.stringify({ width, height, maximized: window.isMaximized() }));
     } catch (error) { console.error('ACEswarm window size:', error.message); }
   };
-  if (savedWindow.maximized === true) window.maximize();
+  if (savedWindow.maximized === true) window.once('show', () => window.maximize());
   for (const event of ['resize', 'maximize', 'unmaximize', 'close']) window.on(event, saveWindowSize);
-  window.loadFile(path.join(__dirname, 'shell.html'));
+  window.loadFile(path.join(__dirname, 'shell.html')).catch(error => console.error('Desktop load:', error));
   window.setMenuBarVisibility(false);
   window.webContents.on('before-input-event', handleDesktopShortcut);
   // Protect ordinary renderer navigation; MCP navigation is guarded by its init-page hook.
@@ -211,6 +246,7 @@ function createWindow() {
       return { action: 'deny' };
     });
   });
+  return ready.finally(() => cleanupReady());
 }
 
 function routePagePopup(url) {
@@ -246,6 +282,9 @@ process.on('SIGINT', handleTerminationSignal);
 app.whenReady().then(async () => {
   if (!primaryInstance) return;
   try {
+    splash = createSplash();
+    await splash.ready;
+    if (quitting) return;
     const portError = await browserPortCheck;
     if (portError) throw portError;
     installCertificateValidationBypass(session.defaultSession);
@@ -255,7 +294,8 @@ app.whenReady().then(async () => {
     prepareBootstrap({ stateDirectory: paths.state, existingOsWorkspace });
     const runtime = resolveRuntime({ packaged: app.isPackaged, resourcesPath: process.resourcesPath, sourceRoot: path.resolve(__dirname, '..') });
     services = new LocalServices(paths, runtime);
-    endpoints = await services.start();
+    endpoints = await services.start(message => splash.status(message));
+    if (quitting) return;
     shellStatePath = path.join(app.getPath('userData'), 'shell-state.json');
     readShellState();
     appearancePath = path.join(app.getPath('userData'), 'appearance.json');
@@ -275,7 +315,9 @@ app.whenReady().then(async () => {
       broadcastAppearance();
       return currentAppearance();
     });
+    splash.status('Connecting local services...');
     await services.startPackageMcps();
+    if (quitting) return;
     createApplicationMenu();
     ipcMain.on('aivuda-shell:get-default-appstore-url', (event) => {
       let storeUrl = null;
@@ -381,23 +423,39 @@ app.whenReady().then(async () => {
       if (event.sender !== window?.webContents) return { ok: false, error: 'Only the desktop can record.' };
       try { return await recording[method](); } catch (error) { return { ok: false, error: error.message }; }
     });
-    createWindow();
+    splash.status('Loading your desktop...');
+    const desktopReady = createWindow();
     downloads.attach(window.webContents.session);
     downloads.attach(session.fromPartition('persist:aivuda-shell'));
-    agentConnection = await startAgentConnection({ configuration: browserConfiguration, stateDirectory: paths.state, services });
+    await Promise.all([
+      desktopReady,
+      startAgentConnection({ configuration: browserConfiguration, stateDirectory: paths.state, services })
+        .then(connection => { agentConnection = connection; }),
+    ]);
+    if (quitting) return;
+    window.show();
+    splash.close();
     provisionOnce({ stateDirectory: paths.state, existingOsWorkspace, osUrl: endpoints.osApi, storeUrl: endpoints.store, storeApiUrl: endpoints.storeApi, configPath: path.join(app.isPackaged ? process.resourcesPath : path.resolve(__dirname, '..', 'resources'), 'seed-apps', 'aceswarm-config-export.json') })
       .then((result) => console.log(result.skipped ? `ACEswarm seed provisioning skipped: ${result.reason}` : 'ACEswarm seed provisioning completed'))
       .catch((error) => { services.failures.push(`Seed provisioning: ${error.message}`); console.error(error); });
   } catch (error) {
+    const showStartupError = !quitting && splash && !splash.window.isDestroyed();
+    if (showStartupError) {
+      splash.status('Startup failed.', `${error.message}\n\nLogs: ${paths?.logs || 'not initialized'}`);
+      if (window && !window.isDestroyed()) window.destroy();
+    }
     await agentConnection?.stop();
     await services?.stop();
+    if (quitting) return;
     console.error('ACEswarm startup failed:', error);
+    if (showStartupError) return;
     require('electron').dialog.showErrorBox('ACEswarm startup failed', `${error.message}\n\nLogs: ${paths?.logs || 'not initialized'}`);
     app.quit();
   }
 });
 app.on('before-quit', (event) => {
-  if (quitting || !services) return;
+  if (quitting) return;
+  if (!services) { quitting = true; return; }
   event.preventDefault();
   quitting = true;
   shutdown().finally(() => app.quit());

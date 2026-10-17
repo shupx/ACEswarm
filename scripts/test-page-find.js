@@ -1,3 +1,4 @@
+const { desktopWindow } = require('./desktop-window');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -39,7 +40,7 @@ async function run() {
       ACESWARM_CADDY: path.join(root, 'resources/app-gateway/caddy'),
     }, timeout: 90000,
   });
-  const page = await application.firstWindow({ timeout: 90000 });
+  const page = await desktopWindow(application);
   page.on('pageerror', error => errors.push(error.message));
   await page.waitForFunction(() => typeof isRestoringShellState !== 'undefined' && !isRestoringShellState);
   await page.evaluate(async url => { await window.aivudaShell.authorizeUrl(url); createTab(url); }, `http://127.0.0.1:${server.address().port}/`);

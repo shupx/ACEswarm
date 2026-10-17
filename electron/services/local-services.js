@@ -83,7 +83,8 @@ class LocalServices {
     return child;
   }
 
-  async start() {
+  async start(onStatus = () => {}) {
+    onStatus('Starting local services...');
     const gatewayPort = validateFixedPort(GATEWAY_PORT, 'ACESWARM_GATEWAY_PORT');
     const storeGatewayPort = validateFixedPort(STORE_GATEWAY_PORT, 'ACESWARM_STORE_GATEWAY_PORT');
     const [osPort, storePort, adminPort] = await Promise.all([
@@ -98,18 +99,21 @@ class LocalServices {
     const common = this.runtime.packaged ? {} : {
       PYTHONPATH: this.runtime.pythonPath,
     };
+    onStatus('Starting AivudaOS...');
     const osChild = this.launch('aivudaos', this.runtime.python,
       pythonModuleArgs(this.runtime, 'uvicorn', ['aivudaos.gateway.main:app', '--host', '127.0.0.1', '--port', String(osPort)]), {
         ...common, ...caddyEnvironment, AIVUDAOS_EMBEDDED_MODE: '1', AIVUDAOS_WS_ROOT: this.paths.os,
         AIVUDAOS_PACKAGE_ROOT: path.join(this.runtime.osRoot, 'aivudaos', 'resources'),
       });
     await waitFor(`http://127.0.0.1:${osPort}/openapi.json`, osChild);
+    onStatus('Starting AppStore...');
     const storeChild = this.launch('aivudaappstore', this.runtime.python,
       pythonModuleArgs(this.runtime, 'uvicorn', ['aivudaappstore.backend.app.app:app', '--host', '127.0.0.1', '--port', String(storePort)]), {
         ...common, AIVUDAAPPSTORE_WS_ROOT: this.paths.store,
         AIVUDAAPPSTORE_PACKAGE_ROOT: path.join(this.runtime.storeRoot, 'aivudaappstore', 'resources'),
       });
     await waitFor(`http://127.0.0.1:${storePort}/openapi.json`, storeChild);
+    onStatus('Connecting applications...');
     const gatewayChild = this.launch('gateway', gateway.binary, ['run', '--config', gateway.config], caddyEnvironment);
     await waitFor(`http://127.0.0.1:${gatewayPort}/`, gatewayChild);
     await waitFor(`http://127.0.0.1:${storeGatewayPort}/aivuda_app_store/store/index`, gatewayChild);

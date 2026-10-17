@@ -1,3 +1,4 @@
+const { desktopWindow } = require('./desktop-window');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -35,13 +36,15 @@ async function run() {
       ACESWARM_UI_TEST_STARTUP_ERROR: startupError, ACESWARM_UI_TEST_FAIL_ON_ERROR: '1',
       ACESWARM_UI_TEST_PROFILE: path.join(temp, 'profile'), ACESWARM_WS_ROOT: path.join(temp, 'workspace'),
       ACESWARM_GATEWAY_PORT: String(await gatewayPort()), ACESWARM_STORE_GATEWAY_PORT: String(await gatewayPort()),
+      ACESWARM_MCP_PORT: String(await gatewayPort()), ACESWARM_AIVUDAOS_MCP_PORT: String(await gatewayPort()),
+      AIVUDAAPPSTORE_MCP_PORT: String(await gatewayPort()),
       ACESWARM_CDP_PORT: '0', ACESWARM_PYTHON: path.join(root, '.venv/bin/python'),
       ACESWARM_CADDY: path.join(root, 'resources/app-gateway/caddy'),
     }, timeout: 90000,
   });
   application.process().stderr.on('data', chunk => { startupLog += chunk; });
   application.process().stdout.on('data', chunk => { startupLog += chunk; });
-  const page = await application.firstWindow({ timeout: 90000 });
+  const page = await desktopWindow(application);
   page.setDefaultTimeout(15000);
   page.on('pageerror', error => errors.push(error.message));
   await page.waitForFunction(() => typeof isRestoringShellState !== 'undefined' && !isRestoringShellState);

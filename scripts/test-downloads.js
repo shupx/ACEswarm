@@ -1,3 +1,4 @@
+const { desktopWindow } = require('./desktop-window');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const http = require('node:http');
@@ -61,7 +62,7 @@ async function run() {
     application.process().kill('SIGKILL');
   }, 90000);
   console.log('Electron launched for download checks.');
-  const page = await application.firstWindow({ timeout: 90000 });
+  const page = await desktopWindow(application);
   page.setDefaultTimeout(15000);
   page.on('pageerror', error => errors.push(error.message));
   await page.waitForFunction(() => typeof isRestoringShellState !== 'undefined' && !isRestoringShellState);
