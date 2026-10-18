@@ -60,6 +60,31 @@ async function run() {
   await desktop.waitForFunction(() => typeof isRestoringShellState !== 'undefined' && !isRestoringShellState);
   await desktop.locator('#tools-button').click();
   assert.equal(await desktop.locator('#tools-menu').isVisible(), true);
+  await application.evaluate(() => { globalThis.quitConfirmationResponse = 0; });
+  for (const trigger of ['window', 'menu', 'shortcut']) {
+    const before = await application.evaluate(() => globalThis.quitConfirmationCalls.length);
+    if (trigger === 'window') await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].close());
+    else if (trigger === 'menu') await desktop.locator('#system-quit').click();
+    else await application.evaluate(({ BrowserWindow }) => {
+      const contents = BrowserWindow.getAllWindows()[0].webContents;
+      contents.sendInputEvent({ type: 'keyDown', keyCode: 'Q', modifiers: ['control'] });
+      contents.sendInputEvent({ type: 'keyUp', keyCode: 'Q', modifiers: ['control'] });
+    });
+    const deadline = Date.now() + 5000;
+    while (await application.evaluate(() => globalThis.quitConfirmationCalls.length) === before) {
+      assert.ok(Date.now() < deadline, `${trigger} must request quit confirmation`);
+      await new Promise(resolve => setTimeout(resolve, 25));
+    }
+    const options = await application.evaluate(() => globalThis.quitConfirmationCalls.at(-1));
+    assert.deepEqual(options.buttons, ['Cancel', 'Quit']);
+    assert.equal(options.defaultId, 0);
+    assert.equal(options.cancelId, 0);
+    await desktop.locator('#tools-button').click();
+    await desktop.locator('#tools-button').click();
+    assert.equal(await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible()), true);
+  }
+  await application.evaluate(() => { globalThis.quitConfirmationResponse = 1; });
+  console.log('PASS: window close, System Quit and Ctrl+Q request confirmation; Cancel keeps the desktop usable.');
   assert.deepEqual(errors, []);
   await application.close();
   application = null;

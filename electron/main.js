@@ -28,6 +28,34 @@ const remoteOrigins = new Set();
 const certificateBypassSessions = new WeakSet();
 let paths;
 let quitting = false;
+let confirmingQuit = false;
+
+async function requestQuit() {
+  if (quitting || confirmingQuit) return;
+  confirmingQuit = true;
+  try {
+    const parent = window && !window.isDestroyed() && window.isVisible() ? window : splash?.window;
+    const options = {
+      type: 'question', title: 'Quit ACEswarm?',
+      message: 'Are you sure you want to quit ACEswarm?',
+      detail: 'Local services and running applications will stop.',
+      buttons: ['Cancel', 'Quit'], defaultId: 0, cancelId: 0, noLink: true,
+    };
+    const dialog = require('electron').dialog;
+    const { response } = await (parent && !parent.isDestroyed()
+      ? dialog.showMessageBox(parent, options) : dialog.showMessageBox(options));
+    if (response !== 1 || quitting) return;
+    if (window && !window.isDestroyed() && window.isVisible()) {
+      const result = await window.webContents.executeJavaScript('window.__aivudaFinalizeActiveRecordingBeforeClose?.()');
+      if (result?.ok === false) throw new Error(result.error || 'Could not save recording.');
+    }
+    quitting = true;
+    await shutdown();
+    app.quit();
+  } catch (error) {
+    require('electron').dialog.showErrorBox('Unable to quit ACEswarm', error.message);
+  } finally { confirmingQuit = false; }
+}
 
 let shellStatePath;
 let shellState;
@@ -203,21 +231,10 @@ function createWindow() {
   };
   window.webContents.on('will-navigate', blockShellNavigation);
   window.webContents.on('will-redirect', blockShellNavigation);
-  let finalizingClose = false;
   window.on('close', (event) => {
     if (quitting) return;
     event.preventDefault();
-    if (finalizingClose) return;
-    finalizingClose = true;
-    window.webContents.executeJavaScript('window.__aivudaFinalizeActiveRecordingBeforeClose?.()')
-      .then((result) => {
-        if (result?.ok === false) throw new Error(result.error || 'Could not save recording.');
-        app.quit();
-      })
-      .catch((error) => {
-        finalizingClose = false;
-        require('electron').dialog.showErrorBox('Recording save failed', error.message);
-      });
+    void requestQuit();
   });
   window.webContents.once('did-finish-load', () => {
     console.log('ACEswarm workbench ready');
@@ -283,6 +300,11 @@ app.whenReady().then(async () => {
   if (!primaryInstance) return;
   try {
     splash = createSplash();
+    splash.window.on('close', event => {
+      if (quitting) return;
+      event.preventDefault();
+      void requestQuit();
+    });
     await splash.ready;
     if (quitting) return;
     const portError = await browserPortCheck;
@@ -454,10 +476,8 @@ app.whenReady().then(async () => {
   }
 });
 app.on('before-quit', (event) => {
-  if (quitting) return;
-  if (!services) { quitting = true; return; }
+  if (quitting || !primaryInstance) return;
   event.preventDefault();
-  quitting = true;
-  shutdown().finally(() => app.quit());
+  void requestQuit();
 });
 app.on('window-all-closed', () => app.quit());

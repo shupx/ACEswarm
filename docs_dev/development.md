@@ -221,3 +221,11 @@ ACEswarm also starts a loopback AivudaOS MCP forwarding gateway on 28794
 and six device-management tools. `osMcp` is this agent entry; `osDirectMcp` is the
 local built-in OS endpoint. Its process and listener are cleaned up by the guardian.
 See [mcp-server.md](mcp-server.md) for remote registration and certificate trust.
+
+## Quit confirmation
+
+Window close, **System → Quit ACEswarm**, Ctrl+Q and the startup window's **Quit**
+button display an English confirmation with **Cancel** selected by default.
+Cancelling leaves the desktop and services running; confirming saves an active
+recording before shutting down services. SIGTERM/SIGINT stop unattended processes
+without a dialog. `npm run test:startup` covers confirmation and cancellation.
